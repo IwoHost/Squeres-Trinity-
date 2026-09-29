@@ -1,0 +1,303 @@
+// Core helpers: random numbers, teams, math and the square renderer.
+(function () {
+  const SQ = (window.SQ = window.SQ || {});
+
+  // The video frame is portrait 1080x1920, like a reel or a short.
+  SQ.W = 1080;
+  SQ.H = 1920;
+  // The arena is a 1000x1000 world drawn at this spot on the canvas.
+  SQ.ARENA = { x: 40, y: 430, size: 1000 };
+  SQ.WORLD = 1000;
+  SQ.modes = {};
+
+  function mulberry32(a) {
+    return function () {
+      a |= 0;
+      a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  SQ.makeRng = function (seed) {
+    const r = mulberry32(seed >>> 0);
+    r.range = (a, b) => a + r() * (b - a);
+    r.int = (a, b) => Math.floor(a + r() * (b - a + 1));
+    r.pick = (arr) => arr[Math.floor(r() * arr.length)];
+    r.chance = (p) => r() < p;
+    r.sign = () => (r() < 0.5 ? -1 : 1);
+    r.shuffle = (arr) => {
+      const a = arr.slice();
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(r() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    };
+    return r;
+  };
+
+  SQ.randomSeed = () => (Math.random() * 1e9) | 0;
+
+  SQ.TEAMS = [
+    { name: 'Red', color: '#ff4d5e', dark: '#9e1f2e', light: '#ffb3bb' },
+    { name: 'Green', color: '#35d97a', dark: '#16803f', light: '#aef5c9' },
+    { name: 'Blue', color: '#4f86ff', dark: '#1f45a8', light: '#b8ceff' },
+    { name: 'Yellow', color: '#ffd23f', dark: '#a8820c', light: '#fff0b0' },
+    { name: 'Purple', color: '#a95cff', dark: '#5b2596', light: '#dcc0ff' },
+    { name: 'Cyan', color: '#1fd6f0', dark: '#0b7c8c', light: '#b0f3fc' },
+    { name: 'Orange', color: '#ff8f33', dark: '#a8520f', light: '#ffd0a8' },
+    { name: 'Pink', color: '#ff6ac1', dark: '#a0286e', light: '#ffc4e6' },
+  ];
+
+  SQ.pickTeams = function (rng, n) {
+    return rng.shuffle(SQ.TEAMS.map((t, i) => i)).slice(0, n).map((i) => SQ.TEAMS[i]);
+  };
+
+  SQ.clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+  SQ.lerp = (a, b, t) => a + (b - a) * t;
+  SQ.dist2 = (ax, ay, bx, by) => (ax - bx) * (ax - bx) + (ay - by) * (ay - by);
+  SQ.ease = {
+    outBack: (t) => 1 + 2.7 * Math.pow(t - 1, 3) + 1.7 * Math.pow(t - 1, 2),
+    outCubic: (t) => 1 - Math.pow(1 - t, 3),
+    inOut: (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2),
+    outElastic: (t) =>
+      t === 0 || t === 1 ? t : Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * ((2 * Math.PI) / 3)) + 1,
+  };
+
+  SQ.hexToRgb = function (hex) {
+    const n = parseInt(hex.slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  };
+  SQ.rgba = function (hex, a) {
+    const [r, g, b] = SQ.hexToRgb(hex);
+    return `rgba(${r},${g},${b},${a})`;
+  };
+
+  SQ.fontDisplay = '"Bungee", "Impact", "Arial Black", sans-serif';
+  SQ.fontBody = '"Chakra Petch", "Segoe UI", system-ui, sans-serif';
+
+  SQ.roundRect = function (ctx, x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  };
+
+  // Draws one square character centred on (x, y).
+  // o: { angle, squash, lookX, lookY, mood, blink, flash, shield, face, alpha, glow, outline }
+  SQ.drawSquare = function (ctx, x, y, size, team, o) {
+    o = o || {};
+    const s = size;
+    const half = s / 2;
+    ctx.save();
+    ctx.translate(x, y);
+    if (o.angle) ctx.rotate(o.angle);
+    const sq = o.squash || 0;
+    ctx.scale(1 + sq, 1 - sq);
+    if (o.alpha != null) ctx.globalAlpha = o.alpha;
+
+    if (o.glow) {
+      ctx.shadowColor = o.glowColor || team.color;
+      ctx.shadowBlur = o.glow;
+    }
+    // drop shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    SQ.roundRect(ctx, -half + s * 0.08, -half + s * 0.12, s, s, s * 0.16);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // body
+    ctx.fillStyle = o.flash > 0 ? mixWhite(team.color, o.flash) : team.color;
+    SQ.roundRect(ctx, -half, -half, s, s, s * 0.16);
+    ctx.fill();
+    ctx.lineWidth = Math.max(2, s * 0.09);
+    ctx.strokeStyle = o.outline || team.dark;
+    ctx.stroke();
+    // gloss
+    ctx.fillStyle = 'rgba(255,255,255,0.22)';
+    SQ.roundRect(ctx, -half + s * 0.12, -half + s * 0.1, s * 0.76, s * 0.22, s * 0.1);
+    ctx.fill();
+
+    if (s >= 14 && o.face !== false) drawFace(ctx, s, o);
+
+    if (o.shield > 0) {
+      ctx.globalAlpha = (o.alpha != null ? o.alpha : 1) * Math.min(1, o.shield) * 0.9;
+      ctx.strokeStyle = '#e9fbff';
+      ctx.lineWidth = Math.max(2, s * 0.07);
+      ctx.setLineDash([s * 0.18, s * 0.12]);
+      SQ.roundRect(ctx, -half - s * 0.2, -half - s * 0.2, s * 1.4, s * 1.4, s * 0.3);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    ctx.restore();
+  };
+
+  function mixWhite(hex, t) {
+    const [r, g, b] = SQ.hexToRgb(hex);
+    t = SQ.clamp(t, 0, 1);
+    return `rgb(${r + (255 - r) * t | 0},${g + (255 - g) * t | 0},${b + (255 - b) * t | 0})`;
+  }
+  SQ.mixWhite = mixWhite;
+
+  function drawFace(ctx, s, o) {
+    if (o.face === 'moai') {
+      ctx.font = `${s * 0.78}px serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🗿', 0, s * 0.04);
+      return;
+    }
+    const mood = o.mood || 'normal';
+    const ex = s * 0.2;
+    const ey = -s * 0.04;
+    let er = s * 0.13;
+    let pr = s * 0.068;
+    if (mood === 'scared') {
+      er *= 1.2;
+      pr *= 0.6;
+    }
+    const lx = SQ.clamp(o.lookX || 0, -1, 1) * er * 0.45;
+    const ly = SQ.clamp(o.lookY || 0, -1, 1) * er * 0.45;
+
+    ctx.lineCap = 'round';
+    if (mood === 'dead') {
+      ctx.strokeStyle = '#1a1a22';
+      ctx.lineWidth = s * 0.06;
+      for (const sx of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(sx * ex - er * 0.7, ey - er * 0.7);
+        ctx.lineTo(sx * ex + er * 0.7, ey + er * 0.7);
+        ctx.moveTo(sx * ex + er * 0.7, ey - er * 0.7);
+        ctx.lineTo(sx * ex - er * 0.7, ey + er * 0.7);
+        ctx.stroke();
+      }
+      return;
+    }
+    if (mood === 'happy') {
+      ctx.strokeStyle = '#1a1a22';
+      ctx.lineWidth = s * 0.06;
+      for (const sx of [-1, 1]) {
+        ctx.beginPath();
+        ctx.arc(sx * ex, ey + er * 0.3, er * 0.8, Math.PI * 1.15, Math.PI * 1.85);
+        ctx.stroke();
+      }
+      ctx.beginPath();
+      ctx.arc(0, s * 0.14, s * 0.14, 0.15 * Math.PI, 0.85 * Math.PI);
+      ctx.stroke();
+      return;
+    }
+    if (o.blink) {
+      ctx.strokeStyle = '#1a1a22';
+      ctx.lineWidth = s * 0.05;
+      for (const sx of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(sx * ex - er, ey);
+        ctx.lineTo(sx * ex + er, ey);
+        ctx.stroke();
+      }
+    } else {
+      for (const sx of [-1, 1]) {
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(sx * ex, ey, er, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#15151d';
+        ctx.beginPath();
+        ctx.arc(sx * ex + lx, ey + ly, pr, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    if (mood === 'angry') {
+      ctx.strokeStyle = '#1a1a22';
+      ctx.lineWidth = s * 0.06;
+      ctx.beginPath();
+      ctx.moveTo(-ex - er, ey - er * 1.5);
+      ctx.lineTo(-ex + er * 0.8, ey - er * 0.8);
+      ctx.moveTo(ex + er, ey - er * 1.5);
+      ctx.lineTo(ex - er * 0.8, ey - er * 0.8);
+      ctx.stroke();
+    } else if (mood === 'scared') {
+      ctx.fillStyle = '#1a1a22';
+      ctx.beginPath();
+      ctx.ellipse(0, s * 0.22, s * 0.07, s * 0.09, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Pixel "deal with it" sunglasses, drawn from a tiny bitmap.
+  const GLASSES = [
+    '1111111111111111',
+    '1122211111222111',
+    '0112211001122110',
+    '0011110000111100',
+  ];
+  SQ.drawSunglasses = function (ctx, x, y, width) {
+    const px = width / GLASSES[0].length;
+    ctx.save();
+    ctx.translate(x - width / 2, y - (GLASSES.length * px) / 2);
+    for (let r = 0; r < GLASSES.length; r++) {
+      for (let c = 0; c < GLASSES[r].length; c++) {
+        const v = GLASSES[r][c];
+        if (v === '0') continue;
+        ctx.fillStyle = v === '1' ? '#050507' : '#ffffff';
+        ctx.fillRect(c * px, r * px, px + 0.5, px + 0.5);
+      }
+    }
+    ctx.restore();
+  };
+
+  // Text with a thick outline, used for titles, banners and meme captions.
+  SQ.outlinedText = function (ctx, text, x, y, size, fill, opts) {
+    opts = opts || {};
+    ctx.save();
+    ctx.font = `${opts.weight || ''} ${size}px ${opts.font || SQ.fontDisplay}`;
+    ctx.textAlign = opts.align || 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = opts.stroke != null ? opts.stroke : size * 0.16;
+    ctx.strokeStyle = opts.strokeColor || '#0b0b10';
+    if (ctx.lineWidth > 0) ctx.strokeText(text, x, y);
+    ctx.fillStyle = fill;
+    ctx.fillText(text, x, y);
+    ctx.restore();
+  };
+
+  // Draws a row of differently coloured text runs, centred on x.
+  SQ.richLine = function (ctx, runs, x, y, size) {
+    ctx.save();
+    ctx.font = `${size}px ${SQ.fontDisplay}`;
+    ctx.textBaseline = 'middle';
+    const widths = runs.map((r) => ctx.measureText(r.t).width);
+    const total = widths.reduce((a, b) => a + b, 0);
+    let cx = x - total / 2;
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = size * 0.16;
+    ctx.strokeStyle = '#0b0b10';
+    runs.forEach((r, i) => {
+      ctx.textAlign = 'left';
+      ctx.strokeText(r.t, cx, y);
+      ctx.fillStyle = r.c;
+      ctx.fillText(r.t, cx, y);
+      cx += widths[i];
+    });
+    ctx.restore();
+    return total;
+  };
+
+  SQ.fitSize = function (ctx, runs, maxW, size) {
+    ctx.font = `${size}px ${SQ.fontDisplay}`;
+    const w = runs.reduce((a, r) => a + ctx.measureText(r.t).width, 0);
+    return w > maxW ? Math.floor((size * maxW) / w) : size;
+  };
+
+  SQ.fmtTime = function (s) {
+    s = Math.max(0, Math.ceil(s));
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  };
+})();
