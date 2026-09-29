@@ -151,6 +151,64 @@
     ctx.drawImage(c, x - d / 2, y - d / 2, d, d);
   };
 
+  // Every power-up in every mode, with its icon, box colour and the label shown on pickup.
+  SQ.ITEMS = {
+    speed: { icon: '⚡', color: '#ffc21a', label: 'SPEED!' },
+    shield: { icon: '🛡️', color: '#5cc8ff', label: 'SHIELD!' },
+    bomb: { icon: '💣', color: '#ff4d5e', label: 'BOOM!' },
+    freeze: { icon: '❄️', color: '#7fe3ff', label: 'FREEZE!' },
+    magnet: { icon: '🧲', color: '#ff5c7a', label: 'MAGNET!' },
+    mega: { icon: '🍄', color: '#ff6ac1', label: 'MEGA!' },
+    multi: { icon: '✨', color: '#ffd23f', label: 'MULTIBALL!' },
+    paint: { icon: '🖌️', color: '#a95cff', label: 'PAINT RUSH!' },
+    heal: { icon: '❤️', color: '#ff4d5e', label: '+HEALTH' },
+    rage: { icon: '🔥', color: '#ff8f33', label: 'RAGE!' },
+    expand: { icon: '🌐', color: '#35d97a', label: 'EXPANSION!' },
+    boost: { icon: '⚡', color: '#ffc21a', label: 'BOOST!' },
+    knife: { icon: '🔪', color: '#c9d2e3', label: 'KNIFE!' },
+    banana: { icon: '🍌', color: '#ffd23f', label: 'BANANA DROP' },
+    portal: { icon: '🌀', color: '#4f86ff', label: 'PORTAL!' },
+    sword: { icon: '🗡️', color: '#c9d2e3', label: 'SWORD!' },
+    spikes: { icon: '🌵', color: '#35d97a', label: 'SPIKES!' },
+  };
+
+  // A power-up box: white tile, coloured rim, bobbing icon and a pulse so it reads on any floor.
+  // t = seconds since it spawned; left = seconds until it disappears (blinks near the end).
+  SQ.drawItem = function (ctx, x, y, type, t, size, left) {
+    const def = SQ.ITEMS[type] || { icon: '?', color: '#ffffff' };
+    size = size || 50;
+    const born = SQ.clamp(t * 3, 0, 1);
+    const s = size * SQ.ease.outBack(born);
+    if (s <= 1) return;
+    const bob = Math.sin(t * 3.5) * size * 0.08;
+    ctx.save();
+    ctx.translate(x, y);
+    if (left != null && left < 2.5 && Math.floor(t * 8) % 2) ctx.globalAlpha = 0.4;
+    // pulse ring
+    const pr = (t * 0.9) % 1;
+    ctx.strokeStyle = SQ.rgba(def.color, 0.7 * (1 - pr));
+    ctx.lineWidth = 4;
+    const rr = s * (0.55 + pr * 0.55);
+    SQ.roundRect(ctx, -rr, -rr, rr * 2, rr * 2, rr * 0.4);
+    ctx.stroke();
+    // ground shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath();
+    ctx.ellipse(0, s * 0.62, s * 0.42, s * 0.12, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // box
+    ctx.translate(0, bob - s * 0.05);
+    ctx.rotate(Math.sin(t * 2) * 0.08);
+    ctx.fillStyle = '#ffffff';
+    SQ.roundRect(ctx, -s / 2, -s / 2, s, s, s * 0.24);
+    ctx.fill();
+    ctx.lineWidth = s * 0.11;
+    ctx.strokeStyle = def.color;
+    ctx.stroke();
+    SQ.drawEmoji(ctx, def.icon, 0, s * 0.03, s * 0.6);
+    ctx.restore();
+  };
+
   // Draws one square character centred on (x, y).
   // o: { angle, squash, pop, lookX, lookY, mood, blink, flash, shield, face, alpha, glow, glowColor, outline }
   SQ.drawSquare = function (ctx, x, y, size, team, o) {

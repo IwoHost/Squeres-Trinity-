@@ -591,6 +591,13 @@
       const t = this.now;
       [0, 2, 4, 7].forEach((d, k) => this.tone(t + k * 0.05, this.scaleFreq(d, 1), 0.08, { type: 'square', gain: 0.06, cutoff: 5000, rev: 0.3 }));
     }
+    // soft sparkle when a power-up appears
+    itemSpawn() {
+      if (!this._ok('spawn', 150)) return;
+      const t = this.now;
+      this.tone(t, this.scaleFreq(this.curDeg + 7, 1), 0.12, { type: 'sine', gain: 0.07, rev: 0.6 });
+      this.tone(t + 0.06, this.scaleFreq(this.curDeg + 11, 1), 0.18, { type: 'sine', gain: 0.06, rev: 0.6 });
+    }
     ding() {
       if (!this._ok('ding', 80)) return;
       const t = this.now;

@@ -6,6 +6,8 @@
     { type: 'shield', icon: '🛡️' },
     { type: 'bomb', icon: '💣' },
     { type: 'freeze', icon: '❄️' },
+    { type: 'magnet', icon: '🧲' },
+    { type: 'mega', icon: '🍄' },
   ];
 
   class Chase {
@@ -138,8 +140,12 @@
         const p = rng.pick(PICKUPS);
         const r = Math.min(this.storm * 0.6, 380);
         const a = rng.range(0, 6.28);
-        this.pickups.push({ ...p, x: 500 + Math.cos(a) * rng.range(0, r), y: 500 + Math.sin(a) * rng.range(0, r), t: 0 });
-        this.nextPickup = rng.range(4, 8);
+        const x = 500 + Math.cos(a) * rng.range(0, r);
+        const y = 500 + Math.sin(a) * rng.range(0, r);
+        this.pickups.push({ ...p, x, y, t: 0, life: 14 });
+        this.nextPickup = rng.range(3, 6);
+        this.g.audio.itemSpawn();
+        this.g.fx.ring(x, y, SQ.ITEMS[p.type].color, 40);
       }
 
       for (const e of E) {
@@ -147,6 +153,9 @@
         e.pop = Math.max(0, (e.pop || 0) - dt * 4);
         e.squash *= Math.exp(-dt * 10);
         e.boost -= dt;
+        e.magnet = (e.magnet || 0) - dt;
+        e.big = (e.big || 0) - dt;
+        e.size = SQ.lerp(e.size, e.big > 0 ? 46 : 26, Math.min(1, dt * 5));
         e.shield -= dt;
         e.blink -= dt;
         if (e.blink < -0.12) e.blink = rng.range(2, 5);
@@ -251,13 +260,31 @@
         }
         for (let p = this.pickups.length - 1; p >= 0; p--) {
           const pk = this.pickups[p];
-          if (Math.abs(pk.x - a.x) < 30 && Math.abs(pk.y - a.y) < 30) {
+          if (Math.abs(pk.x - a.x) < a.size / 2 + 20 && Math.abs(pk.y - a.y) < a.size / 2 + 20) {
             this.pickups.splice(p, 1);
             this.collect(a, pk);
           }
         }
       }
-      for (const pk of this.pickups) pk.t += dt;
+      for (let p = this.pickups.length - 1; p >= 0; p--) {
+        this.pickups[p].t += dt;
+        if (this.pickups[p].t > this.pickups[p].life) this.pickups.splice(p, 1);
+      }
+      // magnets pull nearby prey in
+      for (const m of E) {
+        if (m.magnet <= 0) continue;
+        const prey = this.preyOf(m.team);
+        for (const o of E) {
+          if (o.team !== prey || o.shield > 0) continue;
+          const dx = m.x - o.x;
+          const dy = m.y - o.y;
+          const d2 = dx * dx + dy * dy;
+          if (d2 > 280 * 280 || d2 < 1) continue;
+          const d = Math.sqrt(d2);
+          o.x += (dx / d) * 150 * dt;
+          o.y += (dy / d) * 150 * dt;
+        }
+      }
       // pushes between squares must never shove one through the wall
       for (const e of E) {
         const h = e.size / 2;
@@ -316,8 +343,15 @@
       const g = this.g;
       const team = this.teams[e.team];
       g.audio.pickup();
-      g.fx.ring(pk.x, pk.y, '#ffffff', 50);
-      if (pk.type === 'speed') {
+      g.fx.ring(pk.x, pk.y, SQ.ITEMS[pk.type].color, 60);
+      g.fx.burst(pk.x, pk.y, SQ.ITEMS[pk.type].color, 10, 220, 8);
+      if (pk.type === 'magnet') {
+        e.magnet = 4;
+        g.fx.text(e.x, e.y - 40, 'MAGNET!', '#ff5c7a');
+      } else if (pk.type === 'mega') {
+        e.big = 5;
+        g.fx.text(e.x, e.y - 40, 'MEGA!', '#ff6ac1');
+      } else if (pk.type === 'speed') {
         e.boost = 3.5;
         g.fx.text(e.x, e.y - 40, 'SPEED!', '#ffe066');
       } else if (pk.type === 'shield') {
@@ -381,18 +415,17 @@
         ctx.stroke();
         ctx.restore();
       }
-      for (const pk of this.pickups) {
-        const bob = Math.sin(pk.t * 4) * 5;
-        const s = Math.min(1, pk.t * 4);
-        ctx.save();
-        ctx.translate(pk.x, pk.y + bob);
-        ctx.scale(s, s);
-        ctx.fillStyle = 'rgba(255,255,255,0.18)';
+      for (const pk of this.pickups) SQ.drawItem(ctx, pk.x, pk.y, pk.type, pk.t, 46, pk.life - pk.t);
+      // magnet field
+      for (const e of this.ents) {
+        if (!(e.magnet > 0)) continue;
+        ctx.strokeStyle = SQ.rgba('#ff5c7a', 0.35 + 0.2 * Math.sin(this.time * 12));
+        ctx.lineWidth = 4;
+        ctx.setLineDash([14, 10]);
         ctx.beginPath();
-        ctx.arc(0, 0, 26 + Math.sin(pk.t * 6) * 3, 0, Math.PI * 2);
-        ctx.fill();
-        SQ.drawEmoji(ctx, pk.icon, 0, 2, 38);
-        ctx.restore();
+        ctx.arc(e.x, e.y, 120 + ((this.time * 160) % 160), 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
       }
       for (const e of this.ents) {
         const sp = Math.hypot(e.vx, e.vy) || 1;

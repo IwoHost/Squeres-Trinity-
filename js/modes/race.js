@@ -10,6 +10,7 @@
     { type: 'knife', icon: '🔪' },
     { type: 'banana', icon: '🍌' },
     { type: 'freeze', icon: '❄️' },
+    { type: 'portal', icon: '🌀' },
   ];
 
   class Race {
@@ -207,7 +208,18 @@
       const t = this.tile;
       for (const it of this.items) {
         it.t += dt;
-        if (it.respawn > 0) it.respawn -= dt;
+        if (it.respawn > 0) {
+          it.respawn -= dt;
+          // comes back somewhere new, as a new random item
+          if (it.respawn <= 0) {
+            const spot = this.randomItemSpot();
+            if (spot) {
+              Object.assign(it, rng.pick(ITEMS), { x: spot[0], y: spot[1], t: 0 });
+              g.audio.itemSpawn();
+              g.fx.ring(it.x, it.y, SQ.ITEMS[it.type].color, 30);
+            } else it.respawn = 1;
+          }
+        }
       }
       for (const p of this.racers) {
         p.squash *= Math.exp(-dt * 10);
@@ -287,7 +299,7 @@
         for (const it of this.items) {
           if (it.respawn > 0) continue;
           if (Math.abs(it.x - p.x) < t * 0.35 && Math.abs(it.y - p.y) < t * 0.35) {
-            it.respawn = 8;
+            it.respawn = rng.range(3, 6);
             this.useItem(p, it);
           }
         }
@@ -443,11 +455,59 @@
       }
     }
 
+    // a free maze cell that no racer or other item is sitting on
+    randomItemSpot() {
+      const t = this.tile;
+      for (let k = 0; k < 30; k++) {
+        const c = this.rng.int(0, this.mw - 1) * 2 + 1;
+        const r = this.rng.int(0, this.mw - 1) * 2 + 1;
+        if (this.grid[this.idx(c, r)] !== FLOOR) continue;
+        const x = (c + 0.5) * t;
+        const y = (r + 0.5) * t;
+        if (this.racers.some((p) => SQ.dist2(p.x, p.y, x, y) < t * t * 2)) continue;
+        if (this.items.some((o) => o.respawn <= 0 && SQ.dist2(o.x, o.y, x, y) < t * t)) continue;
+        return [x, y];
+      }
+      return null;
+    }
+
     useItem(p, it) {
       const g = this.g;
       g.audio.pickup();
-      g.fx.ring(it.x, it.y, '#ffffff', 40);
-      if (it.type === 'boost') {
+      g.fx.ring(it.x, it.y, SQ.ITEMS[it.type].color, 50);
+      g.fx.burst(it.x, it.y, SQ.ITEMS[it.type].color, 10, 220, 8);
+      if (it.type === 'portal') {
+        // jump 5 tiles further along the fastest route
+        let c = Math.floor(p.x / this.tile);
+        let r = Math.floor(p.y / this.tile);
+        for (let k = 0; k < 5; k++) {
+          let best = null;
+          for (const [dx, dy] of [
+            [1, 0],
+            [-1, 0],
+            [0, 1],
+            [0, -1],
+          ]) {
+            const nc = c + dx;
+            const nr = r + dy;
+            if (nc < 0 || nr < 0 || nc >= this.T || nr >= this.T) continue;
+            const v = this.grid[this.idx(nc, nr)];
+            if (v === WALL || v === BRICK) continue;
+            if (this.dist[this.idx(nc, nr)] < this.dist[this.idx(c, r)]) best = [nc, nr];
+          }
+          if (!best) break;
+          [c, r] = best;
+        }
+        g.fx.ring(p.x, p.y, '#4f86ff', 60);
+        p.x = (c + 0.5) * this.tile;
+        p.y = (r + 0.5) * this.tile;
+        p.vx *= 0.3;
+        p.vy *= 0.3;
+        g.fx.ring(p.x, p.y, '#4f86ff', 80);
+        g.fx.burst(p.x, p.y, '#4f86ff', 16, 260, 9);
+        g.fx.text(p.x, p.y - 40, 'PORTAL!', '#8fb3ff', 36);
+        g.audio.whoosh();
+      } else if (it.type === 'boost') {
         p.boost = 2.5;
         g.fx.text(p.x, p.y - 40, 'BOOST!', '#ffe066', 36);
       } else if (it.type === 'knife') {
@@ -566,18 +626,7 @@
       const [fc, fr] = this.finishTile;
       SQ.drawEmoji(ctx, '🏁', (fc + 0.5) * t, (fr + 0.5) * t - Math.abs(Math.sin(this.time * 3)) * 6, t * 0.5);
 
-      for (const it of this.items) {
-        if (it.respawn > 0) continue;
-        ctx.save();
-        ctx.translate(it.x, it.y + Math.sin(it.t * 4) * 4);
-        ctx.rotate(Math.sin(it.t * 2) * 0.2);
-        ctx.fillStyle = 'rgba(80,60,200,0.18)';
-        ctx.beginPath();
-        ctx.arc(0, 0, t * 0.3, 0, Math.PI * 2);
-        ctx.fill();
-        SQ.drawEmoji(ctx, it.icon, 0, 2, t * 0.42);
-        ctx.restore();
-      }
+      for (const it of this.items) if (it.respawn <= 0) SQ.drawItem(ctx, it.x, it.y, it.type, it.t, t * 0.5);
       for (const bn of this.bananas) SQ.drawEmoji(ctx, '🍌', bn.x, bn.y, t * 0.36);
 
       for (const p of this.racers) {

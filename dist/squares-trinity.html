@@ -430,6 +430,64 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     ctx.drawImage(c, x - d / 2, y - d / 2, d, d);
   };
 
+  // Every power-up in every mode, with its icon, box colour and the label shown on pickup.
+  SQ.ITEMS = {
+    speed: { icon: '⚡', color: '#ffc21a', label: 'SPEED!' },
+    shield: { icon: '🛡️', color: '#5cc8ff', label: 'SHIELD!' },
+    bomb: { icon: '💣', color: '#ff4d5e', label: 'BOOM!' },
+    freeze: { icon: '❄️', color: '#7fe3ff', label: 'FREEZE!' },
+    magnet: { icon: '🧲', color: '#ff5c7a', label: 'MAGNET!' },
+    mega: { icon: '🍄', color: '#ff6ac1', label: 'MEGA!' },
+    multi: { icon: '✨', color: '#ffd23f', label: 'MULTIBALL!' },
+    paint: { icon: '🖌️', color: '#a95cff', label: 'PAINT RUSH!' },
+    heal: { icon: '❤️', color: '#ff4d5e', label: '+HEALTH' },
+    rage: { icon: '🔥', color: '#ff8f33', label: 'RAGE!' },
+    expand: { icon: '🌐', color: '#35d97a', label: 'EXPANSION!' },
+    boost: { icon: '⚡', color: '#ffc21a', label: 'BOOST!' },
+    knife: { icon: '🔪', color: '#c9d2e3', label: 'KNIFE!' },
+    banana: { icon: '🍌', color: '#ffd23f', label: 'BANANA DROP' },
+    portal: { icon: '🌀', color: '#4f86ff', label: 'PORTAL!' },
+    sword: { icon: '🗡️', color: '#c9d2e3', label: 'SWORD!' },
+    spikes: { icon: '🌵', color: '#35d97a', label: 'SPIKES!' },
+  };
+
+  // A power-up box: white tile, coloured rim, bobbing icon and a pulse so it reads on any floor.
+  // t = seconds since it spawned; left = seconds until it disappears (blinks near the end).
+  SQ.drawItem = function (ctx, x, y, type, t, size, left) {
+    const def = SQ.ITEMS[type] || { icon: '?', color: '#ffffff' };
+    size = size || 50;
+    const born = SQ.clamp(t * 3, 0, 1);
+    const s = size * SQ.ease.outBack(born);
+    if (s <= 1) return;
+    const bob = Math.sin(t * 3.5) * size * 0.08;
+    ctx.save();
+    ctx.translate(x, y);
+    if (left != null && left < 2.5 && Math.floor(t * 8) % 2) ctx.globalAlpha = 0.4;
+    // pulse ring
+    const pr = (t * 0.9) % 1;
+    ctx.strokeStyle = SQ.rgba(def.color, 0.7 * (1 - pr));
+    ctx.lineWidth = 4;
+    const rr = s * (0.55 + pr * 0.55);
+    SQ.roundRect(ctx, -rr, -rr, rr * 2, rr * 2, rr * 0.4);
+    ctx.stroke();
+    // ground shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath();
+    ctx.ellipse(0, s * 0.62, s * 0.42, s * 0.12, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // box
+    ctx.translate(0, bob - s * 0.05);
+    ctx.rotate(Math.sin(t * 2) * 0.08);
+    ctx.fillStyle = '#ffffff';
+    SQ.roundRect(ctx, -s / 2, -s / 2, s, s, s * 0.24);
+    ctx.fill();
+    ctx.lineWidth = s * 0.11;
+    ctx.strokeStyle = def.color;
+    ctx.stroke();
+    SQ.drawEmoji(ctx, def.icon, 0, s * 0.03, s * 0.6);
+    ctx.restore();
+  };
+
   // Draws one square character centred on (x, y).
   // o: { angle, squash, pop, lookX, lookY, mood, blink, flash, shield, face, alpha, glow, glowColor, outline }
   SQ.drawSquare = function (ctx, x, y, size, team, o) {
@@ -1272,6 +1330,13 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       const t = this.now;
       [0, 2, 4, 7].forEach((d, k) => this.tone(t + k * 0.05, this.scaleFreq(d, 1), 0.08, { type: 'square', gain: 0.06, cutoff: 5000, rev: 0.3 }));
     }
+    // soft sparkle when a power-up appears
+    itemSpawn() {
+      if (!this._ok('spawn', 150)) return;
+      const t = this.now;
+      this.tone(t, this.scaleFreq(this.curDeg + 7, 1), 0.12, { type: 'sine', gain: 0.07, rev: 0.6 });
+      this.tone(t + 0.06, this.scaleFreq(this.curDeg + 11, 1), 0.18, { type: 'sine', gain: 0.06, rev: 0.6 });
+    }
     ding() {
       if (!this._ok('ding', 80)) return;
       const t = this.now;
@@ -1766,6 +1831,8 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     { type: 'shield', icon: '🛡️' },
     { type: 'bomb', icon: '💣' },
     { type: 'freeze', icon: '❄️' },
+    { type: 'magnet', icon: '🧲' },
+    { type: 'mega', icon: '🍄' },
   ];
 
   class Chase {
@@ -1898,8 +1965,12 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         const p = rng.pick(PICKUPS);
         const r = Math.min(this.storm * 0.6, 380);
         const a = rng.range(0, 6.28);
-        this.pickups.push({ ...p, x: 500 + Math.cos(a) * rng.range(0, r), y: 500 + Math.sin(a) * rng.range(0, r), t: 0 });
-        this.nextPickup = rng.range(4, 8);
+        const x = 500 + Math.cos(a) * rng.range(0, r);
+        const y = 500 + Math.sin(a) * rng.range(0, r);
+        this.pickups.push({ ...p, x, y, t: 0, life: 14 });
+        this.nextPickup = rng.range(3, 6);
+        this.g.audio.itemSpawn();
+        this.g.fx.ring(x, y, SQ.ITEMS[p.type].color, 40);
       }
 
       for (const e of E) {
@@ -1907,6 +1978,9 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         e.pop = Math.max(0, (e.pop || 0) - dt * 4);
         e.squash *= Math.exp(-dt * 10);
         e.boost -= dt;
+        e.magnet = (e.magnet || 0) - dt;
+        e.big = (e.big || 0) - dt;
+        e.size = SQ.lerp(e.size, e.big > 0 ? 46 : 26, Math.min(1, dt * 5));
         e.shield -= dt;
         e.blink -= dt;
         if (e.blink < -0.12) e.blink = rng.range(2, 5);
@@ -2011,13 +2085,31 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         }
         for (let p = this.pickups.length - 1; p >= 0; p--) {
           const pk = this.pickups[p];
-          if (Math.abs(pk.x - a.x) < 30 && Math.abs(pk.y - a.y) < 30) {
+          if (Math.abs(pk.x - a.x) < a.size / 2 + 20 && Math.abs(pk.y - a.y) < a.size / 2 + 20) {
             this.pickups.splice(p, 1);
             this.collect(a, pk);
           }
         }
       }
-      for (const pk of this.pickups) pk.t += dt;
+      for (let p = this.pickups.length - 1; p >= 0; p--) {
+        this.pickups[p].t += dt;
+        if (this.pickups[p].t > this.pickups[p].life) this.pickups.splice(p, 1);
+      }
+      // magnets pull nearby prey in
+      for (const m of E) {
+        if (m.magnet <= 0) continue;
+        const prey = this.preyOf(m.team);
+        for (const o of E) {
+          if (o.team !== prey || o.shield > 0) continue;
+          const dx = m.x - o.x;
+          const dy = m.y - o.y;
+          const d2 = dx * dx + dy * dy;
+          if (d2 > 280 * 280 || d2 < 1) continue;
+          const d = Math.sqrt(d2);
+          o.x += (dx / d) * 150 * dt;
+          o.y += (dy / d) * 150 * dt;
+        }
+      }
       // pushes between squares must never shove one through the wall
       for (const e of E) {
         const h = e.size / 2;
@@ -2076,8 +2168,15 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       const g = this.g;
       const team = this.teams[e.team];
       g.audio.pickup();
-      g.fx.ring(pk.x, pk.y, '#ffffff', 50);
-      if (pk.type === 'speed') {
+      g.fx.ring(pk.x, pk.y, SQ.ITEMS[pk.type].color, 60);
+      g.fx.burst(pk.x, pk.y, SQ.ITEMS[pk.type].color, 10, 220, 8);
+      if (pk.type === 'magnet') {
+        e.magnet = 4;
+        g.fx.text(e.x, e.y - 40, 'MAGNET!', '#ff5c7a');
+      } else if (pk.type === 'mega') {
+        e.big = 5;
+        g.fx.text(e.x, e.y - 40, 'MEGA!', '#ff6ac1');
+      } else if (pk.type === 'speed') {
         e.boost = 3.5;
         g.fx.text(e.x, e.y - 40, 'SPEED!', '#ffe066');
       } else if (pk.type === 'shield') {
@@ -2141,18 +2240,17 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         ctx.stroke();
         ctx.restore();
       }
-      for (const pk of this.pickups) {
-        const bob = Math.sin(pk.t * 4) * 5;
-        const s = Math.min(1, pk.t * 4);
-        ctx.save();
-        ctx.translate(pk.x, pk.y + bob);
-        ctx.scale(s, s);
-        ctx.fillStyle = 'rgba(255,255,255,0.18)';
+      for (const pk of this.pickups) SQ.drawItem(ctx, pk.x, pk.y, pk.type, pk.t, 46, pk.life - pk.t);
+      // magnet field
+      for (const e of this.ents) {
+        if (!(e.magnet > 0)) continue;
+        ctx.strokeStyle = SQ.rgba('#ff5c7a', 0.35 + 0.2 * Math.sin(this.time * 12));
+        ctx.lineWidth = 4;
+        ctx.setLineDash([14, 10]);
         ctx.beginPath();
-        ctx.arc(0, 0, 26 + Math.sin(pk.t * 6) * 3, 0, Math.PI * 2);
-        ctx.fill();
-        SQ.drawEmoji(ctx, pk.icon, 0, 2, 38);
-        ctx.restore();
+        ctx.arc(e.x, e.y, 120 + ((this.time * 160) % 160), 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
       }
       for (const e of this.ents) {
         const sp = Math.hypot(e.vx, e.vy) || 1;
@@ -2214,6 +2312,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       this.rules = [
         [{ t: 'Every bounce ', c: '#ffffff' }, { t: 'steals', c: '#ffd23f' }, { t: ' a tile', c: '#ffffff' }],
         [{ t: `Most tiles in ${this.duration}s wins`, c: '#ffffff' }],
+        [{ t: 'Grab the ', c: '#ffffff' }, { t: 'power-ups', c: '#1fd6f0' }, { t: '!', c: '#ffffff' }],
       ];
       this.grid = new Int8Array(this.N * this.N);
       const vertical = rng.chance(0.5);
@@ -2241,7 +2340,9 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         this.addBall(ti, sx / k, sy / k);
       });
       this.time = 0;
-      this.nextEvent = rng.range(14, 20);
+      this.items = [];
+      this.lock = this.teams.map(() => 0);
+      this.nextItem = rng.range(2.5, 4);
       this.counts = this.teams.map(() => 0);
       this.tileFlash = new Float32Array(this.N * this.N);
       this.leader = -1;
@@ -2255,7 +2356,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     addBall(ti, x, y) {
       const a = this.rng.pick([1, 3, 5, 7]) * (Math.PI / 4) + this.rng.range(-0.3, 0.3);
       const speed = 520;
-      this.balls.push({ team: ti, x, y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, size: 26, big: 0, squash: 0, trail: [] });
+      this.balls.push({ team: ti, x, y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, size: 26, big: 0, boost: 0, frozen: 0, paint: 0, squash: 0, trail: [] });
     }
 
     recount() {
@@ -2276,31 +2377,16 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       this.time += dt;
       for (let i = 0; i < this.tileFlash.length; i++) if (this.tileFlash[i] > 0) this.tileFlash[i] = Math.max(0, this.tileFlash[i] - dt * 3);
 
-      this.nextEvent -= dt;
-      if (this.nextEvent <= 0 && this.time < this.duration - 6) {
-        this.nextEvent = this.rng.range(12, 18);
-        const ev = this.rng.pick(['multi', 'speed', 'big']);
-        if (ev === 'multi' && this.balls.length < this.teams.length * 3) {
-          g.fx.banner('MULTIBALL!', 'every color gets another square', '#ffd23f', 1.6);
-          for (const b of this.balls.slice()) this.addBall(b.team, b.x, b.y);
-        } else if (ev === 'speed') {
-          g.fx.banner('SPEED UP!', null, '#1fd6f0', 1.4);
-          for (const b of this.balls) {
-            b.vx *= 1.25;
-            b.vy *= 1.25;
-          }
-        } else {
-          const b = this.rng.pick(this.balls);
-          b.big = 7;
-          g.fx.banner('MEGA SQUARE!', `${this.teams[b.team].name} grows for 7s`, this.teams[b.team].color, 1.6);
-        }
-        g.audio.whoosh();
-      }
+      this.updateItems(dt);
+      this.lock = this.lock.map((v) => Math.max(0, v - dt));
 
       const steps = 6;
       const sdt = dt / steps;
       for (const b of this.balls) {
         b.big -= dt;
+        b.boost -= dt;
+        b.frozen -= dt;
+        b.paint -= dt;
         b.size = SQ.lerp(b.size, b.big > 0 ? 60 : 26, Math.min(1, dt * 5));
         b.squash *= Math.exp(-dt * 12);
         for (let s = 0; s < steps; s++) this.moveBall(b, sdt);
@@ -2329,8 +2415,84 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       }
     }
 
+    // ---------- power-ups ----------
+    updateItems(dt) {
+      const g = this.g;
+      const rng = this.rng;
+      this.nextItem -= dt;
+      if (this.nextItem <= 0 && this.items.length < 3 && this.time < this.duration - 4) {
+        this.nextItem = rng.range(3, 5.5);
+        const type = rng.pick(['speed', 'mega', 'multi', 'bomb', 'freeze', 'paint', 'shield', 'bomb', 'paint']);
+        let x, y, tries = 0;
+        do {
+          x = rng.range(70, 930);
+          y = rng.range(70, 930);
+          tries++;
+        } while (tries < 20 && (this.balls.some((b) => SQ.dist2(b.x, b.y, x, y) < 150 * 150) || this.items.some((it) => SQ.dist2(it.x, it.y, x, y) < 200 * 200)));
+        this.items.push({ type, x, y, t: 0, life: 14 });
+        g.audio.itemSpawn();
+        g.fx.ring(x, y, SQ.ITEMS[type].color, 50);
+      }
+      for (let i = this.items.length - 1; i >= 0; i--) {
+        const it = this.items[i];
+        it.t += dt;
+        if (it.t > it.life) {
+          this.items.splice(i, 1);
+          continue;
+        }
+        const b = this.balls.find((b) => Math.abs(b.x - it.x) < b.size / 2 + 24 && Math.abs(b.y - it.y) < b.size / 2 + 24);
+        if (b) {
+          this.items.splice(i, 1);
+          this.collect(b, it);
+        }
+      }
+    }
+
+    collect(b, it) {
+      const g = this.g;
+      const team = this.teams[b.team];
+      const def = SQ.ITEMS[it.type];
+      g.audio.pickup();
+      g.fx.ring(it.x, it.y, def.color, 70);
+      g.fx.burst(it.x, it.y, def.color, 14, 260, 9);
+      g.fx.text(it.x, it.y - 50, def.label, def.color, 42);
+      if (it.type === 'speed') b.boost = 5;
+      else if (it.type === 'mega') b.big = 6;
+      else if (it.type === 'shield') {
+        this.lock[b.team] = 5;
+        g.fx.banner(`${team.name.toUpperCase()} TILES LOCKED`, 'nobody can steal them for 5s', team.color, 1.4);
+      }
+      else if (it.type === 'paint') b.paint = 3.5;
+      else if (it.type === 'multi') {
+        if (this.balls.filter((o) => o.team === b.team).length < 4) this.addBall(b.team, b.x, b.y);
+      } else if (it.type === 'freeze') {
+        g.audio.freeze();
+        g.fx.flash(0.3, '#bdf3ff');
+        for (const o of this.balls) if (o.team !== b.team) o.frozen = 2.2;
+      } else if (it.type === 'bomb') {
+        // paints a 5x5 block of tiles around the blast
+        g.audio.explode();
+        g.cam.shake(10);
+        g.hitstop(0.06);
+        g.fx.ring(it.x, it.y, team.color, 150);
+        const c0 = Math.floor(it.x / this.cell);
+        const r0 = Math.floor(it.y / this.cell);
+        for (let r = r0 - 2; r <= r0 + 2; r++)
+          for (let c = c0 - 2; c <= c0 + 2; c++) {
+            if (r < 0 || c < 0 || r >= this.N || c >= this.N) continue;
+            const i = r * this.N + c;
+            if (this.grid[i] !== b.team) {
+              this.grid[i] = b.team;
+              this.tileFlash[i] = 1;
+              this.dirty.push(i);
+            }
+          }
+      }
+    }
+
     moveBall(b, dt) {
-      if (this.frozen) return;
+      if (this.frozen || b.frozen > 0) return;
+      dt *= b.boost > 0 ? 1.6 : 1;
       const h = b.size / 2;
       const hitAxis = (axis) => {
         // corners of the leading edge
@@ -2349,6 +2511,10 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         let hit = false;
         for (const [px, py] of pts) {
           const i = this.cellAt(px, py);
+          if (i >= 0 && this.grid[i] !== b.team && this.lock[this.grid[i]] > 0) {
+            hit = 'locked';
+            continue;
+          }
           if (i >= 0 && this.grid[i] !== b.team) {
             this.grid[i] = b.team;
             this.tileFlash[i] = 1;
@@ -2360,7 +2526,9 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
             this.g.audio.melodyHit((cx - 500) / 600);
           }
         }
-        return hit;
+        // with Paint Rush the square plows straight through enemy tiles
+        if (hit === 'locked') return true;
+        return hit && b.paint <= 0;
       };
       b.x += b.vx * dt;
       if (hitAxis('x')) {
@@ -2442,6 +2610,17 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         ctx.fillStyle = SQ.mixWhite(t.color, f * 0.6);
         ctx.fillRect(cx - w / 2, cy - w / 2, w, w);
       }
+      // locked tiles get a white rim
+      if (this.lock.some((v) => v > 0)) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+        ctx.lineWidth = 3;
+        for (let i = 0; i < this.grid.length; i++) {
+          const lk = this.lock[this.grid[i]];
+          if (lk <= 0 || (lk < 1.2 && Math.floor(lk * 8) % 2)) continue;
+          ctx.strokeRect((i % this.N) * c + 4, Math.floor(i / this.N) * c + 4, c - 8, c - 8);
+        }
+      }
+      for (const it of this.items) SQ.drawItem(ctx, it.x, it.y, it.type, it.t, 54, it.life - it.t);
       for (const b of this.balls) {
         const t = this.teams[b.team];
         ctx.strokeStyle = SQ.rgba(t.light, 0.5);
@@ -2454,7 +2633,15 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
           ctx.stroke();
         }
         const sp = Math.hypot(b.vx, b.vy) || 1;
-        SQ.drawSquare(ctx, b.x, b.y, b.size, t, { lookX: b.vx / sp, lookY: b.vy / sp, squash: b.squash, outline: '#ffffff', mood: b.big > 0 ? 'angry' : 'normal', glow: 12, glowColor: '#ffffff' });
+        SQ.drawSquare(ctx, b.x, b.y, b.size, t, {
+          lookX: b.vx / sp,
+          lookY: b.vy / sp,
+          squash: b.squash,
+          outline: b.frozen > 0 ? '#bdf3ff' : '#ffffff',
+          mood: b.frozen > 0 ? 'scared' : b.big > 0 || b.paint > 0 ? 'angry' : 'normal',
+          glow: b.boost > 0 || b.paint > 0 ? 22 : 12,
+          glowColor: b.paint > 0 ? '#a95cff' : b.boost > 0 ? '#ffc21a' : '#ffffff',
+        });
       }
     }
 
@@ -2497,7 +2684,13 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       this.N = 20;
       this.cell = 50;
       this.title = n === 2 ? `${this.teams[0].name.toUpperCase()} VS ${this.teams[1].name.toUpperCase()}` : 'DOMAIN BRAWL';
-      this.rules = [[{ t: 'Squares are invincible', c: '#ffffff' }], [{ t: 'in their own ', c: '#ffffff' }, { t: 'domain', c: '#ffd23f' }]];
+      this.rules = [
+        [{ t: 'Squares are invincible', c: '#ffffff' }],
+        [{ t: 'in their own ', c: '#ffffff' }, { t: 'domain', c: '#ffd23f' }],
+        [{ t: 'Grab the ', c: '#ffffff' }, { t: 'power-ups', c: '#1fd6f0' }, { t: '!', c: '#ffffff' }],
+      ];
+      this.items = [];
+      this.nextItem = rng.range(2, 3.5);
       this.owner = new Int8Array(this.N * this.N).fill(-1);
       this.since = new Float32Array(this.N * this.N);
       this.time = 0;
@@ -2526,6 +2719,12 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
           flash: 0,
           squash: 0,
           turnT: rng.range(1.5, 3),
+          base: 110,
+          shieldT: 0,
+          boost: 0,
+          rage: 0,
+          big: 0,
+          frozen: 0,
           hits: 0,
           expanded: false,
         };
@@ -2546,12 +2745,20 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         s.flash = Math.max(0, s.flash - dt * 3);
         s.squash *= Math.exp(-dt * 9);
         s.turnT -= dt;
-        const sp = 320 + Math.min(160, this.time * 1.6);
+        for (const k of ['shieldT', 'boost', 'rage', 'big', 'frozen']) s[k] -= dt;
+        s.size = SQ.lerp(s.size, s.big > 0 ? 160 : s.base, Math.min(1, dt * 4));
+        if (s.frozen > 0) continue;
+        const sp = (320 + Math.min(160, this.time * 1.6)) * (s.boost > 0 ? 1.6 : 1);
         if (s.turnT <= 0) {
           s.turnT = rng.range(1.6, 3.2);
           let a;
           const others = alive.filter((o) => o !== s);
-          if (others.length && rng.chance(0.55)) {
+          // go for a nearby power-up about half the time
+          const near = this.items.slice().sort((p, q) => SQ.dist2(p.x, p.y, s.x, s.y) - SQ.dist2(q.x, q.y, s.x, s.y))[0];
+          if (near && rng.chance(0.5)) {
+            a = Math.atan2(near.y - s.y, near.x - s.x);
+            s.turnT = rng.range(1, 1.8);
+          } else if (others.length && rng.chance(0.55)) {
             const o = rng.pick(others);
             a = Math.atan2(o.y - s.y, o.x - s.x) + rng.range(-0.3, 0.3);
           } else a = rng.range(0, 6.28);
@@ -2583,7 +2790,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
             tot++;
             if (this.owner[i] === s.team && this.time - this.since[i] > SETTLE) own++;
           }
-        s.safe = tot > 0 && own / tot >= 0.5;
+        s.safe = s.shieldT > 0 || (tot > 0 && own / tot >= 0.5);
         // paint
         for (let r = r0; r <= r1; r++)
           for (let c = c0; c <= c1; c++) {
@@ -2633,6 +2840,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         s.x = SQ.clamp(s.x, h, 1000 - h);
         s.y = SQ.clamp(s.y, h, 1000 - h);
       }
+      this.updateItems(dt, alive);
       alive.forEach((s) => (s.alive = s.hp > 0));
       this.counts = this.teams.map(() => 0);
       for (let i = 0; i < this.owner.length; i++) if (this.owner[i] >= 0) this.counts[this.owner[i]]++;
@@ -2675,7 +2883,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       ]) {
         if (v.safe) continue;
         const crit = this.rng.chance(0.15);
-        const dmg = crit ? 3 : 1;
+        const dmg = (crit ? 3 : 1) * (atk.rage > 0 ? 2 : 1);
         v.hp = Math.max(0, v.hp - dmg);
         v.flash = 1;
         atk.hits++;
@@ -2693,6 +2901,74 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
           for (let i = 0; i < this.owner.length; i++) if (this.owner[i] === v.team) (this.owner[i] = atk.team), (this.since[i] = this.time);
         } else if (v.hp <= 2) g.fx.maybeSay(v, 'lonely', 0.5);
         else g.fx.maybeSay(atk, 'hunter', 0.15);
+      }
+    }
+
+    // ---------- power-ups ----------
+    updateItems(dt, alive) {
+      const g = this.g;
+      const rng = this.rng;
+      this.nextItem -= dt;
+      if (this.nextItem <= 0 && this.items.length < 3) {
+        this.nextItem = rng.range(3, 5);
+        const type = rng.pick(['heal', 'shield', 'speed', 'expand', 'rage', 'mega', 'freeze', 'expand', 'rage']);
+        let x, y, tries = 0;
+        do {
+          x = rng.range(70, 930);
+          y = rng.range(70, 930);
+          tries++;
+        } while (tries < 20 && (alive.some((s) => SQ.dist2(s.x, s.y, x, y) < 180 * 180) || this.items.some((it) => SQ.dist2(it.x, it.y, x, y) < 220 * 220)));
+        this.items.push({ type, x, y, t: 0, life: 15 });
+        g.audio.itemSpawn();
+        g.fx.ring(x, y, SQ.ITEMS[type].color, 50);
+      }
+      for (let i = this.items.length - 1; i >= 0; i--) {
+        const it = this.items[i];
+        it.t += dt;
+        if (it.t > it.life) {
+          this.items.splice(i, 1);
+          continue;
+        }
+        const s = alive.find((s) => s.hp > 0 && Math.abs(s.x - it.x) < s.size / 2 + 22 && Math.abs(s.y - it.y) < s.size / 2 + 22);
+        if (s) {
+          this.items.splice(i, 1);
+          this.collect(s, it, alive);
+        }
+      }
+    }
+
+    collect(s, it, alive) {
+      const g = this.g;
+      const team = this.teams[s.team];
+      const def = SQ.ITEMS[it.type];
+      g.audio.pickup();
+      g.fx.ring(it.x, it.y, def.color, 80);
+      g.fx.burst(it.x, it.y, def.color, 16, 280, 10);
+      g.fx.text(s.x, s.y - s.size * 0.7, def.label, def.color, 44);
+      if (it.type === 'heal') s.hp = Math.min(this.maxHp, s.hp + 3);
+      else if (it.type === 'shield') s.shieldT = 4.5;
+      else if (it.type === 'speed') s.boost = 4;
+      else if (it.type === 'rage') s.rage = 6;
+      else if (it.type === 'mega') s.big = 6;
+      else if (it.type === 'freeze') {
+        g.audio.freeze();
+        g.fx.flash(0.3, '#bdf3ff');
+        for (const o of alive) if (o !== s) o.frozen = 2;
+      } else if (it.type === 'expand') {
+        // instantly settled domain in a big block around the square
+        const c0 = Math.floor(s.x / this.cell);
+        const r0 = Math.floor(s.y / this.cell);
+        for (let r = r0 - 3; r <= r0 + 3; r++)
+          for (let c = c0 - 3; c <= c0 + 3; c++) {
+            if (r < 0 || c < 0 || r >= this.N || c >= this.N) continue;
+            const i = r * this.N + c;
+            this.owner[i] = s.team;
+            this.since[i] = this.time - 10;
+          }
+        g.fx.ring(s.x, s.y, team.color, 200);
+        g.fx.banner('DOMAIN EXPANSION', `${team.name} claims the ground`, team.color, 1.5);
+        g.audio.boom();
+        g.hitstop(0.05);
       }
     }
 
@@ -2715,6 +2991,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         ctx.fillStyle = age > SETTLE ? t.dark : SQ.rgba(t.dark, 0.45);
         ctx.fillRect(x, y, c + 0.5, c + 0.5);
       }
+      for (const it of this.items) SQ.drawItem(ctx, it.x, it.y, it.type, it.t, 60, it.life - it.t);
       for (const s of this.sq) {
         if (!s.alive) continue;
         const t = this.teams[s.team];
@@ -2724,8 +3001,10 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
           lookY: s.vy / sp,
           squash: s.squash,
           flash: s.flash,
-          mood: s.hp <= 2 ? 'scared' : s.safe ? 'normal' : 'angry',
-          glow: s.safe ? 28 : 0,
+          mood: s.frozen > 0 || s.hp <= 2 ? 'scared' : s.safe ? 'normal' : 'angry',
+          glow: s.safe || s.rage > 0 || s.boost > 0 ? 28 : 0,
+          glowColor: s.rage > 0 ? '#ff8f33' : s.boost > 0 ? '#ffc21a' : null,
+          shield: s.shieldT,
           outline: s.safe ? '#ffffff' : null,
         });
       }
@@ -2767,6 +3046,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     { type: 'knife', icon: '🔪' },
     { type: 'banana', icon: '🍌' },
     { type: 'freeze', icon: '❄️' },
+    { type: 'portal', icon: '🌀' },
   ];
 
   class Race {
@@ -2964,7 +3244,18 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       const t = this.tile;
       for (const it of this.items) {
         it.t += dt;
-        if (it.respawn > 0) it.respawn -= dt;
+        if (it.respawn > 0) {
+          it.respawn -= dt;
+          // comes back somewhere new, as a new random item
+          if (it.respawn <= 0) {
+            const spot = this.randomItemSpot();
+            if (spot) {
+              Object.assign(it, rng.pick(ITEMS), { x: spot[0], y: spot[1], t: 0 });
+              g.audio.itemSpawn();
+              g.fx.ring(it.x, it.y, SQ.ITEMS[it.type].color, 30);
+            } else it.respawn = 1;
+          }
+        }
       }
       for (const p of this.racers) {
         p.squash *= Math.exp(-dt * 10);
@@ -3044,7 +3335,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         for (const it of this.items) {
           if (it.respawn > 0) continue;
           if (Math.abs(it.x - p.x) < t * 0.35 && Math.abs(it.y - p.y) < t * 0.35) {
-            it.respawn = 8;
+            it.respawn = rng.range(3, 6);
             this.useItem(p, it);
           }
         }
@@ -3200,11 +3491,59 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       }
     }
 
+    // a free maze cell that no racer or other item is sitting on
+    randomItemSpot() {
+      const t = this.tile;
+      for (let k = 0; k < 30; k++) {
+        const c = this.rng.int(0, this.mw - 1) * 2 + 1;
+        const r = this.rng.int(0, this.mw - 1) * 2 + 1;
+        if (this.grid[this.idx(c, r)] !== FLOOR) continue;
+        const x = (c + 0.5) * t;
+        const y = (r + 0.5) * t;
+        if (this.racers.some((p) => SQ.dist2(p.x, p.y, x, y) < t * t * 2)) continue;
+        if (this.items.some((o) => o.respawn <= 0 && SQ.dist2(o.x, o.y, x, y) < t * t)) continue;
+        return [x, y];
+      }
+      return null;
+    }
+
     useItem(p, it) {
       const g = this.g;
       g.audio.pickup();
-      g.fx.ring(it.x, it.y, '#ffffff', 40);
-      if (it.type === 'boost') {
+      g.fx.ring(it.x, it.y, SQ.ITEMS[it.type].color, 50);
+      g.fx.burst(it.x, it.y, SQ.ITEMS[it.type].color, 10, 220, 8);
+      if (it.type === 'portal') {
+        // jump 5 tiles further along the fastest route
+        let c = Math.floor(p.x / this.tile);
+        let r = Math.floor(p.y / this.tile);
+        for (let k = 0; k < 5; k++) {
+          let best = null;
+          for (const [dx, dy] of [
+            [1, 0],
+            [-1, 0],
+            [0, 1],
+            [0, -1],
+          ]) {
+            const nc = c + dx;
+            const nr = r + dy;
+            if (nc < 0 || nr < 0 || nc >= this.T || nr >= this.T) continue;
+            const v = this.grid[this.idx(nc, nr)];
+            if (v === WALL || v === BRICK) continue;
+            if (this.dist[this.idx(nc, nr)] < this.dist[this.idx(c, r)]) best = [nc, nr];
+          }
+          if (!best) break;
+          [c, r] = best;
+        }
+        g.fx.ring(p.x, p.y, '#4f86ff', 60);
+        p.x = (c + 0.5) * this.tile;
+        p.y = (r + 0.5) * this.tile;
+        p.vx *= 0.3;
+        p.vy *= 0.3;
+        g.fx.ring(p.x, p.y, '#4f86ff', 80);
+        g.fx.burst(p.x, p.y, '#4f86ff', 16, 260, 9);
+        g.fx.text(p.x, p.y - 40, 'PORTAL!', '#8fb3ff', 36);
+        g.audio.whoosh();
+      } else if (it.type === 'boost') {
         p.boost = 2.5;
         g.fx.text(p.x, p.y - 40, 'BOOST!', '#ffe066', 36);
       } else if (it.type === 'knife') {
@@ -3323,18 +3662,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       const [fc, fr] = this.finishTile;
       SQ.drawEmoji(ctx, '🏁', (fc + 0.5) * t, (fr + 0.5) * t - Math.abs(Math.sin(this.time * 3)) * 6, t * 0.5);
 
-      for (const it of this.items) {
-        if (it.respawn > 0) continue;
-        ctx.save();
-        ctx.translate(it.x, it.y + Math.sin(it.t * 4) * 4);
-        ctx.rotate(Math.sin(it.t * 2) * 0.2);
-        ctx.fillStyle = 'rgba(80,60,200,0.18)';
-        ctx.beginPath();
-        ctx.arc(0, 0, t * 0.3, 0, Math.PI * 2);
-        ctx.fill();
-        SQ.drawEmoji(ctx, it.icon, 0, 2, t * 0.42);
-        ctx.restore();
-      }
+      for (const it of this.items) if (it.respawn <= 0) SQ.drawItem(ctx, it.x, it.y, it.type, it.t, t * 0.5);
       for (const bn of this.bananas) SQ.drawEmoji(ctx, '🍌', bn.x, bn.y, t * 0.36);
 
       for (const p of this.racers) {
@@ -3412,6 +3740,9 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     { type: 'heal', icon: '❤️' },
     { type: 'speed', icon: '⚡' },
     { type: 'spikes', icon: '🌵' },
+    { type: 'shield', icon: '🛡️' },
+    { type: 'mega', icon: '🍄' },
+    { type: 'bomb', icon: '💣' },
   ];
 
   class Brawl {
@@ -3493,9 +3824,16 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       if (this.nextDrop <= 0 && this.drops.length < 3) {
         this.nextDrop = rng.range(3.5, 6.5);
         const d = this.variant === 'sword' ? rng.pick(DROPS) : rng.pick(DROPS.slice(1));
-        this.drops.push({ ...d, x: rng.range(lo + 80, hi - 80), y: rng.range(lo + 80, hi - 80), t: 0 });
+        const x = rng.range(lo + 80, hi - 80);
+        const y = rng.range(lo + 80, hi - 80);
+        this.drops.push({ ...d, x, y, t: 0, life: 15 });
+        g.audio.itemSpawn();
+        g.fx.ring(x, y, SQ.ITEMS[d.type].color, 45);
       }
-      for (const d of this.drops) d.t += dt;
+      for (let i = this.drops.length - 1; i >= 0; i--) {
+        this.drops[i].t += dt;
+        if (this.drops[i].t > this.drops[i].life) this.drops.splice(i, 1);
+      }
 
       for (const s of this.sq) {
         if (!s.alive) {
@@ -3505,6 +3843,11 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         s.flash = Math.max(0, s.flash - dt * 4);
         s.squash *= Math.exp(-dt * 10);
         s.boost -= dt;
+        s.shieldT = (s.shieldT || 0) - dt;
+        if (s.megaT > 0) {
+          s.megaT -= dt;
+          if (s.megaT <= 0) s.size = Math.max(30, s.size - 36);
+        }
         s.blink -= dt;
         if (s.blink < -0.12) s.blink = rng.range(2, 5);
         for (const k in s.hitCool) s.hitCool[k] -= dt;
@@ -3641,6 +3984,11 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     damage(v, amt, by) {
       if (!v.alive || amt <= 0) return;
       const g = this.g;
+      if (v.shieldT > 0) {
+        if (amt >= 8) g.fx.text(v.x, v.y - v.size * 0.7, 'BLOCKED', '#bfe9ff', 30);
+        return;
+      }
+      if (by && by.megaT > 0) amt *= 1.5;
       v.hp -= amt;
       v.flash = 1;
       if (amt >= 8) g.fx.text(v.x + (Math.random() - 0.5) * 30, v.y - v.size * 0.7, `-${Math.round(amt)}`, amt >= 15 ? '#ffd23f' : '#ffffff', amt >= 15 ? 40 : 30);
@@ -3661,15 +4009,30 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
           else g.fx.maybeSay(by, 'hunter', 0.4);
         }
         g.highlight(v.x, v.y, 1.9, 1.2, 0.25);
-        if (v.sword) this.drops.push({ type: 'sword', icon: '🗡️', x: v.x, y: v.y, t: 0 });
+        if (v.sword) this.drops.push({ type: 'sword', icon: '🗡️', x: v.x, y: v.y, t: 0, life: 15 });
       }
     }
 
     collect(s, d) {
       const g = this.g;
       g.audio.pickup();
-      g.fx.ring(d.x, d.y, '#ffffff', 50);
-      if (d.type === 'sword') {
+      g.fx.ring(d.x, d.y, SQ.ITEMS[d.type].color, 60);
+      g.fx.burst(d.x, d.y, SQ.ITEMS[d.type].color, 12, 240, 9);
+      if (d.type === 'shield') {
+        s.shieldT = 4;
+        g.fx.text(s.x, s.y - 50, 'SHIELD!', '#5cc8ff', 38);
+      } else if (d.type === 'mega') {
+        if (!(s.megaT > 0)) s.size += 36;
+        s.megaT = 6;
+        g.fx.text(s.x, s.y - 60, 'MEGA!', '#ff6ac1', 40);
+      } else if (d.type === 'bomb') {
+        g.audio.explode();
+        g.cam.shake(12);
+        g.hitstop(0.06);
+        g.fx.ring(d.x, d.y, '#ff4d5e', 220);
+        g.fx.text(d.x, d.y - 60, 'BOOM!', '#ffffff', 56);
+        for (const o of this.sq) if (o !== s && o.alive && SQ.dist2(o.x, o.y, d.x, d.y) < 230 * 230) this.damage(o, 22, s);
+      } else if (d.type === 'sword') {
         this.giveSword(s);
         g.fx.text(s.x, s.y - 50, 'SWORD!', '#dfe6ff', 38);
       } else if (d.type === 'heal') {
@@ -3705,18 +4068,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         ctx.lineWidth = 6;
         ctx.strokeRect(s, s, 1000 - 2 * s, 1000 - 2 * s);
       }
-      for (const d of this.drops) {
-        const s = Math.min(1, d.t * 4);
-        ctx.save();
-        ctx.translate(d.x, d.y + Math.sin(d.t * 4) * 5);
-        ctx.scale(s, s);
-        ctx.fillStyle = 'rgba(255,255,255,0.12)';
-        ctx.beginPath();
-        ctx.arc(0, 0, 30, 0, Math.PI * 2);
-        ctx.fill();
-        SQ.drawEmoji(ctx, d.icon, 0, 2, 42);
-        ctx.restore();
-      }
+      for (const d of this.drops) SQ.drawItem(ctx, d.x, d.y, d.type, d.t, 54, d.life - d.t);
       for (const s of this.sq) {
         const t = this.teams[s.team];
         if (!s.alive) {
@@ -3749,7 +4101,9 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
           flash: s.flash,
           blink: s.blink < 0,
           mood: s.hp < 30 ? 'scared' : s.sword ? 'angry' : 'normal',
-          glow: s.boost > 0 ? 18 : 0,
+          glow: s.boost > 0 || s.megaT > 0 ? 18 : 0,
+          glowColor: s.megaT > 0 ? '#ff6ac1' : null,
+          shield: s.shieldT,
         });
         // hp pip over the head
         const w = s.size;

@@ -18,11 +18,23 @@ controls.
 
 | Mode | What happens |
 | --- | --- |
-| Color Chase | Red chases Green, Green chases Blue, Blue chases Red (3 to 5 colors). A tagged square switches color. Pickups: ⚡ speed, 🛡️ shield, 💣 bomb, ❄️ freeze. A storm shrinks the arena late in the match. |
-| Tile Wars | Pong-wars style. Each color's square bounces around and steals every tile it hits. Random multiball, speed-up and mega-square events. Most tiles when the timer ends wins. |
-| Domain Duel | Big squares paint the floor. On their own settled paint they cannot be hurt. Segmented health bars, crits and "domain expansion". |
-| Square Race | A random maze with breakable brick gates. Items: ⚡ boost, 🔪 knife, 🍌 banana, ❄️ freeze. The camera follows the leaders. |
+| Color Chase | Red chases Green, Green chases Blue, Blue chases Red (3 to 5 colors). A tagged square switches color. A storm shrinks the arena late in the match. |
+| Tile Wars | Pong-wars style. Each color's square bounces around and steals every tile it hits. Most tiles when the timer ends wins. |
+| Domain Duel | Big squares paint the floor. On their own settled paint they cannot be hurt. Segmented health bars and crits. |
+| Square Race | A random maze with breakable brick gates. The camera follows the leaders. |
 | Sword Brawl | Bouncing squares with spinning swords that grow with every hit, or a variant where every bounce makes you bigger. Last square standing. |
+
+### Power-ups
+
+Items spawn at random spots and only work when a square touches them. They blink before they disappear.
+
+| Mode | Items |
+| --- | --- |
+| Color Chase | ⚡ Speed · 🛡️ Shield (can't be tagged) · 💣 Bomb (tags everyone nearby) · ❄️ Freeze (freezes your hunters) · 🧲 Magnet (pulls prey in) · 🍄 Mega (grow bigger) |
+| Tile Wars | ⚡ Speed · 🍄 Mega · ✨ Multiball (an extra square) · 💣 Bomb (paints a 5×5 block) · ❄️ Freeze (stops the others) · 🖌️ Paint Rush (plow through enemy tiles) · 🛡️ Lock (your tiles can't be stolen for 5s) |
+| Domain Duel | ❤️ Heal · 🛡️ Shield (invincible anywhere) · ⚡ Speed · 🌐 Expansion (instant 7×7 domain) · 🔥 Rage (double damage) · 🍄 Mega · ❄️ Freeze |
+| Square Race | ⚡ Boost · 🔪 Knife · 🍌 Banana · ❄️ Freeze · 🌀 Portal (jump ahead). Items reappear somewhere new after pickup. |
+| Sword Brawl | 🗡️ Sword · ❤️ Heal · ⚡ Speed · 🌵 Spikes · 🛡️ Shield · 🍄 Mega (bigger and hits harder) · 💣 Bomb |
 
 **Random** picks a mode and all its settings from the seed. Type a seed to replay a match exactly.
 

@@ -15,6 +15,7 @@
       this.rules = [
         [{ t: 'Every bounce ', c: '#ffffff' }, { t: 'steals', c: '#ffd23f' }, { t: ' a tile', c: '#ffffff' }],
         [{ t: `Most tiles in ${this.duration}s wins`, c: '#ffffff' }],
+        [{ t: 'Grab the ', c: '#ffffff' }, { t: 'power-ups', c: '#1fd6f0' }, { t: '!', c: '#ffffff' }],
       ];
       this.grid = new Int8Array(this.N * this.N);
       const vertical = rng.chance(0.5);
@@ -42,7 +43,9 @@
         this.addBall(ti, sx / k, sy / k);
       });
       this.time = 0;
-      this.nextEvent = rng.range(14, 20);
+      this.items = [];
+      this.lock = this.teams.map(() => 0);
+      this.nextItem = rng.range(2.5, 4);
       this.counts = this.teams.map(() => 0);
       this.tileFlash = new Float32Array(this.N * this.N);
       this.leader = -1;
@@ -56,7 +59,7 @@
     addBall(ti, x, y) {
       const a = this.rng.pick([1, 3, 5, 7]) * (Math.PI / 4) + this.rng.range(-0.3, 0.3);
       const speed = 520;
-      this.balls.push({ team: ti, x, y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, size: 26, big: 0, squash: 0, trail: [] });
+      this.balls.push({ team: ti, x, y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, size: 26, big: 0, boost: 0, frozen: 0, paint: 0, squash: 0, trail: [] });
     }
 
     recount() {
@@ -77,31 +80,16 @@
       this.time += dt;
       for (let i = 0; i < this.tileFlash.length; i++) if (this.tileFlash[i] > 0) this.tileFlash[i] = Math.max(0, this.tileFlash[i] - dt * 3);
 
-      this.nextEvent -= dt;
-      if (this.nextEvent <= 0 && this.time < this.duration - 6) {
-        this.nextEvent = this.rng.range(12, 18);
-        const ev = this.rng.pick(['multi', 'speed', 'big']);
-        if (ev === 'multi' && this.balls.length < this.teams.length * 3) {
-          g.fx.banner('MULTIBALL!', 'every color gets another square', '#ffd23f', 1.6);
-          for (const b of this.balls.slice()) this.addBall(b.team, b.x, b.y);
-        } else if (ev === 'speed') {
-          g.fx.banner('SPEED UP!', null, '#1fd6f0', 1.4);
-          for (const b of this.balls) {
-            b.vx *= 1.25;
-            b.vy *= 1.25;
-          }
-        } else {
-          const b = this.rng.pick(this.balls);
-          b.big = 7;
-          g.fx.banner('MEGA SQUARE!', `${this.teams[b.team].name} grows for 7s`, this.teams[b.team].color, 1.6);
-        }
-        g.audio.whoosh();
-      }
+      this.updateItems(dt);
+      this.lock = this.lock.map((v) => Math.max(0, v - dt));
 
       const steps = 6;
       const sdt = dt / steps;
       for (const b of this.balls) {
         b.big -= dt;
+        b.boost -= dt;
+        b.frozen -= dt;
+        b.paint -= dt;
         b.size = SQ.lerp(b.size, b.big > 0 ? 60 : 26, Math.min(1, dt * 5));
         b.squash *= Math.exp(-dt * 12);
         for (let s = 0; s < steps; s++) this.moveBall(b, sdt);
@@ -130,8 +118,84 @@
       }
     }
 
+    // ---------- power-ups ----------
+    updateItems(dt) {
+      const g = this.g;
+      const rng = this.rng;
+      this.nextItem -= dt;
+      if (this.nextItem <= 0 && this.items.length < 3 && this.time < this.duration - 4) {
+        this.nextItem = rng.range(3, 5.5);
+        const type = rng.pick(['speed', 'mega', 'multi', 'bomb', 'freeze', 'paint', 'shield', 'bomb', 'paint']);
+        let x, y, tries = 0;
+        do {
+          x = rng.range(70, 930);
+          y = rng.range(70, 930);
+          tries++;
+        } while (tries < 20 && (this.balls.some((b) => SQ.dist2(b.x, b.y, x, y) < 150 * 150) || this.items.some((it) => SQ.dist2(it.x, it.y, x, y) < 200 * 200)));
+        this.items.push({ type, x, y, t: 0, life: 14 });
+        g.audio.itemSpawn();
+        g.fx.ring(x, y, SQ.ITEMS[type].color, 50);
+      }
+      for (let i = this.items.length - 1; i >= 0; i--) {
+        const it = this.items[i];
+        it.t += dt;
+        if (it.t > it.life) {
+          this.items.splice(i, 1);
+          continue;
+        }
+        const b = this.balls.find((b) => Math.abs(b.x - it.x) < b.size / 2 + 24 && Math.abs(b.y - it.y) < b.size / 2 + 24);
+        if (b) {
+          this.items.splice(i, 1);
+          this.collect(b, it);
+        }
+      }
+    }
+
+    collect(b, it) {
+      const g = this.g;
+      const team = this.teams[b.team];
+      const def = SQ.ITEMS[it.type];
+      g.audio.pickup();
+      g.fx.ring(it.x, it.y, def.color, 70);
+      g.fx.burst(it.x, it.y, def.color, 14, 260, 9);
+      g.fx.text(it.x, it.y - 50, def.label, def.color, 42);
+      if (it.type === 'speed') b.boost = 5;
+      else if (it.type === 'mega') b.big = 6;
+      else if (it.type === 'shield') {
+        this.lock[b.team] = 5;
+        g.fx.banner(`${team.name.toUpperCase()} TILES LOCKED`, 'nobody can steal them for 5s', team.color, 1.4);
+      }
+      else if (it.type === 'paint') b.paint = 3.5;
+      else if (it.type === 'multi') {
+        if (this.balls.filter((o) => o.team === b.team).length < 4) this.addBall(b.team, b.x, b.y);
+      } else if (it.type === 'freeze') {
+        g.audio.freeze();
+        g.fx.flash(0.3, '#bdf3ff');
+        for (const o of this.balls) if (o.team !== b.team) o.frozen = 2.2;
+      } else if (it.type === 'bomb') {
+        // paints a 5x5 block of tiles around the blast
+        g.audio.explode();
+        g.cam.shake(10);
+        g.hitstop(0.06);
+        g.fx.ring(it.x, it.y, team.color, 150);
+        const c0 = Math.floor(it.x / this.cell);
+        const r0 = Math.floor(it.y / this.cell);
+        for (let r = r0 - 2; r <= r0 + 2; r++)
+          for (let c = c0 - 2; c <= c0 + 2; c++) {
+            if (r < 0 || c < 0 || r >= this.N || c >= this.N) continue;
+            const i = r * this.N + c;
+            if (this.grid[i] !== b.team) {
+              this.grid[i] = b.team;
+              this.tileFlash[i] = 1;
+              this.dirty.push(i);
+            }
+          }
+      }
+    }
+
     moveBall(b, dt) {
-      if (this.frozen) return;
+      if (this.frozen || b.frozen > 0) return;
+      dt *= b.boost > 0 ? 1.6 : 1;
       const h = b.size / 2;
       const hitAxis = (axis) => {
         // corners of the leading edge
@@ -150,6 +214,10 @@
         let hit = false;
         for (const [px, py] of pts) {
           const i = this.cellAt(px, py);
+          if (i >= 0 && this.grid[i] !== b.team && this.lock[this.grid[i]] > 0) {
+            hit = 'locked';
+            continue;
+          }
           if (i >= 0 && this.grid[i] !== b.team) {
             this.grid[i] = b.team;
             this.tileFlash[i] = 1;
@@ -161,7 +229,9 @@
             this.g.audio.melodyHit((cx - 500) / 600);
           }
         }
-        return hit;
+        // with Paint Rush the square plows straight through enemy tiles
+        if (hit === 'locked') return true;
+        return hit && b.paint <= 0;
       };
       b.x += b.vx * dt;
       if (hitAxis('x')) {
@@ -243,6 +313,17 @@
         ctx.fillStyle = SQ.mixWhite(t.color, f * 0.6);
         ctx.fillRect(cx - w / 2, cy - w / 2, w, w);
       }
+      // locked tiles get a white rim
+      if (this.lock.some((v) => v > 0)) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+        ctx.lineWidth = 3;
+        for (let i = 0; i < this.grid.length; i++) {
+          const lk = this.lock[this.grid[i]];
+          if (lk <= 0 || (lk < 1.2 && Math.floor(lk * 8) % 2)) continue;
+          ctx.strokeRect((i % this.N) * c + 4, Math.floor(i / this.N) * c + 4, c - 8, c - 8);
+        }
+      }
+      for (const it of this.items) SQ.drawItem(ctx, it.x, it.y, it.type, it.t, 54, it.life - it.t);
       for (const b of this.balls) {
         const t = this.teams[b.team];
         ctx.strokeStyle = SQ.rgba(t.light, 0.5);
@@ -255,7 +336,15 @@
           ctx.stroke();
         }
         const sp = Math.hypot(b.vx, b.vy) || 1;
-        SQ.drawSquare(ctx, b.x, b.y, b.size, t, { lookX: b.vx / sp, lookY: b.vy / sp, squash: b.squash, outline: '#ffffff', mood: b.big > 0 ? 'angry' : 'normal', glow: 12, glowColor: '#ffffff' });
+        SQ.drawSquare(ctx, b.x, b.y, b.size, t, {
+          lookX: b.vx / sp,
+          lookY: b.vy / sp,
+          squash: b.squash,
+          outline: b.frozen > 0 ? '#bdf3ff' : '#ffffff',
+          mood: b.frozen > 0 ? 'scared' : b.big > 0 || b.paint > 0 ? 'angry' : 'normal',
+          glow: b.boost > 0 || b.paint > 0 ? 22 : 12,
+          glowColor: b.paint > 0 ? '#a95cff' : b.boost > 0 ? '#ffc21a' : '#ffffff',
+        });
       }
     }
 

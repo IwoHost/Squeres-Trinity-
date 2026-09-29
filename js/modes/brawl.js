@@ -6,6 +6,9 @@
     { type: 'heal', icon: '❤️' },
     { type: 'speed', icon: '⚡' },
     { type: 'spikes', icon: '🌵' },
+    { type: 'shield', icon: '🛡️' },
+    { type: 'mega', icon: '🍄' },
+    { type: 'bomb', icon: '💣' },
   ];
 
   class Brawl {
@@ -87,9 +90,16 @@
       if (this.nextDrop <= 0 && this.drops.length < 3) {
         this.nextDrop = rng.range(3.5, 6.5);
         const d = this.variant === 'sword' ? rng.pick(DROPS) : rng.pick(DROPS.slice(1));
-        this.drops.push({ ...d, x: rng.range(lo + 80, hi - 80), y: rng.range(lo + 80, hi - 80), t: 0 });
+        const x = rng.range(lo + 80, hi - 80);
+        const y = rng.range(lo + 80, hi - 80);
+        this.drops.push({ ...d, x, y, t: 0, life: 15 });
+        g.audio.itemSpawn();
+        g.fx.ring(x, y, SQ.ITEMS[d.type].color, 45);
       }
-      for (const d of this.drops) d.t += dt;
+      for (let i = this.drops.length - 1; i >= 0; i--) {
+        this.drops[i].t += dt;
+        if (this.drops[i].t > this.drops[i].life) this.drops.splice(i, 1);
+      }
 
       for (const s of this.sq) {
         if (!s.alive) {
@@ -99,6 +109,11 @@
         s.flash = Math.max(0, s.flash - dt * 4);
         s.squash *= Math.exp(-dt * 10);
         s.boost -= dt;
+        s.shieldT = (s.shieldT || 0) - dt;
+        if (s.megaT > 0) {
+          s.megaT -= dt;
+          if (s.megaT <= 0) s.size = Math.max(30, s.size - 36);
+        }
         s.blink -= dt;
         if (s.blink < -0.12) s.blink = rng.range(2, 5);
         for (const k in s.hitCool) s.hitCool[k] -= dt;
@@ -235,6 +250,11 @@
     damage(v, amt, by) {
       if (!v.alive || amt <= 0) return;
       const g = this.g;
+      if (v.shieldT > 0) {
+        if (amt >= 8) g.fx.text(v.x, v.y - v.size * 0.7, 'BLOCKED', '#bfe9ff', 30);
+        return;
+      }
+      if (by && by.megaT > 0) amt *= 1.5;
       v.hp -= amt;
       v.flash = 1;
       if (amt >= 8) g.fx.text(v.x + (Math.random() - 0.5) * 30, v.y - v.size * 0.7, `-${Math.round(amt)}`, amt >= 15 ? '#ffd23f' : '#ffffff', amt >= 15 ? 40 : 30);
@@ -255,15 +275,30 @@
           else g.fx.maybeSay(by, 'hunter', 0.4);
         }
         g.highlight(v.x, v.y, 1.9, 1.2, 0.25);
-        if (v.sword) this.drops.push({ type: 'sword', icon: '🗡️', x: v.x, y: v.y, t: 0 });
+        if (v.sword) this.drops.push({ type: 'sword', icon: '🗡️', x: v.x, y: v.y, t: 0, life: 15 });
       }
     }
 
     collect(s, d) {
       const g = this.g;
       g.audio.pickup();
-      g.fx.ring(d.x, d.y, '#ffffff', 50);
-      if (d.type === 'sword') {
+      g.fx.ring(d.x, d.y, SQ.ITEMS[d.type].color, 60);
+      g.fx.burst(d.x, d.y, SQ.ITEMS[d.type].color, 12, 240, 9);
+      if (d.type === 'shield') {
+        s.shieldT = 4;
+        g.fx.text(s.x, s.y - 50, 'SHIELD!', '#5cc8ff', 38);
+      } else if (d.type === 'mega') {
+        if (!(s.megaT > 0)) s.size += 36;
+        s.megaT = 6;
+        g.fx.text(s.x, s.y - 60, 'MEGA!', '#ff6ac1', 40);
+      } else if (d.type === 'bomb') {
+        g.audio.explode();
+        g.cam.shake(12);
+        g.hitstop(0.06);
+        g.fx.ring(d.x, d.y, '#ff4d5e', 220);
+        g.fx.text(d.x, d.y - 60, 'BOOM!', '#ffffff', 56);
+        for (const o of this.sq) if (o !== s && o.alive && SQ.dist2(o.x, o.y, d.x, d.y) < 230 * 230) this.damage(o, 22, s);
+      } else if (d.type === 'sword') {
         this.giveSword(s);
         g.fx.text(s.x, s.y - 50, 'SWORD!', '#dfe6ff', 38);
       } else if (d.type === 'heal') {
@@ -299,18 +334,7 @@
         ctx.lineWidth = 6;
         ctx.strokeRect(s, s, 1000 - 2 * s, 1000 - 2 * s);
       }
-      for (const d of this.drops) {
-        const s = Math.min(1, d.t * 4);
-        ctx.save();
-        ctx.translate(d.x, d.y + Math.sin(d.t * 4) * 5);
-        ctx.scale(s, s);
-        ctx.fillStyle = 'rgba(255,255,255,0.12)';
-        ctx.beginPath();
-        ctx.arc(0, 0, 30, 0, Math.PI * 2);
-        ctx.fill();
-        SQ.drawEmoji(ctx, d.icon, 0, 2, 42);
-        ctx.restore();
-      }
+      for (const d of this.drops) SQ.drawItem(ctx, d.x, d.y, d.type, d.t, 54, d.life - d.t);
       for (const s of this.sq) {
         const t = this.teams[s.team];
         if (!s.alive) {
@@ -343,7 +367,9 @@
           flash: s.flash,
           blink: s.blink < 0,
           mood: s.hp < 30 ? 'scared' : s.sword ? 'angry' : 'normal',
-          glow: s.boost > 0 ? 18 : 0,
+          glow: s.boost > 0 || s.megaT > 0 ? 18 : 0,
+          glowColor: s.megaT > 0 ? '#ff6ac1' : null,
+          shield: s.shieldT,
         });
         // hp pip over the head
         const w = s.size;
