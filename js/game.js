@@ -353,7 +353,8 @@
         }
         if (steps >= 8) this.acc = 0;
       }
-      if (P === 'play' && !this.cam.tracking && this.cam.hold <= 0) {
+      // this.phase, not P: when a match ends this frame the camera must stay on the winner
+      if (this.phase === 'play' && !this.cam.tracking && this.cam.hold <= 0) {
         // the resting view always shows the whole arena, edge to edge
         this.cam.setDefault(500, 500, 1);
         this.cam.tx = this.cam.defaultView.x;
@@ -413,6 +414,8 @@
       t.lastMode = id;
       t.next = { pair, id, seed: t.rng.int(1, 1e9) };
       t.part++;
+      if (t.coinFlip && t.coinFlip.shown) t.coinFlip = null;
+      else if (t.coinFlip) t.coinFlip.shown = true;
       this.stage = list.length === 2 ? 'FINAL' : `${this.roundName(list.length)} ${t.match + 1}`;
       this.fx.clear();
       this.setPhase('bracket');
@@ -426,7 +429,11 @@
 
     async finishTourMatch() {
       const t = this.tour;
-      const w = this.mode.winner.team;
+      const res = this.mode.winner;
+      this.emitResult();
+      // a knockout needs someone to advance: a tie is settled by a coin flip
+      const w = res.tie ? t.rng.pick(res.tied) : res.team;
+      if (res.tie) t.coinFlip = { team: w, at: t.round };
       t.results[t.round][t.match] = w;
       t.lastResult = { r: t.round, i: t.match };
       t.match++;
@@ -468,8 +475,21 @@
       this.emit('done', { winner: { team: c, text: `${c.name.toUpperCase()} IS THE CHAMPION` }, video: null, tour: true });
     }
 
+    // Tells the page who played and who won, for the win stats.
+    emitResult() {
+      const m = this.mode;
+      if (!m || !m.winner) return;
+      this.emit('result', {
+        mode: this.modeInfo.id,
+        teams: m.teams.map((t) => t.base),
+        winner: m.winner.tie ? null : m.winner.team.base,
+        tied: m.winner.tie ? m.winner.tied.map((t) => t.base) : null,
+      });
+    }
+
     async finish() {
       if (this.tour) return this.finishTourMatch();
+      this.emitResult();
       this.setPhase('done');
       if (this.recorder.active) {
         const blob = await this.recorder.stop();
@@ -718,8 +738,18 @@
       ctx.globalAlpha = k;
       ctx.fillStyle = 'rgba(8,8,14,0.6)';
       ctx.fillRect(A.x, A.y, A.size, A.size);
-      SQ.drawSquare(ctx, SQ.W / 2, A.y + 380, 220, w.team, { mood: 'happy', squash: Math.sin(this.real * 6) * 0.05 });
-      if (this.opts.memes > 0) SQ.drawSunglasses(ctx, SQ.W / 2, A.y + 372, 210);
+      if (w.tie) {
+        // every tied square side by side, dazed
+        const n = w.tied.length;
+        const size = Math.min(180, 700 / n);
+        w.tied.forEach((t, i) => {
+          const x = SQ.W / 2 + (i - (n - 1) / 2) * size * 1.3;
+          SQ.drawSquare(ctx, x, A.y + 380, size, t, { mood: 'dead', angle: Math.sin(this.real * 3 + i) * 0.12 });
+        });
+      } else {
+        SQ.drawSquare(ctx, SQ.W / 2, A.y + 380, 220, w.team, { mood: 'happy', squash: Math.sin(this.real * 6) * 0.05 });
+        if (this.opts.memes > 0) SQ.drawSunglasses(ctx, SQ.W / 2, A.y + 372, 210);
+      }
       SQ.outlinedText(ctx, w.text, SQ.W / 2, A.y + 620, 96, w.team.color, { stroke: 16 });
       SQ.outlinedText(ctx, 'Follow for the next episode', SQ.W / 2, A.y + 720, 40, '#ffffff', { stroke: 8, font: SQ.fontBody, weight: 700 });
       ctx.restore();
@@ -811,6 +841,7 @@
         ctx.save();
         ctx.translate(W / 2, 1700);
         ctx.scale(inK, inK);
+        if (t.coinFlip && T < 3) SQ.outlinedText(ctx, `LAST MATCH WAS A TIE · ${t.coinFlip.team.name.toUpperCase()} WON THE COIN FLIP`, 0, -120, 28, '#ffffff', { stroke: 6 });
         SQ.outlinedText(ctx, `NEXT UP  ·  ${this.stage}`, 0, -58, 34, '#ffd23f', { stroke: 7 });
         const size = SQ.fitSize(ctx, [{ t: a.name + ' VS ' + b.name }], W - 120, 72);
         SQ.richLine(ctx, [{ t: a.name.toUpperCase(), c: a.color }, { t: '  VS  ', c: '#ffffff' }, { t: b.name.toUpperCase(), c: b.color }], 0, 14, size);

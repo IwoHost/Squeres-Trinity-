@@ -87,6 +87,13 @@ In the Names panel you can rename any color (up to 10 characters), for example t
 nickname. The name is used everywhere: rules, intro, scoreboard, winner text and the tournament
 bracket. Tick the star next to a color to put it in every match. Personalities stay with the color.
 
+## Win stats
+
+The Win stats panel next to the game counts wins, matches played, win rate and ties for every
+color, overall or per mode. It is stored in this browser only and can be reset. Draws (the last
+squares going down together, or an exact tie on points) count as ties; in a tournament a coin flip
+decides who advances.
+
 ## Memes
 
 With memes on, squares react with captions ("skill issue", "it's so over", "we're so back",

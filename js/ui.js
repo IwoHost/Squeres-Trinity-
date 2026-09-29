@@ -37,6 +37,93 @@
     sel.value = selected || game.opts.music;
   }
 
+  // ----- win stats, kept in this browser -----
+  const MODE_NAMES = { chase: 'Color Chase', territory: 'Tile Wars', domain: 'Domain Duel', race: 'Square Race', brawl: 'Weapon Brawl', bounce: 'Bounce Brawl', marble: 'Marble Race', hill: 'King of the Hill' };
+  let stats = store.get('stats', { total: 0, modes: {} });
+  const statsSel = $('stats-mode');
+  const fillStatsModes = () => {
+    statsSel.innerHTML = '';
+    const add = (v, label) => {
+      const o = document.createElement('option');
+      o.value = v;
+      o.textContent = label;
+      statsSel.appendChild(o);
+    };
+    add('all', 'All modes');
+    Object.keys(MODE_NAMES).forEach((k) => add(k, MODE_NAMES[k]));
+  };
+  fillStatsModes();
+  function renderStats() {
+    const pick = statsSel.value || 'all';
+    const rows = {};
+    SQ.TEAMS.forEach((t) => (rows[t.base] = { p: 0, w: 0, t: 0 }));
+    for (const [mode, byColor] of Object.entries(stats.modes)) {
+      if (pick !== 'all' && pick !== mode) continue;
+      for (const [c, r] of Object.entries(byColor)) {
+        if (!rows[c]) continue;
+        rows[c].p += r.p;
+        rows[c].w += r.w;
+        rows[c].t += r.t;
+      }
+    }
+    const list = SQ.TEAMS.map((team) => ({ team, ...rows[team.base] })).sort((a, b) => b.w - a.w || b.w / (b.p || 1) - a.w / (a.p || 1));
+    const maxW = Math.max(1, ...list.map((r) => r.w));
+    const table = $('stats-table');
+    table.innerHTML = '<thead><tr><th>Color</th><th>Wins</th><th>Played</th><th>Win %</th><th>Ties</th></tr></thead>';
+    const body = document.createElement('tbody');
+    for (const r of list) {
+      const tr = document.createElement('tr');
+      const name = document.createElement('td');
+      const sw = document.createElement('i');
+      sw.style.background = r.team.color;
+      name.append(sw, document.createTextNode(r.team.name));
+      const wins = document.createElement('td');
+      const bar = document.createElement('span');
+      bar.className = 'bar';
+      bar.style.width = `${Math.round((r.w / maxW) * 40)}px`;
+      wins.append(bar, document.createTextNode(String(r.w)));
+      const cell = (v) => {
+        const td = document.createElement('td');
+        td.textContent = v;
+        return td;
+      };
+      tr.append(name, wins, cell(r.p), cell(r.p ? `${Math.round((r.w / r.p) * 100)}%` : '–'), cell(r.t));
+      body.appendChild(tr);
+    }
+    table.appendChild(body);
+    $('stats-note').textContent = `${stats.total} match${stats.total === 1 ? '' : 'es'} counted on this device.`;
+  }
+  statsSel.addEventListener('change', renderStats);
+  game.on('result', (r) => {
+    stats.total++;
+    const byColor = (stats.modes[r.mode] = stats.modes[r.mode] || {});
+    for (const c of r.teams) {
+      const row = (byColor[c] = byColor[c] || { p: 0, w: 0, t: 0 });
+      row.p++;
+      if (r.winner === c) row.w++;
+      if (r.tied && r.tied.includes(c)) row.t++;
+    }
+    store.set('stats', stats);
+    renderStats();
+  });
+  let resetArmed = false;
+  $('stats-reset').addEventListener('click', () => {
+    if (!resetArmed) {
+      resetArmed = true;
+      $('stats-reset').textContent = 'Tap again to reset';
+      setTimeout(() => {
+        resetArmed = false;
+        $('stats-reset').textContent = 'Reset stats';
+      }, 3000);
+      return;
+    }
+    resetArmed = false;
+    stats = { total: 0, modes: {} };
+    store.set('stats', stats);
+    $('stats-reset').textContent = 'Reset stats';
+    renderStats();
+  });
+
   // ----- custom names -----
   const names = store.get('names', {});
   SQ.starred = store.get('stars', []).filter((b) => SQ.TEAMS.some((t) => t.base === b));
@@ -62,6 +149,7 @@
       names[t.base] = inp.value.replace(/[^\p{L}\p{N} _.-]/gu, '');
       store.set('names', names);
       applyNames();
+      renderStats();
     });
     const star = document.createElement('label');
     star.className = 'star';
@@ -82,6 +170,8 @@
     row.append(sw, inp, star);
     $('names').appendChild(row);
   });
+
+  renderStats();
 
   // ----- restore preferences -----
   const prefs = store.get('prefs2', {});

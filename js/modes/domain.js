@@ -186,6 +186,16 @@
       const living = this.sq.filter((s) => s.alive);
       if (!this.winner && (living.length <= 1 || this.time >= this.duration)) {
         let w;
+        // everyone left fell in the same clash, or time ran out dead even: a tie
+        const pool = living.length ? living : alive;
+        const rank = (s) => (living.length ? s.hp * 10000 + this.counts[s.team] : 0);
+        const top = Math.max(...pool.map(rank));
+        const tied = living.length === 1 ? [] : pool.filter((s) => rank(s) === top);
+        if (tied.length >= 2) {
+          this.winner = SQ.tieResult(tied.map((s) => this.teams[s.team]), living.length ? 'dead even when time ran out' : 'they took each other out');
+          this.winnerEnt = null;
+          return;
+        }
         if (living.length === 1) w = living[0];
         else w = (living.length ? living : this.sq).slice().sort((p, q) => q.hp - p.hp || this.counts[q.team] - this.counts[p.team])[0];
         if (w) {

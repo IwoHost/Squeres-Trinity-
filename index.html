@@ -145,6 +145,14 @@ body.theater-on .desk { visibility: hidden; }
 .row { display: flex; gap: 10px; flex-wrap: wrap; }
 .parts { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
 .parts .btn { padding: 11px 10px; font-size: 13px; }
+.stats-wrap { overflow-x: auto; }
+.stats { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 14px; }
+.stats th { text-align: right; color: var(--muted); font-weight: 700; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; padding: 6px 6px; border-bottom: 1px solid var(--line); }
+.stats th:first-child, .stats td:first-child { text-align: left; }
+.stats td { text-align: right; padding: 7px 6px; border-bottom: 1px solid var(--line); }
+.stats td:first-child { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+.stats td i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; flex: none; }
+.stats .bar { display: inline-block; height: 6px; border-radius: 3px; background: var(--gold); vertical-align: middle; margin-right: 6px; }
 .names { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
 .name-row { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; align-items: center; gap: 8px; }
 .name-row i { width: 16px; height: 16px; border-radius: 4px; display: block; }
@@ -280,6 +288,14 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         <label class="btn upload" for="upload">Add your music<input type="file" id="upload" accept="audio/*" multiple></label>
       </div>
       <p class="hint">All built-in tracks are generated live by the game, so they are free to post. Only upload music you have the rights to.</p>
+    </div>
+
+    <div class="group">
+      <span class="label">Win stats</span>
+      <div class="field"><label for="stats-mode">Mode</label><select id="stats-mode"></select></div>
+      <div class="stats-wrap"><table class="stats" id="stats-table" aria-label="Wins per color"></table></div>
+      <div class="row"><button class="btn" id="stats-reset" type="button">Reset stats</button></div>
+      <p class="hint" id="stats-note">Counted on this device only.</p>
     </div>
 
     <div class="group">

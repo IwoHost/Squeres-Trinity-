@@ -45,7 +45,7 @@
     { name: 'Green', color: '#35d97a', dark: '#16803f', light: '#aef5c9' },
     { name: 'Blue', color: '#4f86ff', dark: '#1f45a8', light: '#b8ceff' },
     { name: 'Yellow', color: '#ffd23f', dark: '#a8820c', light: '#fff0b0' },
-    { name: 'Purple', color: '#a95cff', dark: '#5b2596', light: '#dcc0ff' },
+    { name: 'Purple', color: '#8a4dff', dark: '#3f1f99', light: '#c9b3ff' },
     { name: 'Cyan', color: '#1fd6f0', dark: '#0b7c8c', light: '#b0f3fc' },
     { name: 'Orange', color: '#ff8f33', dark: '#a8520f', light: '#ffd0a8' },
     { name: 'Pink', color: '#ff6ac1', dark: '#a0286e', light: '#ffc4e6' },
@@ -181,6 +181,13 @@
   });
   SQ.starred = []; // base names of colors that must be in every match
   SQ.persona = (team) => (team && team.persona) || SQ.PERSONAS.Green;
+
+  // A stand-in "team" for a drawn match, so banners and frames still have a color to use.
+  SQ.TIE = { name: 'Tie', base: 'Tie', color: '#e8ecf5', dark: '#6b7390', light: '#ffffff', persona: null };
+  SQ.tieResult = function (teams, sub) {
+    const names = teams.map((t) => t.name);
+    return { team: SQ.TIE, tie: true, tied: teams, text: "IT'S A TIE!", sub: sub || `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` };
+  };
 
   SQ.pickTeams = function (rng, n) {
     let idx = rng.shuffle(SQ.TEAMS.map((t, i) => i));

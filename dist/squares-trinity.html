@@ -145,6 +145,14 @@ body.theater-on .desk { visibility: hidden; }
 .row { display: flex; gap: 10px; flex-wrap: wrap; }
 .parts { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
 .parts .btn { padding: 11px 10px; font-size: 13px; }
+.stats-wrap { overflow-x: auto; }
+.stats { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 14px; }
+.stats th { text-align: right; color: var(--muted); font-weight: 700; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; padding: 6px 6px; border-bottom: 1px solid var(--line); }
+.stats th:first-child, .stats td:first-child { text-align: left; }
+.stats td { text-align: right; padding: 7px 6px; border-bottom: 1px solid var(--line); }
+.stats td:first-child { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+.stats td i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; flex: none; }
+.stats .bar { display: inline-block; height: 6px; border-radius: 3px; background: var(--gold); vertical-align: middle; margin-right: 6px; }
 .names { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
 .name-row { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; align-items: center; gap: 8px; }
 .name-row i { width: 16px; height: 16px; border-radius: 4px; display: block; }
@@ -283,6 +291,14 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     </div>
 
     <div class="group">
+      <span class="label">Win stats</span>
+      <div class="field"><label for="stats-mode">Mode</label><select id="stats-mode"></select></div>
+      <div class="stats-wrap"><table class="stats" id="stats-table" aria-label="Wins per color"></table></div>
+      <div class="row"><button class="btn" id="stats-reset" type="button">Reset stats</button></div>
+      <p class="hint" id="stats-note">Counted on this device only.</p>
+    </div>
+
+    <div class="group">
       <span class="label">Names</span>
       <p class="hint">Rename any color. Tick the star to put that color in every match.</p>
       <div class="names" id="names"></div>
@@ -359,7 +375,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     { name: 'Green', color: '#35d97a', dark: '#16803f', light: '#aef5c9' },
     { name: 'Blue', color: '#4f86ff', dark: '#1f45a8', light: '#b8ceff' },
     { name: 'Yellow', color: '#ffd23f', dark: '#a8820c', light: '#fff0b0' },
-    { name: 'Purple', color: '#a95cff', dark: '#5b2596', light: '#dcc0ff' },
+    { name: 'Purple', color: '#8a4dff', dark: '#3f1f99', light: '#c9b3ff' },
     { name: 'Cyan', color: '#1fd6f0', dark: '#0b7c8c', light: '#b0f3fc' },
     { name: 'Orange', color: '#ff8f33', dark: '#a8520f', light: '#ffd0a8' },
     { name: 'Pink', color: '#ff6ac1', dark: '#a0286e', light: '#ffc4e6' },
@@ -495,6 +511,13 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
   });
   SQ.starred = []; // base names of colors that must be in every match
   SQ.persona = (team) => (team && team.persona) || SQ.PERSONAS.Green;
+
+  // A stand-in "team" for a drawn match, so banners and frames still have a color to use.
+  SQ.TIE = { name: 'Tie', base: 'Tie', color: '#e8ecf5', dark: '#6b7390', light: '#ffffff', persona: null };
+  SQ.tieResult = function (teams, sub) {
+    const names = teams.map((t) => t.name);
+    return { team: SQ.TIE, tie: true, tied: teams, text: "IT'S A TIE!", sub: sub || `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` };
+  };
 
   SQ.pickTeams = function (rng, n) {
     let idx = rng.shuffle(SQ.TEAMS.map((t, i) => i));
@@ -2838,6 +2861,14 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       if (left <= 0 && !this.winner) {
         const best = this.counts.indexOf(Math.max(...this.counts));
         const pct = Math.round((this.counts[best] / this.grid.length) * 100);
+        const level = this.teams.filter((t, i) => this.counts[i] === this.counts[best]);
+        if (level.length >= 2) {
+          this.winner = SQ.tieResult(level, `exactly ${this.counts[best]} tiles each`);
+          this.winnerEnt = null;
+          this.frozen = true;
+          this.spin = null;
+          return;
+        }
         this.winner = { team: this.teams[best], text: `${this.teams[best].name.toUpperCase()} WINS!`, sub: `${pct}% of the board` };
         this.winnerEnt = this.balls.find((b) => b.team === best);
         this.frozen = true;
@@ -3570,6 +3601,16 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       const living = this.sq.filter((s) => s.alive);
       if (!this.winner && (living.length <= 1 || this.time >= this.duration)) {
         let w;
+        // everyone left fell in the same clash, or time ran out dead even: a tie
+        const pool = living.length ? living : alive;
+        const rank = (s) => (living.length ? s.hp * 10000 + this.counts[s.team] : 0);
+        const top = Math.max(...pool.map(rank));
+        const tied = living.length === 1 ? [] : pool.filter((s) => rank(s) === top);
+        if (tied.length >= 2) {
+          this.winner = SQ.tieResult(tied.map((s) => this.teams[s.team]), living.length ? 'dead even when time ran out' : 'they took each other out');
+          this.winnerEnt = null;
+          return;
+        }
         if (living.length === 1) w = living[0];
         else w = (living.length ? living : this.sq).slice().sort((p, q) => q.hp - p.hp || this.counts[q.team] - this.counts[p.team])[0];
         if (w) {
@@ -4743,6 +4784,12 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       this.updateProjectiles(dt, lo, hi);
 
       const living = this.sq.filter((s) => s.alive);
+      // the last squares went down in the same instant: nobody wins
+      const together = this.sq.filter((s) => !s.alive && s.dead === 0);
+      if (!this.winner && living.length === 0 && together.length >= 2) {
+        this.winner = SQ.tieResult(together.map((s) => this.teams[s.team]), `${together.map((s) => this.teams[s.team].name).join(' and ')} went down together`);
+        this.winnerEnt = null;
+      }
       if (!this.winner && living.length <= 1) {
         const w = living[0] || this.sq.slice().sort((a, b) => b.dead - a.dead)[0];
         this.winner = { team: this.teams[w.team], text: `${this.teams[w.team].name.toUpperCase()} WINS!`, sub: `${w.kills} knockout${w.kills === 1 ? '' : 's'}${w.w ? ` · ${WEAPONS[w.w.type].name} LV ${w.w.lvl}` : ''}` };
@@ -5571,6 +5618,8 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
           g.fx.burst(m.x, m.y, '#ff6a2b', 30, 420, 12);
           g.fx.burst(m.x, m.y, this.teams[m.team].color, 20, 300, 10);
           g.fx.text(m.x, m.y - 50, 'ELIMINATED', '#ff6a2b', 46);
+          g.lastQuickZoom = -10;
+          g.quickZoom(m.x, m.y - 80, 1.8, 0.9);
           g.fx.voice(m, 'lose', true);
           continue;
         }
@@ -5616,6 +5665,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         this.leadTold = this.time;
         g.fx.text(lead.x, lead.y - 50, 'NEW LEADER', this.teams[lead.team].color, 34);
         g.fx.voice(lead, 'lead');
+        g.quickZoom(lead.x, lead.y + 60, 1.6, 0.7);
         g.audio.whoosh();
       }
       this.leader = lead.team;
@@ -5658,6 +5708,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         g.fx.ring(r.x, r.y, '#ffd23f', 60);
         g.fx.sparks(m.x, m.y, 10, '#ffe066');
         g.fx.text(m.x, m.y - 40, 'BOOST!', '#ffd23f', 34);
+        if (Math.random() < 0.4) g.quickZoom(m.x, m.y + 80, 1.5, 0.6);
       }
       for (const p of this.portals) {
         if (m.portalCool > 0 || Math.hypot(p.x - m.x, p.y - m.y) > p.r) continue;
@@ -5671,6 +5722,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         g.fx.ring(p.tx, p.ty, '#b35cff', 90);
         g.fx.burst(p.tx, p.ty, '#b35cff', 16, 260, 9);
         g.fx.text(p.tx, p.ty - 50, p.forward ? 'SHORTCUT!' : 'UNLUCKY!', p.forward ? '#35d97a' : '#ff4d5e', 44);
+        g.quickZoom(p.tx, p.ty, 1.8, 0.8);
         g.audio.whoosh();
         g.fx.voice(m, p.forward ? 'lead' : 'hurt', true);
         if (!p.forward) g.audio.boom();
@@ -6741,7 +6793,8 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         }
         if (steps >= 8) this.acc = 0;
       }
-      if (P === 'play' && !this.cam.tracking && this.cam.hold <= 0) {
+      // this.phase, not P: when a match ends this frame the camera must stay on the winner
+      if (this.phase === 'play' && !this.cam.tracking && this.cam.hold <= 0) {
         // the resting view always shows the whole arena, edge to edge
         this.cam.setDefault(500, 500, 1);
         this.cam.tx = this.cam.defaultView.x;
@@ -6801,6 +6854,8 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       t.lastMode = id;
       t.next = { pair, id, seed: t.rng.int(1, 1e9) };
       t.part++;
+      if (t.coinFlip && t.coinFlip.shown) t.coinFlip = null;
+      else if (t.coinFlip) t.coinFlip.shown = true;
       this.stage = list.length === 2 ? 'FINAL' : `${this.roundName(list.length)} ${t.match + 1}`;
       this.fx.clear();
       this.setPhase('bracket');
@@ -6814,7 +6869,11 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
 
     async finishTourMatch() {
       const t = this.tour;
-      const w = this.mode.winner.team;
+      const res = this.mode.winner;
+      this.emitResult();
+      // a knockout needs someone to advance: a tie is settled by a coin flip
+      const w = res.tie ? t.rng.pick(res.tied) : res.team;
+      if (res.tie) t.coinFlip = { team: w, at: t.round };
       t.results[t.round][t.match] = w;
       t.lastResult = { r: t.round, i: t.match };
       t.match++;
@@ -6856,8 +6915,21 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       this.emit('done', { winner: { team: c, text: `${c.name.toUpperCase()} IS THE CHAMPION` }, video: null, tour: true });
     }
 
+    // Tells the page who played and who won, for the win stats.
+    emitResult() {
+      const m = this.mode;
+      if (!m || !m.winner) return;
+      this.emit('result', {
+        mode: this.modeInfo.id,
+        teams: m.teams.map((t) => t.base),
+        winner: m.winner.tie ? null : m.winner.team.base,
+        tied: m.winner.tie ? m.winner.tied.map((t) => t.base) : null,
+      });
+    }
+
     async finish() {
       if (this.tour) return this.finishTourMatch();
+      this.emitResult();
       this.setPhase('done');
       if (this.recorder.active) {
         const blob = await this.recorder.stop();
@@ -7106,8 +7178,18 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       ctx.globalAlpha = k;
       ctx.fillStyle = 'rgba(8,8,14,0.6)';
       ctx.fillRect(A.x, A.y, A.size, A.size);
-      SQ.drawSquare(ctx, SQ.W / 2, A.y + 380, 220, w.team, { mood: 'happy', squash: Math.sin(this.real * 6) * 0.05 });
-      if (this.opts.memes > 0) SQ.drawSunglasses(ctx, SQ.W / 2, A.y + 372, 210);
+      if (w.tie) {
+        // every tied square side by side, dazed
+        const n = w.tied.length;
+        const size = Math.min(180, 700 / n);
+        w.tied.forEach((t, i) => {
+          const x = SQ.W / 2 + (i - (n - 1) / 2) * size * 1.3;
+          SQ.drawSquare(ctx, x, A.y + 380, size, t, { mood: 'dead', angle: Math.sin(this.real * 3 + i) * 0.12 });
+        });
+      } else {
+        SQ.drawSquare(ctx, SQ.W / 2, A.y + 380, 220, w.team, { mood: 'happy', squash: Math.sin(this.real * 6) * 0.05 });
+        if (this.opts.memes > 0) SQ.drawSunglasses(ctx, SQ.W / 2, A.y + 372, 210);
+      }
       SQ.outlinedText(ctx, w.text, SQ.W / 2, A.y + 620, 96, w.team.color, { stroke: 16 });
       SQ.outlinedText(ctx, 'Follow for the next episode', SQ.W / 2, A.y + 720, 40, '#ffffff', { stroke: 8, font: SQ.fontBody, weight: 700 });
       ctx.restore();
@@ -7199,6 +7281,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         ctx.save();
         ctx.translate(W / 2, 1700);
         ctx.scale(inK, inK);
+        if (t.coinFlip && T < 3) SQ.outlinedText(ctx, `LAST MATCH WAS A TIE · ${t.coinFlip.team.name.toUpperCase()} WON THE COIN FLIP`, 0, -120, 28, '#ffffff', { stroke: 6 });
         SQ.outlinedText(ctx, `NEXT UP  ·  ${this.stage}`, 0, -58, 34, '#ffd23f', { stroke: 7 });
         const size = SQ.fitSize(ctx, [{ t: a.name + ' VS ' + b.name }], W - 120, 72);
         SQ.richLine(ctx, [{ t: a.name.toUpperCase(), c: a.color }, { t: '  VS  ', c: '#ffffff' }, { t: b.name.toUpperCase(), c: b.color }], 0, 14, size);
@@ -7294,6 +7377,93 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     sel.value = selected || game.opts.music;
   }
 
+  // ----- win stats, kept in this browser -----
+  const MODE_NAMES = { chase: 'Color Chase', territory: 'Tile Wars', domain: 'Domain Duel', race: 'Square Race', brawl: 'Weapon Brawl', bounce: 'Bounce Brawl', marble: 'Marble Race', hill: 'King of the Hill' };
+  let stats = store.get('stats', { total: 0, modes: {} });
+  const statsSel = $('stats-mode');
+  const fillStatsModes = () => {
+    statsSel.innerHTML = '';
+    const add = (v, label) => {
+      const o = document.createElement('option');
+      o.value = v;
+      o.textContent = label;
+      statsSel.appendChild(o);
+    };
+    add('all', 'All modes');
+    Object.keys(MODE_NAMES).forEach((k) => add(k, MODE_NAMES[k]));
+  };
+  fillStatsModes();
+  function renderStats() {
+    const pick = statsSel.value || 'all';
+    const rows = {};
+    SQ.TEAMS.forEach((t) => (rows[t.base] = { p: 0, w: 0, t: 0 }));
+    for (const [mode, byColor] of Object.entries(stats.modes)) {
+      if (pick !== 'all' && pick !== mode) continue;
+      for (const [c, r] of Object.entries(byColor)) {
+        if (!rows[c]) continue;
+        rows[c].p += r.p;
+        rows[c].w += r.w;
+        rows[c].t += r.t;
+      }
+    }
+    const list = SQ.TEAMS.map((team) => ({ team, ...rows[team.base] })).sort((a, b) => b.w - a.w || b.w / (b.p || 1) - a.w / (a.p || 1));
+    const maxW = Math.max(1, ...list.map((r) => r.w));
+    const table = $('stats-table');
+    table.innerHTML = '<thead><tr><th>Color</th><th>Wins</th><th>Played</th><th>Win %</th><th>Ties</th></tr></thead>';
+    const body = document.createElement('tbody');
+    for (const r of list) {
+      const tr = document.createElement('tr');
+      const name = document.createElement('td');
+      const sw = document.createElement('i');
+      sw.style.background = r.team.color;
+      name.append(sw, document.createTextNode(r.team.name));
+      const wins = document.createElement('td');
+      const bar = document.createElement('span');
+      bar.className = 'bar';
+      bar.style.width = `${Math.round((r.w / maxW) * 40)}px`;
+      wins.append(bar, document.createTextNode(String(r.w)));
+      const cell = (v) => {
+        const td = document.createElement('td');
+        td.textContent = v;
+        return td;
+      };
+      tr.append(name, wins, cell(r.p), cell(r.p ? `${Math.round((r.w / r.p) * 100)}%` : '–'), cell(r.t));
+      body.appendChild(tr);
+    }
+    table.appendChild(body);
+    $('stats-note').textContent = `${stats.total} match${stats.total === 1 ? '' : 'es'} counted on this device.`;
+  }
+  statsSel.addEventListener('change', renderStats);
+  game.on('result', (r) => {
+    stats.total++;
+    const byColor = (stats.modes[r.mode] = stats.modes[r.mode] || {});
+    for (const c of r.teams) {
+      const row = (byColor[c] = byColor[c] || { p: 0, w: 0, t: 0 });
+      row.p++;
+      if (r.winner === c) row.w++;
+      if (r.tied && r.tied.includes(c)) row.t++;
+    }
+    store.set('stats', stats);
+    renderStats();
+  });
+  let resetArmed = false;
+  $('stats-reset').addEventListener('click', () => {
+    if (!resetArmed) {
+      resetArmed = true;
+      $('stats-reset').textContent = 'Tap again to reset';
+      setTimeout(() => {
+        resetArmed = false;
+        $('stats-reset').textContent = 'Reset stats';
+      }, 3000);
+      return;
+    }
+    resetArmed = false;
+    stats = { total: 0, modes: {} };
+    store.set('stats', stats);
+    $('stats-reset').textContent = 'Reset stats';
+    renderStats();
+  });
+
   // ----- custom names -----
   const names = store.get('names', {});
   SQ.starred = store.get('stars', []).filter((b) => SQ.TEAMS.some((t) => t.base === b));
@@ -7319,6 +7489,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       names[t.base] = inp.value.replace(/[^\p{L}\p{N} _.-]/gu, '');
       store.set('names', names);
       applyNames();
+      renderStats();
     });
     const star = document.createElement('label');
     star.className = 'star';
@@ -7339,6 +7510,8 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     row.append(sw, inp, star);
     $('names').appendChild(row);
   });
+
+  renderStats();
 
   // ----- restore preferences -----
   const prefs = store.get('prefs2', {});

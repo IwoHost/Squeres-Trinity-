@@ -234,6 +234,14 @@
       if (left <= 0 && !this.winner) {
         const best = this.counts.indexOf(Math.max(...this.counts));
         const pct = Math.round((this.counts[best] / this.grid.length) * 100);
+        const level = this.teams.filter((t, i) => this.counts[i] === this.counts[best]);
+        if (level.length >= 2) {
+          this.winner = SQ.tieResult(level, `exactly ${this.counts[best]} tiles each`);
+          this.winnerEnt = null;
+          this.frozen = true;
+          this.spin = null;
+          return;
+        }
         this.winner = { team: this.teams[best], text: `${this.teams[best].name.toUpperCase()} WINS!`, sub: `${pct}% of the board` };
         this.winnerEnt = this.balls.find((b) => b.team === best);
         this.frozen = true;

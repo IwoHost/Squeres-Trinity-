@@ -260,6 +260,8 @@
           g.fx.burst(m.x, m.y, '#ff6a2b', 30, 420, 12);
           g.fx.burst(m.x, m.y, this.teams[m.team].color, 20, 300, 10);
           g.fx.text(m.x, m.y - 50, 'ELIMINATED', '#ff6a2b', 46);
+          g.lastQuickZoom = -10;
+          g.quickZoom(m.x, m.y - 80, 1.8, 0.9);
           g.fx.voice(m, 'lose', true);
           continue;
         }
@@ -305,6 +307,7 @@
         this.leadTold = this.time;
         g.fx.text(lead.x, lead.y - 50, 'NEW LEADER', this.teams[lead.team].color, 34);
         g.fx.voice(lead, 'lead');
+        g.quickZoom(lead.x, lead.y + 60, 1.6, 0.7);
         g.audio.whoosh();
       }
       this.leader = lead.team;
@@ -347,6 +350,7 @@
         g.fx.ring(r.x, r.y, '#ffd23f', 60);
         g.fx.sparks(m.x, m.y, 10, '#ffe066');
         g.fx.text(m.x, m.y - 40, 'BOOST!', '#ffd23f', 34);
+        if (Math.random() < 0.4) g.quickZoom(m.x, m.y + 80, 1.5, 0.6);
       }
       for (const p of this.portals) {
         if (m.portalCool > 0 || Math.hypot(p.x - m.x, p.y - m.y) > p.r) continue;
@@ -360,6 +364,7 @@
         g.fx.ring(p.tx, p.ty, '#b35cff', 90);
         g.fx.burst(p.tx, p.ty, '#b35cff', 16, 260, 9);
         g.fx.text(p.tx, p.ty - 50, p.forward ? 'SHORTCUT!' : 'UNLUCKY!', p.forward ? '#35d97a' : '#ff4d5e', 44);
+        g.quickZoom(p.tx, p.ty, 1.8, 0.8);
         g.audio.whoosh();
         g.fx.voice(m, p.forward ? 'lead' : 'hurt', true);
         if (!p.forward) g.audio.boom();

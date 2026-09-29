@@ -290,6 +290,12 @@
       this.updateProjectiles(dt, lo, hi);
 
       const living = this.sq.filter((s) => s.alive);
+      // the last squares went down in the same instant: nobody wins
+      const together = this.sq.filter((s) => !s.alive && s.dead === 0);
+      if (!this.winner && living.length === 0 && together.length >= 2) {
+        this.winner = SQ.tieResult(together.map((s) => this.teams[s.team]), `${together.map((s) => this.teams[s.team].name).join(' and ')} went down together`);
+        this.winnerEnt = null;
+      }
       if (!this.winner && living.length <= 1) {
         const w = living[0] || this.sq.slice().sort((a, b) => b.dead - a.dead)[0];
         this.winner = { team: this.teams[w.team], text: `${this.teams[w.team].name.toUpperCase()} WINS!`, sub: `${w.kills} knockout${w.kills === 1 ? '' : 's'}${w.w ? ` · ${WEAPONS[w.w.type].name} LV ${w.w.lvl}` : ''}` };
