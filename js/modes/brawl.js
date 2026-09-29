@@ -217,11 +217,20 @@
         if (s.y > hi - h) (s.y = hi - h), (s.vy = -Math.abs(s.vy)), (s.squash = -0.2), (bounced = true);
         if (bounced) {
           g.audio.melodyHit((s.x - 500) / 600);
-          // Bounce Brawl: every bounce makes the square 10% bigger, up to 3x its starting size
-          if (this.variant === 'grow' && s.size < 162) {
-            s.size = Math.min(162, s.size * 1.1);
+          // Bounce Brawl: every bounce makes the square 10% bigger. No cap, only the walls.
+          if (this.variant === 'grow') {
+            s.size = Math.min(s.size * 1.1, (hi - lo) * 0.92);
             s.squash = 0.3;
-            if (s.size >= 162) g.fx.text(s.x, s.y - s.size * 0.7, 'MAX SIZE', '#ffd23f', 36);
+            for (const [at, label] of [[150, 'BIG!'], [300, 'GIANT!'], [500, 'ABSOLUTE UNIT']]) {
+              if (s.size >= at && !(s.said || {})[at]) {
+                s.said = Object.assign(s.said || {}, { [at]: true });
+                g.fx.text(s.x, s.y - s.size * 0.5 - 20, label, '#ffd23f', at >= 300 ? 60 : 44);
+                if (at >= 300) {
+                  g.audio.boom();
+                  g.cam.shake(10);
+                }
+              }
+            }
           }
           // slight angle change keeps paths interesting
           const a = Math.atan2(s.vy, s.vx) + rng.range(-0.15, 0.15);

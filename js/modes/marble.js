@@ -16,7 +16,7 @@
       this.pegs = [];
       this.bumpers = [];
       this.spinners = [];
-      this.sections = opts.quick ? rng.int(4, 5) : rng.int(7, 9);
+      this.sections = opts.quick ? rng.int(7, 8) : rng.int(11, 13);
       this.build();
       this.worldH = this.finishY + 320;
       this.camTracking = true;
@@ -110,10 +110,11 @@
     sec_zigzag(y0, L, R) {
       const rng = this.rng;
       const gap = rng.range(130, 170);
-      for (let k = 0; k < 3; k++) {
-        const y = y0 + 50 + k * 165;
-        if (k % 2 === 0) this.wall(L, y, R - gap, y + 95, 12);
-        else this.wall(R, y, L + gap, y + 95, 12);
+      // two steep ramps: fast rolling, not a slow crawl
+      for (let k = 0; k < 2; k++) {
+        const y = y0 + 50 + k * 250;
+        if (k % 2 === 0) this.wall(L, y, R - gap, y + 190, 12);
+        else this.wall(R, y, L + gap, y + 190, 12);
       }
     }
 
@@ -282,7 +283,7 @@
       if (vn < 0) {
         m.vx = rvx - (1 + e) * vn * nx + svx;
         m.vy = rvy - (1 + e) * vn * ny + svy;
-        m.vx *= 0.995;
+        m.vx *= 0.9995;
       }
       return -vn > 200;
     }

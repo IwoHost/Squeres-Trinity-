@@ -4628,11 +4628,20 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         if (s.y > hi - h) (s.y = hi - h), (s.vy = -Math.abs(s.vy)), (s.squash = -0.2), (bounced = true);
         if (bounced) {
           g.audio.melodyHit((s.x - 500) / 600);
-          // Bounce Brawl: every bounce makes the square 10% bigger, up to 3x its starting size
-          if (this.variant === 'grow' && s.size < 162) {
-            s.size = Math.min(162, s.size * 1.1);
+          // Bounce Brawl: every bounce makes the square 10% bigger. No cap, only the walls.
+          if (this.variant === 'grow') {
+            s.size = Math.min(s.size * 1.1, (hi - lo) * 0.92);
             s.squash = 0.3;
-            if (s.size >= 162) g.fx.text(s.x, s.y - s.size * 0.7, 'MAX SIZE', '#ffd23f', 36);
+            for (const [at, label] of [[150, 'BIG!'], [300, 'GIANT!'], [500, 'ABSOLUTE UNIT']]) {
+              if (s.size >= at && !(s.said || {})[at]) {
+                s.said = Object.assign(s.said || {}, { [at]: true });
+                g.fx.text(s.x, s.y - s.size * 0.5 - 20, label, '#ffd23f', at >= 300 ? 60 : 44);
+                if (at >= 300) {
+                  g.audio.boom();
+                  g.cam.shake(10);
+                }
+              }
+            }
           }
           // slight angle change keeps paths interesting
           const a = Math.atan2(s.vy, s.vx) + rng.range(-0.15, 0.15);
@@ -5276,7 +5285,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       this.pegs = [];
       this.bumpers = [];
       this.spinners = [];
-      this.sections = opts.quick ? rng.int(4, 5) : rng.int(7, 9);
+      this.sections = opts.quick ? rng.int(7, 8) : rng.int(11, 13);
       this.build();
       this.worldH = this.finishY + 320;
       this.camTracking = true;
@@ -5370,10 +5379,11 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     sec_zigzag(y0, L, R) {
       const rng = this.rng;
       const gap = rng.range(130, 170);
-      for (let k = 0; k < 3; k++) {
-        const y = y0 + 50 + k * 165;
-        if (k % 2 === 0) this.wall(L, y, R - gap, y + 95, 12);
-        else this.wall(R, y, L + gap, y + 95, 12);
+      // two steep ramps: fast rolling, not a slow crawl
+      for (let k = 0; k < 2; k++) {
+        const y = y0 + 50 + k * 250;
+        if (k % 2 === 0) this.wall(L, y, R - gap, y + 190, 12);
+        else this.wall(R, y, L + gap, y + 190, 12);
       }
     }
 
@@ -5542,7 +5552,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       if (vn < 0) {
         m.vx = rvx - (1 + e) * vn * nx + svx;
         m.vy = rvy - (1 + e) * vn * ny + svy;
-        m.vx *= 0.995;
+        m.vx *= 0.9995;
       }
       return -vn > 200;
     }
