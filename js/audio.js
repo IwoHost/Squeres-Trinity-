@@ -104,7 +104,10 @@
   class AudioEngine {
     constructor() {
       this.ctx = null;
-      this.musicVol = 0.7;
+      this.musicVol = 0.45;
+      this.sfxVol = 0.9;
+      this.hitIndex = 0;
+      this.curDeg = 0;
       this.sfxVol = 0.8;
       this.track = null;
       this.playing = false;
@@ -144,7 +147,7 @@
 
       // A short generated reverb shared by music and effects.
       this.reverb = ctx.createConvolver();
-      this.reverb.buffer = this._impulse(2.2);
+      this.reverb.buffer = this._impulse(1.3);
       this.revSend = ctx.createGain();
       this.revSend.gain.value = 0.28;
       this.revSend.connect(this.reverb);
@@ -308,6 +311,7 @@
       const phraseBar = bar % 8;
       const I = this.intensity;
       const deg = tr.prog[bar % tr.prog.length];
+      if (s16 === 0) this.curDeg = deg;
       const out = this.musicOut;
       const noteAt = (degree, oct) => {
         const sc = tr.scale;
@@ -404,6 +408,12 @@
         f.Q.value = o.q || 1;
         g.connect(f);
         node = f;
+      }
+      if (o.pan && ctx.createStereoPanner) {
+        const pn = ctx.createStereoPanner();
+        pn.pan.value = SQ.clamp(o.pan, -1, 1);
+        node.connect(pn);
+        node = pn;
       }
       node.connect(out);
       if (o.rev && this.revSend) {
@@ -518,13 +528,30 @@
       return mtof(tr.root + 24 + 12 * (oct || 0) + sc[idx] + 12 * Math.floor(i / n));
     }
 
-    pop(i) {
-      if (!this._ok('pop', 28)) return;
+    // Bubble pop. Combos climb up the current chord, so streaks sound like a rising run.
+    pop(i, pan) {
+      if (!this._ok('pop', 35)) return;
       const t = this.now;
-      const f = this.scaleFreq(i || 0, 1);
-      this.tone(t, f * 0.7, 0.07, { type: 'sine', gain: 0.35, slideTo: f * 1.4, slideTime: 0.05, rev: 0.25 });
-      this.tone(t, f * 2, 0.04, { type: 'triangle', gain: 0.08 });
+      const CLIMB = [0, 2, 4, 7, 9, 11, 14, 16, 18, 21];
+      const f = this.scaleFreq(this.curDeg + CLIMB[SQ.clamp(i || 0, 0, CLIMB.length - 1)], 0);
+      this.tone(t, f * 0.7, 0.08, { type: 'sine', gain: 0.4, slideTo: f * 1.3, slideTime: 0.05, rev: 0.25, pan });
+      this.tone(t, f * 2, 0.04, { type: 'triangle', gain: 0.07, pan });
     }
+    // The signature sound: each hit plays the next note of a rising and falling arpeggio
+    // over the chord the music is on right now, so a busy match sounds like a melody.
+    melodyHit(pan, soft) {
+      if (!this._ok('mel', 45)) return;
+      const RUN = [0, 2, 4, 7, 9, 11, 14, 11, 9, 7, 4, 2];
+      const deg = this.curDeg + RUN[this.hitIndex++ % RUN.length];
+      const f = this.scaleFreq(deg, 0);
+      const t = this.now;
+      const g = soft ? 0.6 : 1;
+      // marimba-like: warm fundamental, a quick bright partial and a soft click
+      this.tone(t, f, 0.22, { type: 'sine', gain: 0.32 * g, release: 0.35, rev: 0.25, pan });
+      this.tone(t, f * 4, 0.03, { type: 'sine', gain: 0.07 * g, release: 0.05, pan });
+      this.tone(t, f * 2, 0.06, { type: 'triangle', gain: 0.06 * g, release: 0.1, pan });
+    }
+
     pluck(i) {
       if (!this._ok('pluck', 22)) return;
       const f = this.scaleFreq(i, 0);
@@ -596,7 +623,7 @@
       o.start(t);
       o.stop(t + 1.4);
       this.noiseHit(t, 0.5, { filter: 'lowpass', freq: 400, gain: 0.5 });
-      this.duck(0.25, 0.8);
+      this.duck(0.5, 0.6);
     }
     explode() {
       if (!this._ok('explode', 120)) return;

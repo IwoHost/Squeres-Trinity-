@@ -38,8 +38,8 @@
   }
 
   // ----- restore preferences -----
-  const prefs = store.get('prefs', {});
-  Object.assign(game.opts, { mode: prefs.mode || 'random', memes: prefs.memes != null ? prefs.memes : 1, speed: prefs.speed || 1, music: prefs.music || 'shuffle', record: prefs.record != null ? prefs.record : true, autoNext: !!prefs.autoNext });
+  const prefs = store.get('prefs2', {});
+  Object.assign(game.opts, { mode: prefs.mode || 'random', memes: prefs.memes != null ? prefs.memes : 1, speed: prefs.speed || 1, music: prefs.music || 'shuffle', record: prefs.record != null ? prefs.record : true, autoNext: !!prefs.autoNext, quality: prefs.quality || 'auto' });
   if (game.opts.music.startsWith('up')) game.opts.music = 'shuffle';
   fillMusic();
   const setRadio = (name, value) => {
@@ -50,6 +50,8 @@
   setRadio('memes', game.opts.memes);
   setRadio('speed', game.opts.speed);
   $('record').checked = game.opts.record;
+  $('quality').value = game.opts.quality;
+  game.setQuality(game.opts.quality);
   $('auto').checked = game.opts.autoNext;
   if (prefs.musicVol != null) $('music-vol').value = prefs.musicVol;
   if (prefs.sfxVol != null) $('sfx-vol').value = prefs.sfxVol;
@@ -57,7 +59,7 @@
   game.audio.sfxVol = +$('sfx-vol').value;
 
   const save = () =>
-    store.set('prefs', { ...game.opts, musicVol: +$('music-vol').value, sfxVol: +$('sfx-vol').value });
+    store.set('prefs2', { ...game.opts, musicVol: +$('music-vol').value, sfxVol: +$('sfx-vol').value });
 
   document.querySelectorAll('input[name="mode"]').forEach((el) => el.addEventListener('change', () => ((game.opts.mode = el.value), save())));
   document.querySelectorAll('input[name="memes"]').forEach((el) => el.addEventListener('change', () => ((game.opts.memes = +el.value), save())));
@@ -78,6 +80,12 @@
     game.opts.record = e.target.checked;
     save();
     status(game.opts.record ? 'The next match will be recorded.' : 'Recording is off.');
+  });
+  $('quality').addEventListener('change', (e) => {
+    game.opts.quality = e.target.value;
+    save();
+    // switching mid-recording would break the video, so it waits for the next match
+    if (!game.recorder.active) game.setQuality(game.opts.quality);
   });
   $('auto').addEventListener('change', (e) => ((game.opts.autoNext = e.target.checked), save()));
 

@@ -33,7 +33,7 @@
       this.zoom = this.tz;
     }
     shake(a) {
-      this.shakeAmt = Math.min(40, this.shakeAmt + a);
+      this.shakeAmt = Math.min(16, this.shakeAmt + a * 0.6);
     }
     punch(a) {
       this.kick += a;
@@ -112,6 +112,7 @@
       return this.g.opts.memes;
     }
     burst(x, y, color, n, speed, size) {
+      if (this.parts.length > 260) n = Math.min(n, 3);
       for (let i = 0; i < n; i++) {
         const a = Math.random() * Math.PI * 2;
         const v = (0.3 + Math.random()) * (speed || 220);
@@ -131,6 +132,7 @@
       }
     }
     sparks(x, y, n, color) {
+      if (this.parts.length > 260) return;
       for (let i = 0; i < n; i++) {
         const a = Math.random() * Math.PI * 2;
         const v = 250 + Math.random() * 450;
@@ -141,7 +143,7 @@
       this.parts.push({ x, y, vx: 0, vy: 0, life: 0, max: 0.45, size: r || 60, color, type: 'ring' });
     }
     text(x, y, str, color, size) {
-      this.texts.push({ x, y, str, color: color || '#fff', size: size || 34, life: 0, max: 1.1 });
+      this.texts.push({ x: SQ.clamp(x, 140, 860), y: SQ.clamp(y, 60, 960), str, color: color || '#fff', size: size || 34, life: 0, max: 1.1 });
     }
     // Speech bubble that follows an entity.
     say(ent, str, dur) {
@@ -154,7 +156,7 @@
     maybeSay(ent, kind, p) {
       const lvl = this.memeLevel;
       if (lvl === 0) return false;
-      const mult = lvl === 2 ? 2.5 : 1;
+      const mult = lvl === 2 ? 2.5 : 0.6;
       if (Math.random() < p * mult) {
         const list = MEMES[kind];
         this.say(ent, list[(Math.random() * list.length) | 0]);

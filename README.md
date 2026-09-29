@@ -27,8 +27,10 @@ be saved as a 1080×1920 video with sound, ready for Reels, Shorts or TikTok.
 All built-in music is synthesized live by the game (`js/audio.js`): 12 library tracks in
 different styles (synthwave, chiptune, lo-fi, house, epic, bubblegum, dungeon, trap),
 plus a generator that writes a new track every time. None of it is sampled from existing
-songs, so it is safe to post. The music gets more intense as a match gets close, and the
-sound effects are tuned to the current track's key.
+songs, so it is safe to post. The music gets more intense as a match gets close.
+
+Every bounce, tile steal and tag plays the next note of an arpeggio over the chord the music
+is on, so a busy match plays a melody that fits the song. Chase combos climb up the scale.
 
 You can also add your own audio files. Only use music you have the rights to.
 
@@ -41,7 +43,8 @@ pixel "deal with it" sunglasses. Everything is drawn in code, so no copyrighted 
 
 ## Video export
 
-Keep "Record each match with sound" on. When the match ends, press **Save video**. Chrome and
+Keep "Record each match with sound" on. **Quality** sets the resolution: Auto uses 720p on
+phones (smooth) and 1080p on computers; you can force either one. It changes at the next match. When the match ends, press **Save video**. Chrome and
 Edge save MP4 where supported, otherwise WebM; Firefox saves WebM. Recording uses the browser's
 built-in `MediaRecorder`, so no upload or server is involved.
 

@@ -361,6 +361,7 @@
               vic.vy = (vic.y - atk.y) * 12;
               g.audio.slash();
               g.audio.hit(false);
+              g.hitstop(0.06);
               g.fx.sparks(vic.x, vic.y, 14, '#ffffff');
               g.fx.text(vic.x, vic.y - 40, 'STABBED!', '#ff6b6b', 38);
               g.fx.maybeSay(vic, 'elim', 0.6);
@@ -434,6 +435,8 @@
         g.fx.text(cx, cy - 30, 'SMASH!', '#ffffff', 44);
         g.audio.explode();
         g.cam.shake(10);
+        g.hitstop(0.08);
+        this.layer = null;
         g.highlight(cx, cy, 2.2, 0.7, 0.4);
         this.dist = this.bfs([this.finishTile]);
       }
@@ -467,16 +470,39 @@
       return this.time < 6 ? 0.5 : 0.7;
     }
 
+    invalidate() {
+      this.layer = null;
+    }
+
     draw(ctx) {
       const t = this.tile;
-      ctx.fillStyle = '#c9c1b0';
-      ctx.fillRect(0, 0, 1000, 1000);
+      // The maze itself is drawn once into a cached layer; bricks change, so they are drawn live.
+      if (!this.layer) {
+        const L = document.createElement('canvas');
+        L.width = L.height = Math.round(1000 * SQ.RES * 1.9);
+        const x = L.getContext('2d');
+        x.scale(L.width / 1000, L.width / 1000);
+        this.drawMaze(x, false);
+        this.layer = L;
+      }
+      ctx.drawImage(this.layer, 0, 0, 1000, 1000);
+      this.drawMaze(ctx, true);
+      this.drawActors(ctx);
+    }
+
+    drawMaze(ctx, bricksOnly) {
+      const t = this.tile;
+      if (!bricksOnly) {
+        ctx.fillStyle = '#c9c1b0';
+        ctx.fillRect(0, 0, 1000, 1000);
+      }
       for (let r = 0; r < this.T; r++)
         for (let c = 0; c < this.T; c++) {
           const v = this.grid[this.idx(c, r)];
           const x = c * t;
           const y = r * t;
-          if (v === FLOOR) {
+          if (bricksOnly && v !== BRICK) continue;
+          if (v === FLOOR || (v === BRICK && !bricksOnly)) {
             ctx.fillStyle = '#ecebe6';
             ctx.fillRect(x - 0.5, y - 0.5, t + 1, t + 1);
           } else if (v === FINISH) {
@@ -515,6 +541,7 @@
             SQ.outlinedText(ctx, String(Math.ceil(this.bhp[this.idx(c, r)])), x + t / 2, y + t / 2, t * 0.4, '#ffffff', { stroke: 6 });
           }
         }
+      if (bricksOnly) return;
       // wall edges
       ctx.strokeStyle = '#2b2a28';
       ctx.lineWidth = 4;
@@ -530,12 +557,13 @@
           if (!this.isWall(c + 1, r)) ctx.moveTo(x + t, y), ctx.lineTo(x + t, y + t);
           ctx.stroke();
         }
+    }
+
+    drawActors(ctx) {
+      const t = this.tile;
       // flag
       const [fc, fr] = this.finishTile;
-      ctx.font = `${t * 0.5}px serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('🏁', (fc + 0.5) * t, (fr + 0.5) * t - Math.abs(Math.sin(this.time * 3)) * 6);
+      SQ.drawEmoji(ctx, '🏁', (fc + 0.5) * t, (fr + 0.5) * t - Math.abs(Math.sin(this.time * 3)) * 6, t * 0.5);
 
       for (const it of this.items) {
         if (it.respawn > 0) continue;
@@ -546,12 +574,10 @@
         ctx.beginPath();
         ctx.arc(0, 0, t * 0.3, 0, Math.PI * 2);
         ctx.fill();
-        ctx.font = `${t * 0.42}px serif`;
-        ctx.fillText(it.icon, 0, 2);
+        SQ.drawEmoji(ctx, it.icon, 0, 2, t * 0.42);
         ctx.restore();
       }
-      ctx.font = `${t * 0.36}px serif`;
-      for (const bn of this.bananas) ctx.fillText('🍌', bn.x, bn.y);
+      for (const bn of this.bananas) SQ.drawEmoji(ctx, '🍌', bn.x, bn.y, t * 0.36);
 
       for (const p of this.racers) {
         const tm = this.teams[p.team];
@@ -583,8 +609,7 @@
           ctx.save();
           ctx.translate(p.x + p.size * 0.55, p.y - p.size * 0.3);
           ctx.rotate(Math.sin(this.time * 10) * 0.4);
-          ctx.font = `${p.size * 0.8}px serif`;
-          ctx.fillText('🔪', 0, 0);
+          SQ.drawEmoji(ctx, '🔪', 0, 0, p.size * 0.8);
           ctx.restore();
         }
       }

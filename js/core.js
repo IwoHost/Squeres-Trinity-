@@ -89,54 +89,153 @@
     ctx.closePath();
   };
 
+  // Render resolution: 1 = 1080x1920, 2/3 = 720x1280. Everything is drawn in 1080 coordinates.
+  SQ.RES = 1;
+
+  // Square bodies are drawn once into small cached canvases and then stamped,
+  // which is far cheaper than building rounded paths for every square every frame.
+  const spriteCache = new Map();
+  function bodySprite(team, size, outline) {
+    const q = size < 40 ? Math.max(8, Math.round(size)) : Math.round(size / 4) * 4;
+    const key = team.name + '|' + q + '|' + (outline || '');
+    let c = spriteCache.get(key);
+    if (c) return c;
+    if (spriteCache.size > 300) spriteCache.clear();
+    const scale = SQ.clamp(2.2 * SQ.RES, 1.4, 2.2); // extra detail for camera zoom
+    const pad = Math.ceil(q * 0.2) + 2;
+    const dim = Math.ceil((q + pad * 2) * scale);
+    c = document.createElement('canvas');
+    c.width = c.height = dim;
+    const x = c.getContext('2d');
+    x.scale(scale, scale);
+    x.translate(pad + q / 2, pad + q / 2);
+    const h = q / 2;
+    x.fillStyle = 'rgba(0,0,0,0.35)';
+    SQ.roundRect(x, -h + q * 0.08, -h + q * 0.12, q, q, q * 0.16);
+    x.fill();
+    x.fillStyle = team.color;
+    SQ.roundRect(x, -h, -h, q, q, q * 0.16);
+    x.fill();
+    x.lineWidth = Math.max(2, q * 0.09);
+    x.strokeStyle = outline || team.dark;
+    x.stroke();
+    x.fillStyle = 'rgba(255,255,255,0.22)';
+    SQ.roundRect(x, -h + q * 0.12, -h + q * 0.1, q * 0.76, q * 0.22, q * 0.1);
+    x.fill();
+    c.q = q;
+    c.pad = pad;
+    spriteCache.set(key, c);
+    return c;
+  }
+  SQ.clearSprites = () => spriteCache.clear();
+
+  // Emoji are slow to rasterise, so each one is drawn once and reused.
+  const emojiCache = new Map();
+  SQ.drawEmoji = function (ctx, ch, x, y, size) {
+    const q = Math.round(size / 4) * 4 || 4;
+    const key = ch + q;
+    let c = emojiCache.get(key);
+    if (!c) {
+      const scale = 2;
+      c = document.createElement('canvas');
+      c.width = c.height = Math.ceil(q * 1.4 * scale);
+      const e = c.getContext('2d');
+      e.scale(scale, scale);
+      e.font = `${q}px serif`;
+      e.textAlign = 'center';
+      e.textBaseline = 'middle';
+      e.fillText(ch, q * 0.7, q * 0.75);
+      emojiCache.set(key, c);
+    }
+    const d = q * 1.4 * (size / q);
+    ctx.drawImage(c, x - d / 2, y - d / 2, d, d);
+  };
+
   // Draws one square character centred on (x, y).
-  // o: { angle, squash, lookX, lookY, mood, blink, flash, shield, face, alpha, glow, outline }
+  // o: { angle, squash, pop, lookX, lookY, mood, blink, flash, shield, face, alpha, glow, glowColor, outline }
   SQ.drawSquare = function (ctx, x, y, size, team, o) {
     o = o || {};
-    const s = size;
+    const s = size * (1 + (o.pop || 0) * 0.45);
     const half = s / 2;
     ctx.save();
     ctx.translate(x, y);
     if (o.angle) ctx.rotate(o.angle);
     const sq = o.squash || 0;
-    ctx.scale(1 + sq, 1 - sq);
+    if (sq) ctx.scale(1 + sq, 1 - sq);
     if (o.alpha != null) ctx.globalAlpha = o.alpha;
 
     if (o.glow) {
-      ctx.shadowColor = o.glowColor || team.color;
-      ctx.shadowBlur = o.glow;
+      // soft halo made of two translucent plates instead of a blur
+      ctx.fillStyle = SQ.rgba(o.glowColor || team.color, 0.18);
+      const gg = o.glow * 0.9;
+      SQ.roundRect(ctx, -half - gg, -half - gg, s + gg * 2, s + gg * 2, s * 0.3);
+      ctx.fill();
+      ctx.fillStyle = SQ.rgba(o.glowColor || team.color, 0.25);
+      SQ.roundRect(ctx, -half - gg / 2, -half - gg / 2, s + gg, s + gg, s * 0.24);
+      ctx.fill();
     }
-    // drop shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    SQ.roundRect(ctx, -half + s * 0.08, -half + s * 0.12, s, s, s * 0.16);
-    ctx.fill();
-    ctx.shadowBlur = 0;
+    const spr = bodySprite(team, s, o.outline);
+    const k = s / spr.q;
+    const d = (spr.q + spr.pad * 2) * k;
+    ctx.drawImage(spr, -d / 2, -d / 2, d, d);
+    if (o.flash > 0) {
+      ctx.globalAlpha = (o.alpha != null ? o.alpha : 1) * Math.min(1, o.flash) * 0.8;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(-half, -half, s, s);
+      ctx.globalAlpha = o.alpha != null ? o.alpha : 1;
+    }
 
-    // body
-    ctx.fillStyle = o.flash > 0 ? mixWhite(team.color, o.flash) : team.color;
-    SQ.roundRect(ctx, -half, -half, s, s, s * 0.16);
-    ctx.fill();
-    ctx.lineWidth = Math.max(2, s * 0.09);
-    ctx.strokeStyle = o.outline || team.dark;
-    ctx.stroke();
-    // gloss
-    ctx.fillStyle = 'rgba(255,255,255,0.22)';
-    SQ.roundRect(ctx, -half + s * 0.12, -half + s * 0.1, s * 0.76, s * 0.22, s * 0.1);
-    ctx.fill();
-
-    if (s >= 14 && o.face !== false) drawFace(ctx, s, o);
+    if (s >= 10 && o.face !== false) {
+      if (s < 36 && o.face !== 'moai') drawSmallFace(ctx, s, o);
+      else drawFace(ctx, s, o);
+    }
 
     if (o.shield > 0) {
       ctx.globalAlpha = (o.alpha != null ? o.alpha : 1) * Math.min(1, o.shield) * 0.9;
       ctx.strokeStyle = '#e9fbff';
-      ctx.lineWidth = Math.max(2, s * 0.07);
-      ctx.setLineDash([s * 0.18, s * 0.12]);
-      SQ.roundRect(ctx, -half - s * 0.2, -half - s * 0.2, s * 1.4, s * 1.4, s * 0.3);
-      ctx.stroke();
-      ctx.setLineDash([]);
+      ctx.lineWidth = Math.max(2, s * 0.08);
+      ctx.strokeRect(-half - s * 0.2, -half - s * 0.2, s * 1.4, s * 1.4);
     }
     ctx.restore();
   };
+
+  // Blocky eyes made of plain rectangles: cheap enough for a hundred squares.
+  function drawSmallFace(ctx, s, o) {
+    const mood = o.mood || 'normal';
+    const ew = s * (mood === 'scared' ? 0.28 : 0.24);
+    const ey = -s * 0.1;
+    const ex = s * 0.2;
+    ctx.fillStyle = '#15151d';
+    if (mood === 'dead' || o.blink) {
+      for (const sx of [-1, 1]) ctx.fillRect(sx * ex - ew / 2, ey + ew * 0.35, ew, s * 0.07);
+      return;
+    }
+    if (mood === 'happy') {
+      for (const sx of [-1, 1]) {
+        ctx.fillRect(sx * ex - ew / 2, ey + ew * 0.1, ew * 0.34, ew * 0.34);
+        ctx.fillRect(sx * ex - ew * 0.17, ey - ew * 0.15, ew * 0.34, ew * 0.34);
+        ctx.fillRect(sx * ex + ew * 0.16, ey + ew * 0.1, ew * 0.34, ew * 0.34);
+      }
+      return;
+    }
+    const pw = ew * (mood === 'scared' ? 0.35 : 0.55);
+    const lx = SQ.clamp(o.lookX || 0, -1, 1) * (ew - pw) * 0.5;
+    const ly = SQ.clamp(o.lookY || 0, -1, 1) * (ew - pw) * 0.5;
+    for (const sx of [-1, 1]) {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(sx * ex - ew / 2, ey - ew / 2, ew, ew);
+      ctx.fillStyle = '#15151d';
+      ctx.fillRect(sx * ex - pw / 2 + lx, ey - pw / 2 + ly, pw, pw);
+      if (mood === 'angry') {
+        // eyelid slanted toward the middle
+        ctx.save();
+        ctx.translate(sx * ex, ey - ew * 0.5);
+        ctx.rotate(sx * -0.45);
+        ctx.fillRect(-ew * 0.7, -ew * 0.25, ew * 1.4, ew * 0.42);
+        ctx.restore();
+      }
+    }
+  }
 
   function mixWhite(hex, t) {
     const [r, g, b] = SQ.hexToRgb(hex);
@@ -147,10 +246,7 @@
 
   function drawFace(ctx, s, o) {
     if (o.face === 'moai') {
-      ctx.font = `${s * 0.78}px serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('🗿', 0, s * 0.04);
+      SQ.drawEmoji(ctx, '🗿', 0, s * 0.04, s * 0.78);
       return;
     }
     const mood = o.mood || 'normal';

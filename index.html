@@ -192,6 +192,11 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     <div class="group">
       <span class="label">Video</span>
       <label class="toggle"><input type="checkbox" id="record" checked> Record each match with sound</label>
+      <div class="field"><label for="quality">Quality</label><select id="quality">
+        <option value="auto">Auto (720p on phones)</option>
+        <option value="720">720p, smoothest</option>
+        <option value="1080">1080p, sharpest</option>
+      </select></div>
       <p class="status" id="rec-status" aria-live="polite">The next match will be recorded.</p>
       <button class="btn btn-save" id="save" type="button" hidden>Save video</button>
     </div>
@@ -199,8 +204,8 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     <div class="group">
       <span class="label">Music and sound</span>
       <div class="field"><label for="music">Track</label><select id="music"></select></div>
-      <div class="field"><label for="music-vol">Music</label><input type="range" id="music-vol" min="0" max="1" step="0.05" value="0.7"></div>
-      <div class="field"><label for="sfx-vol">Effects</label><input type="range" id="sfx-vol" min="0" max="1" step="0.05" value="0.8"></div>
+      <div class="field"><label for="music-vol">Music</label><input type="range" id="music-vol" min="0" max="1" step="0.05" value="0.45"></div>
+      <div class="field"><label for="sfx-vol">Effects</label><input type="range" id="sfx-vol" min="0" max="1" step="0.05" value="0.9"></div>
       <div class="row">
         <label class="btn upload" for="upload">Add your music<input type="file" id="upload" accept="audio/*" multiple></label>
       </div>

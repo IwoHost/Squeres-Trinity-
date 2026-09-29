@@ -51,7 +51,7 @@
             vy: rng.range(-50, 50),
             team: ti,
             size,
-            speed: rng.range(120, 150),
+            speed: rng.range(150, 180),
             wander: rng.range(0, 6.28),
             boost: 0,
             shield: 0,
@@ -128,7 +128,7 @@
       this.time += dt;
       this.comboT -= dt;
       if (this.comboT <= 0) this.combo = 0;
-      if (this.time > 55) this.storm = Math.max(170, this.storm - dt * 14);
+      if (this.time > 35) this.storm = Math.max(170, this.storm - dt * 16);
       const E = this.ents;
 
       // pickups
@@ -143,6 +143,7 @@
 
       for (const e of E) {
         e.flash = Math.max(0, e.flash - dt * 3);
+        e.pop = Math.max(0, (e.pop || 0) - dt * 4);
         e.squash *= Math.exp(-dt * 10);
         e.boost -= dt;
         e.shield -= dt;
@@ -212,7 +213,7 @@
           dy += ((500 - e.y) / rc) * 2;
         }
         const len = Math.hypot(dx, dy) || 1;
-        const sp = e.speed * (e.boost > 0 ? 1.8 : 1) * (this.time > 55 ? 1.15 : 1);
+        const sp = e.speed * (e.boost > 0 ? 1.8 : 1) * (this.time > 35 ? 1.15 : 1);
         const k = Math.min(1, dt * 3.2);
         e.vx += ((dx / len) * sp - e.vx) * k;
         e.vy += ((dy / len) * sp - e.vy) * k;
@@ -283,15 +284,14 @@
       const wasLonely = this.counts[hunter.team] === 1;
       prey.team = hunter.team;
       prey.flash = 1;
-      prey.squash = 0.35;
+      prey.pop = 1;
       hunter.kills++;
       hunter.squash = -0.2;
       g.fx.burst(prey.x, prey.y, oldTeam.color, 10, 240, 9);
       g.fx.ring(prey.x, prey.y, this.teams[hunter.team].color, 36);
       this.combo++;
       this.comboT = 0.9;
-      g.audio.pop(hunter.team * 2 + Math.min(this.combo, 9));
-      g.cam.shake(1.5);
+      g.audio.pop(this.combo - 1, (prey.x - 500) / 600);
       if (this.combo === 5 || (this.combo >= 10 && this.combo % 10 === 0)) g.fx.text(prey.x, prey.y - 40, `x${this.combo} COMBO`, '#ffe066', 38);
       if (hunter.kills === 5 && !hunter.sigma && g.opts.memes > 0) {
         hunter.sigma = true;
@@ -321,7 +321,8 @@
         g.fx.ring(e.x, e.y, '#bdf3ff', 260);
       } else if (pk.type === 'bomb') {
         g.audio.explode();
-        g.cam.shake(18);
+        g.cam.shake(12);
+        g.hitstop(0.08);
         g.fx.flash(0.5, team.light);
         g.fx.ring(e.x, e.y, team.color, 170);
         g.fx.text(e.x, e.y - 50, 'BOOM!', '#ffffff', 56);
@@ -381,10 +382,7 @@
         ctx.beginPath();
         ctx.arc(0, 0, 26 + Math.sin(pk.t * 6) * 3, 0, Math.PI * 2);
         ctx.fill();
-        ctx.font = '38px serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(pk.icon, 0, 2);
+        SQ.drawEmoji(ctx, pk.icon, 0, 2, 38);
         ctx.restore();
       }
       for (const e of this.ents) {
@@ -395,6 +393,7 @@
           mood: e.frozen > 0 ? 'scared' : e.mood,
           blink: e.blink < 0,
           flash: e.flash,
+          pop: e.pop,
           squash: e.squash,
           shield: e.shield,
           face: e.sigma && this.g.opts.memes > 0 ? 'moai' : null,

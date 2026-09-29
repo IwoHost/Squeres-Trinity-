@@ -115,7 +115,7 @@
         if (s.y < lo + h) (s.y = lo + h), (s.vy = Math.abs(s.vy)), (s.squash = -0.2), (bounced = true);
         if (s.y > hi - h) (s.y = hi - h), (s.vy = -Math.abs(s.vy)), (s.squash = -0.2), (bounced = true);
         if (bounced) {
-          g.audio.pluck(s.team * 2 + ((s.size / 10) | 0));
+          g.audio.melodyHit((s.x - 500) / 600);
           if (this.variant === 'grow') s.size = Math.min(170, s.size + 3);
           // slight angle change keeps paths interesting
           const a = Math.atan2(s.vy, s.vx) + rng.range(-0.15, 0.15);
@@ -200,6 +200,7 @@
           s.hitCool[o.team] = 0.4;
           g.audio.slash();
           g.audio.hit(false);
+          g.hitstop(0.045);
           g.fx.sparks(o.x, o.y, 12, '#ffffff');
           const kx = o.x - s.x;
           const ky = o.y - s.y;
@@ -208,7 +209,7 @@
           o.vy = (ky / kl) * o.speed;
           this.damage(o, 10 + s.sword.len * 0.03, s);
           s.sword.len = Math.min(300, s.sword.len + 12);
-          g.fx.text(s.x, s.y - s.size, `+SWORD`, '#dfe6ff', 28);
+
         }
       }
 
@@ -230,11 +231,12 @@
       const g = this.g;
       v.hp -= amt;
       v.flash = 1;
-      g.fx.text(v.x + (Math.random() - 0.5) * 30, v.y - v.size * 0.7, `-${Math.round(amt)}`, amt >= 15 ? '#ffd23f' : '#ffffff', amt >= 15 ? 40 : 30);
+      if (amt >= 8) g.fx.text(v.x + (Math.random() - 0.5) * 30, v.y - v.size * 0.7, `-${Math.round(amt)}`, amt >= 15 ? '#ffd23f' : '#ffffff', amt >= 15 ? 40 : 30);
       if (v.hp <= 0) {
         v.hp = 0;
         v.alive = false;
         v.dead = 0;
+        g.hitstop(0.14);
         g.audio.explode();
         g.fx.burst(v.x, v.y, this.teams[v.team].color, 60, 520, 14);
         g.fx.ring(v.x, v.y, this.teams[v.team].color, 120);
@@ -300,10 +302,7 @@
         ctx.beginPath();
         ctx.arc(0, 0, 30, 0, Math.PI * 2);
         ctx.fill();
-        ctx.font = '42px serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(d.icon, 0, 2);
+        SQ.drawEmoji(ctx, d.icon, 0, 2, 42);
         ctx.restore();
       }
       for (const s of this.sq) {
@@ -403,10 +402,7 @@
         ctx.fillRect(cx + 48, cy + 8, ((colW - 48) * s.hp) / 100, 18);
         ctx.globalAlpha = 1;
         if (!s.alive) {
-          ctx.font = '30px serif';
-          ctx.textAlign = 'left';
-          ctx.textBaseline = 'middle';
-          ctx.fillText('💀', cx + 2, cy + 18);
+          SQ.drawEmoji(ctx, '💀', cx + 17, cy + 17, 30);
         }
       });
     }

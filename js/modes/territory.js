@@ -48,6 +48,7 @@
       this.leader = -1;
       this.winner = null;
       this.lastTick = -1;
+      this.dirty = [];
       this.recount();
     }
 
@@ -96,7 +97,7 @@
         g.audio.whoosh();
       }
 
-      const steps = 4;
+      const steps = 6;
       const sdt = dt / steps;
       for (const b of this.balls) {
         b.big -= dt;
@@ -151,12 +152,12 @@
           if (i >= 0 && this.grid[i] !== b.team) {
             this.grid[i] = b.team;
             this.tileFlash[i] = 1;
+            this.dirty.push(i);
             hit = true;
             const cx = ((i % this.N) + 0.5) * this.cell;
             const cy = (Math.floor(i / this.N) + 0.5) * this.cell;
-            if (Math.random() < 0.5) this.g.fx.burst(cx, cy, this.teams[b.team].light, 3, 120, 7);
-            // pitch follows height: higher on the board, higher note
-            this.g.audio.pluck(Math.floor((1 - cy / 1000) * 10) + b.team);
+            if (Math.random() < 0.35) this.g.fx.burst(cx, cy, this.teams[b.team].light, 3, 120, 7);
+            this.g.audio.melodyHit((cx - 500) / 600);
           }
         }
         return hit;
@@ -198,19 +199,48 @@
       return this.time < 8 ? 0.45 : 0.65;
     }
 
+    invalidate() {
+      this.layer = null;
+    }
+
+    paintCell(x, i) {
+      const c = this.cell;
+      const t = this.teams[this.grid[i]];
+      const cx = (i % this.N) * c;
+      const cy = Math.floor(i / this.N) * c;
+      x.fillStyle = t.dark;
+      x.fillRect(cx, cy, c + 0.5, c + 0.5);
+      x.fillStyle = SQ.rgba(t.color, 0.55);
+      x.fillRect(cx + 3, cy + 3, c - 6, c - 6);
+    }
+
     draw(ctx) {
       const c = this.cell;
-      for (let i = 0; i < this.grid.length; i++) {
-        const t = this.teams[this.grid[i]];
-        const x = (i % this.N) * c;
-        const y = Math.floor(i / this.N) * c;
-        ctx.fillStyle = t.dark;
-        ctx.fillRect(x, y, c + 0.5, c + 0.5);
+      // Tiles live on a cached layer; only tiles that change get repainted.
+      if (!this.layer) {
+        const L = document.createElement('canvas');
+        L.width = L.height = Math.round(1000 * SQ.RES * 1.2);
+        const x = L.getContext('2d');
+        x.scale(L.width / 1000, L.width / 1000);
+        for (let i = 0; i < this.grid.length; i++) this.paintCell(x, i);
+        this.layer = L;
+        this.layerCtx = x;
+        this.dirty.length = 0;
+      }
+      for (const i of this.dirty) this.paintCell(this.layerCtx, i);
+      this.dirty.length = 0;
+      ctx.drawImage(this.layer, 0, 0, 1000, 1000);
+      // freshly stolen tiles pop in
+      for (let i = 0; i < this.tileFlash.length; i++) {
         const f = this.tileFlash[i];
-        ctx.fillStyle = f > 0 ? SQ.mixWhite(t.color, f * 0.7) : t.color;
-        ctx.globalAlpha = f > 0 ? 1 : 0.55;
-        ctx.fillRect(x + 3, y + 3, c - 6, c - 6);
-        ctx.globalAlpha = 1;
+        if (f <= 0) continue;
+        const t = this.teams[this.grid[i]];
+        const k = 1 + 0.35 * SQ.ease.outCubic(f);
+        const cx = ((i % this.N) + 0.5) * c;
+        const cy = (Math.floor(i / this.N) + 0.5) * c;
+        const w = (c - 6) * k;
+        ctx.fillStyle = SQ.mixWhite(t.color, f * 0.6);
+        ctx.fillRect(cx - w / 2, cy - w / 2, w, w);
       }
       for (const b of this.balls) {
         const t = this.teams[b.team];
@@ -224,7 +254,7 @@
           ctx.stroke();
         }
         const sp = Math.hypot(b.vx, b.vy) || 1;
-        SQ.drawSquare(ctx, b.x, b.y, b.size, t, { lookX: b.vx / sp, lookY: b.vy / sp, squash: b.squash, outline: '#ffffff', mood: b.big > 0 ? 'angry' : 'normal', glow: 16, glowColor: '#ffffff' });
+        SQ.drawSquare(ctx, b.x, b.y, b.size, t, { lookX: b.vx / sp, lookY: b.vy / sp, squash: b.squash, outline: '#ffffff', mood: b.big > 0 ? 'angry' : 'normal', glow: 12, glowColor: '#ffffff' });
       }
     }
 

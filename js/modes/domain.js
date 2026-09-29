@@ -79,10 +79,10 @@
         s.x += s.vx * dt;
         s.y += s.vy * dt;
         const h = s.size / 2;
-        if (s.x < h) (s.x = h), (s.vx = Math.abs(s.vx)), (s.squash = 0.15), g.audio.bonk();
-        if (s.x > 1000 - h) (s.x = 1000 - h), (s.vx = -Math.abs(s.vx)), (s.squash = 0.15), g.audio.bonk();
-        if (s.y < h) (s.y = h), (s.vy = Math.abs(s.vy)), (s.squash = -0.15), g.audio.bonk();
-        if (s.y > 1000 - h) (s.y = 1000 - h), (s.vy = -Math.abs(s.vy)), (s.squash = -0.15), g.audio.bonk();
+        if (s.x < h) (s.x = h), (s.vx = Math.abs(s.vx)), (s.squash = 0.15), g.audio.melodyHit((s.x - 500) / 600, true);
+        if (s.x > 1000 - h) (s.x = 1000 - h), (s.vx = -Math.abs(s.vx)), (s.squash = 0.15), g.audio.melodyHit((s.x - 500) / 600, true);
+        if (s.y < h) (s.y = h), (s.vy = Math.abs(s.vy)), (s.squash = -0.15), g.audio.melodyHit((s.x - 500) / 600, true);
+        if (s.y > 1000 - h) (s.y = 1000 - h), (s.vy = -Math.abs(s.vy)), (s.squash = -0.15), g.audio.melodyHit((s.x - 500) / 600, true);
 
         // how much of the footprint is your settled paint?
         let own = 0;
@@ -171,7 +171,8 @@
       const mx = (a.x + b.x) / 2;
       const my = (a.y + b.y) / 2;
       g.fx.sparks(mx, my, 16);
-      g.cam.shake(9);
+      g.cam.shake(7);
+      g.hitstop(0.06);
       if (a.safe && b.safe) {
         g.audio.clank();
         g.fx.text(mx, my - 60, 'BLOCKED', '#dfe6ff', 36);
@@ -192,6 +193,7 @@
         g.fx.text(v.x, v.y - 80, crit ? `CRIT -${dmg}` : `-${dmg}`, crit ? '#ffd23f' : '#ffffff', crit ? 54 : 42);
         if (crit) g.highlight(v.x, v.y, 1.7, 0.8, 0.35);
         if (v.hp <= 0) {
+          g.hitstop(0.14);
           g.audio.explode();
           g.fx.burst(v.x, v.y, this.teams[v.team].color, 60, 520, 18);
           g.fx.flash(0.6, this.teams[v.team].light);

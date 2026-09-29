@@ -12,15 +12,15 @@
       const list = ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
       return list.find((m) => MediaRecorder.isTypeSupported(m)) || '';
     }
-    start(canvas, audioStream) {
+    start(canvas, audioStream, fps, bitrate) {
       if (!this.supported) return false;
-      const tracks = canvas.captureStream(60).getVideoTracks();
+      const tracks = canvas.captureStream(fps || 30).getVideoTracks();
       if (audioStream) tracks.push(...audioStream.getAudioTracks());
       const stream = new MediaStream(tracks);
       this.mime = this.pickMime();
       this.chunks = [];
       try {
-        this.rec = new MediaRecorder(stream, { mimeType: this.mime || undefined, videoBitsPerSecond: 10_000_000, audioBitsPerSecond: 192_000 });
+        this.rec = new MediaRecorder(stream, { mimeType: this.mime || undefined, videoBitsPerSecond: bitrate || 6_000_000, audioBitsPerSecond: 192_000 });
       } catch (e) {
         this.rec = new MediaRecorder(stream);
       }
@@ -47,15 +47,15 @@
   class Game {
     constructor(canvas) {
       this.canvas = canvas;
-      this.ctx = canvas.getContext('2d');
-      canvas.width = SQ.W;
-      canvas.height = SQ.H;
+      this.ctx = canvas.getContext('2d', { alpha: false });
       this.audio = new SQ.AudioEngine();
       this.cam = new SQ.Camera();
       this.fx = new SQ.FX(this);
       this.recorder = new Recorder();
-      this.opts = { mode: 'random', memes: 1, speed: 1, music: 'shuffle', record: false, autoNext: false };
-      this.fixedDt = 1 / 120;
+      this.opts = { mode: 'random', memes: 1, speed: 1, music: 'shuffle', record: false, autoNext: false, quality: 'auto' };
+      this.setQuality('auto');
+      this.fixedDt = 1 / 60;
+      this.hitstopT = 0;
       this.acc = 0;
       this.timeScale = 1;
       this.slowT = 0;
@@ -69,6 +69,26 @@
       this.last = performance.now();
       this.makeIdle();
       requestAnimationFrame((t) => this.frame(t));
+    }
+
+    // 720p on phones keeps things smooth; 1080p on computers.
+    setQuality(q) {
+      this.opts.quality = q;
+      const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+      const res = q === '1080' ? 1 : q === '720' ? 2 / 3 : coarse || window.innerWidth < 900 ? 2 / 3 : 1;
+      if (res === SQ.RES && this.canvas.width === Math.round(SQ.W * res)) return;
+      SQ.RES = res;
+      this.canvas.width = Math.round(SQ.W * res);
+      this.canvas.height = Math.round(SQ.H * res);
+      SQ.clearSprites();
+      this.backdrop = null;
+      this.headerCache = null;
+      if (this.mode && this.mode.invalidate) this.mode.invalidate();
+    }
+
+    // Freezes the simulation for a split second on big impacts.
+    hitstop(d) {
+      this.hitstopT = Math.max(this.hitstopT, d);
     }
 
     on(ev, fn) {
@@ -113,8 +133,9 @@
       this.audio.whoosh();
       this.trackToast = 4;
       this.video = null;
+      this.setQuality(this.opts.quality);
       if (this.opts.record && this.recorder.supported) {
-        this.recorder.start(this.canvas, this.audio.streamDest && this.audio.streamDest.stream);
+        this.recorder.start(this.canvas, this.audio.streamDest && this.audio.streamDest.stream, 30, SQ.RES === 1 ? 9_000_000 : 5_000_000);
       }
       this.emit('match', { mode: this.modeInfo, seed: this.seed, track: this.track });
     }
@@ -128,16 +149,15 @@
     // Director hook used by modes: zoom to a moment, optionally in slow motion.
     highlight(x, y, z, dur, slow) {
       if (this.phase !== 'play') return;
-      if (this.real - this.lastHighlight < 3.2) return;
+      if (this.real - this.lastHighlight < 6) return;
       this.lastHighlight = this.real;
-      this.cam.focus(x, y, z, dur, 5);
-      this.audio.whoosh();
-      if (slow) this.slowmo(slow, dur * 0.85);
+      this.cam.focus(x, y, Math.min(z, 1.8), dur, 3.5);
+      if (slow) this.slowmo(Math.max(0.45, slow), dur * 0.7);
     }
-    slowmo(scale, dur) {
+    slowmo(scale, dur, muffle) {
       this.timeScale = scale;
       this.slowT = dur;
-      this.audio.muffle(true);
+      if (muffle) this.audio.muffle(true);
     }
 
     frame(ts) {
@@ -189,7 +209,7 @@
         this.audio.intensity = m.intensity ? m.intensity() : 0.6;
         if (m.winner) {
           this.setPhase('finale');
-          this.slowmo(0.2, 1.5);
+          this.slowmo(0.25, 1.5, true);
           const w = m.winnerEnt;
           this.cam.tracking = false;
           if (w) this.cam.focus(w.x, w.y, 2.3, 0, 3);
@@ -222,17 +242,21 @@
       if (P === 'intro' || P === 'countdown') simulate = false;
       if (P !== 'outro') this.memeDone = false;
 
+      if (this.hitstopT > 0) {
+        this.hitstopT -= realDt;
+        simulate = false;
+      }
       if (simulate && m) {
         const speed = P === 'idle' ? 0.6 : this.opts.speed;
         this.acc += realDt * this.timeScale * speed;
         let steps = 0;
-        while (this.acc >= this.fixedDt && steps < 24) {
+        while (this.acc >= this.fixedDt && steps < 8) {
           if (P === 'idle' && m.winner) break;
           m.update(this.fixedDt);
           this.acc -= this.fixedDt;
           steps++;
         }
-        if (steps >= 24) this.acc = 0;
+        if (steps >= 8) this.acc = 0;
       }
       if (P === 'play' && !this.cam.tracking && this.cam.hold <= 0) {
         // slow breathing zoom keeps a static arena feeling alive
@@ -269,18 +293,18 @@
       const ctx = this.ctx;
       const A = SQ.ARENA;
       const m = this.mode;
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.setTransform(SQ.RES, 0, 0, SQ.RES, 0, 0);
       this.drawBackdrop(ctx);
       this.drawHeader(ctx);
 
-      // arena frame
+      // arena frame with a soft halo
       const lead = m.winner ? m.winner.team.color : '#e8d7f1';
-      ctx.save();
-      ctx.shadowColor = SQ.rgba(lead, 0.7);
-      ctx.shadowBlur = 40;
+      ctx.fillStyle = SQ.rgba(lead, 0.08);
+      ctx.fillRect(A.x - 34, A.y - 34, A.size + 68, A.size + 68);
+      ctx.fillStyle = SQ.rgba(lead, 0.14);
+      ctx.fillRect(A.x - 20, A.y - 20, A.size + 40, A.size + 40);
       ctx.fillStyle = lead;
       ctx.fillRect(A.x - 10, A.y - 10, A.size + 20, A.size + 20);
-      ctx.restore();
 
       ctx.save();
       ctx.beginPath();
@@ -301,25 +325,41 @@
     }
 
     drawBackdrop(ctx) {
-      const g = ctx.createLinearGradient(0, 0, 0, SQ.H);
-      g.addColorStop(0, '#0c0d14');
-      g.addColorStop(1, '#141726');
-      ctx.fillStyle = g;
-      ctx.fillRect(0, 0, SQ.W, SQ.H);
-      // drifting squares pattern
-      ctx.save();
-      ctx.globalAlpha = 0.05;
-      ctx.fillStyle = '#ffffff';
-      const off = (this.real * 20) % 120;
-      for (let y = -120; y < SQ.H + 120; y += 120)
-        for (let x = -120; x < SQ.W + 120; x += 120) {
-          const s = 18 + 10 * Math.sin((x + y) * 0.01 + this.real);
-          ctx.fillRect(x + off, y + off, s, s);
-        }
-      ctx.restore();
+      if (!this.backdrop) {
+        const c = document.createElement('canvas');
+        c.width = Math.round(SQ.W * SQ.RES);
+        c.height = Math.round(SQ.H * SQ.RES);
+        const b = c.getContext('2d');
+        b.scale(SQ.RES, SQ.RES);
+        const g = b.createLinearGradient(0, 0, 0, SQ.H);
+        g.addColorStop(0, '#0c0d14');
+        g.addColorStop(1, '#141726');
+        b.fillStyle = g;
+        b.fillRect(0, 0, SQ.W, SQ.H);
+        b.fillStyle = 'rgba(255,255,255,0.035)';
+        for (let y = 30; y < SQ.H; y += 120) for (let x = 30; x < SQ.W; x += 120) b.fillRect(x, y, 22, 22);
+        this.backdrop = c;
+      }
+      ctx.drawImage(this.backdrop, 0, 0, SQ.W, SQ.H);
     }
 
     drawHeader(ctx) {
+      // The header only changes when the rules change, so outside the intro it is cached.
+      if (this.phase === 'intro') return this.drawHeaderLive(ctx);
+      const key = this.phase + '|' + this.episode + '|' + this.mode.title + '|' + JSON.stringify(this.mode.rules);
+      if (!this.headerCache || this.headerCache.key !== key) {
+        const c = document.createElement('canvas');
+        c.width = Math.round(SQ.W * SQ.RES);
+        c.height = Math.round(SQ.ARENA.y * SQ.RES);
+        const h = c.getContext('2d');
+        h.scale(SQ.RES, SQ.RES);
+        this.drawHeaderLive(h);
+        this.headerCache = { key, c };
+      }
+      ctx.drawImage(this.headerCache.c, 0, 0, SQ.W, SQ.ARENA.y);
+    }
+
+    drawHeaderLive(ctx) {
       const m = this.mode;
       const A = SQ.ARENA;
       // top tag line
