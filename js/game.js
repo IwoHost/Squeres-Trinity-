@@ -2,7 +2,7 @@
 // drives the camera and slow motion, and draws the frame that gets recorded.
 (function () {
   const SQ = window.SQ;
-  const MODE_IDS = ['chase', 'territory', 'domain', 'race', 'brawl'];
+  const MODE_IDS = ['chase', 'territory', 'domain', 'race', 'brawl', 'bounce'];
 
   class Recorder {
     get supported() {

@@ -22,7 +22,8 @@ controls.
 | Tile Wars | Pong-wars style. Each color's square bounces around and steals every tile it hits. Most tiles when the timer ends wins. |
 | Domain Duel | Big squares paint the floor. On their own settled paint they cannot be hurt. Segmented health bars and crits. |
 | Square Race | A random maze with breakable brick gates. The camera follows the leaders. |
-| Weapon Brawl | Every square gets its own weapon: sword, axe, hammer, spear, daggers, flail, bow or boomerang. Every hit levels the weapon up (longer blades, bigger heads, more daggers, faster arrows). Variants: everyone with the same weapon, or Bounce Brawl where every bounce makes you bigger. Last square standing. |
+| Weapon Brawl | Every square gets its own weapon: sword, axe, hammer, spear, daggers, flail, bow or boomerang. Every hit levels the weapon up (longer blades, bigger heads, more daggers, faster arrows). Sometimes everyone gets the same weapon. Last square standing. |
+| Bounce Brawl | No weapons and no power-ups: every wall bounce makes a square a little bigger (up to about twice its size), and bigger squares hit harder. Last square standing. |
 
 ### Power-ups
 

@@ -228,6 +228,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         <label class="chip"><input type="radio" name="mode" value="domain" id="mode-domain"><span><b style="background:#1fd6f0"></b>Domain Duel</span></label>
         <label class="chip"><input type="radio" name="mode" value="race" id="mode-race"><span><b style="background:var(--gold)"></b>Square Race</span></label>
         <label class="chip"><input type="radio" name="mode" value="brawl" id="mode-brawl"><span><b style="background:#dfe6ff"></b>Weapon Brawl</span></label>
+        <label class="chip"><input type="radio" name="mode" value="bounce" id="mode-bounce"><span><b style="background:#ff8f33"></b>Bounce Brawl</span></label>
       </div>
     </div>
 
@@ -4240,12 +4241,12 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
   const WEAPON_IDS = Object.keys(WEAPONS);
 
   class Brawl {
-    constructor(g, rng) {
+    constructor(g, rng, forced) {
       this.g = g;
       this.rng = rng;
       const n = rng.int(4, 7);
       this.teams = SQ.pickTeams(rng, n);
-      this.variant = rng.pick(['mixed', 'mixed', 'mixed', 'same', 'grow']);
+      this.variant = forced || rng.pick(['mixed', 'mixed', 'mixed', 'same']);
       this.sameWeapon = rng.pick(WEAPON_IDS);
       if (this.variant === 'mixed') {
         this.title = 'WEAPON BRAWL';
@@ -4376,7 +4377,8 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       const hi = 1000 - this.storm;
       const alive = this.sq.filter((s) => s.alive);
 
-      this.nextDrop -= dt;
+      // Bounce Brawl stays pure: no power-ups
+      if (this.variant !== 'grow') this.nextDrop -= dt;
       if (this.nextDrop <= 0 && this.drops.length < 3) {
         this.nextDrop = rng.range(3.5, 6.5);
         const list = this.variant === 'grow' ? DROPS.filter((d) => d.type !== 'weapon') : DROPS;
@@ -4426,7 +4428,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         if (s.y > hi - h) (s.y = hi - h), (s.vy = -Math.abs(s.vy)), (s.squash = -0.2), (bounced = true);
         if (bounced) {
           g.audio.melodyHit((s.x - 500) / 600);
-          if (this.variant === 'grow') s.size = Math.min(170, s.size + 3);
+          if (this.variant === 'grow') s.size = Math.min(104, s.size + 2);
           // slight angle change keeps paths interesting
           const a = Math.atan2(s.vy, s.vx) + rng.range(-0.15, 0.15);
           s.vx = Math.cos(a) * sp;
@@ -5043,6 +5045,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
   }
 
   SQ.modes.brawl = { id: 'brawl', name: 'Weapon Brawl', create: (g, rng) => new Brawl(g, rng) };
+  SQ.modes.bounce = { id: 'bounce', name: 'Bounce Brawl', create: (g, rng) => new Brawl(g, rng, 'grow') };
 })();
 
 </script>
@@ -5051,7 +5054,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
 // drives the camera and slow motion, and draws the frame that gets recorded.
 (function () {
   const SQ = window.SQ;
-  const MODE_IDS = ['chase', 'territory', 'domain', 'race', 'brawl'];
+  const MODE_IDS = ['chase', 'territory', 'domain', 'race', 'brawl', 'bounce'];
 
   class Recorder {
     get supported() {

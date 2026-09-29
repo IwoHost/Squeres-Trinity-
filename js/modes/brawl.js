@@ -26,12 +26,12 @@
   const WEAPON_IDS = Object.keys(WEAPONS);
 
   class Brawl {
-    constructor(g, rng) {
+    constructor(g, rng, forced) {
       this.g = g;
       this.rng = rng;
       const n = rng.int(4, 7);
       this.teams = SQ.pickTeams(rng, n);
-      this.variant = rng.pick(['mixed', 'mixed', 'mixed', 'same', 'grow']);
+      this.variant = forced || rng.pick(['mixed', 'mixed', 'mixed', 'same']);
       this.sameWeapon = rng.pick(WEAPON_IDS);
       if (this.variant === 'mixed') {
         this.title = 'WEAPON BRAWL';
@@ -162,7 +162,8 @@
       const hi = 1000 - this.storm;
       const alive = this.sq.filter((s) => s.alive);
 
-      this.nextDrop -= dt;
+      // Bounce Brawl stays pure: no power-ups
+      if (this.variant !== 'grow') this.nextDrop -= dt;
       if (this.nextDrop <= 0 && this.drops.length < 3) {
         this.nextDrop = rng.range(3.5, 6.5);
         const list = this.variant === 'grow' ? DROPS.filter((d) => d.type !== 'weapon') : DROPS;
@@ -212,7 +213,7 @@
         if (s.y > hi - h) (s.y = hi - h), (s.vy = -Math.abs(s.vy)), (s.squash = -0.2), (bounced = true);
         if (bounced) {
           g.audio.melodyHit((s.x - 500) / 600);
-          if (this.variant === 'grow') s.size = Math.min(170, s.size + 3);
+          if (this.variant === 'grow') s.size = Math.min(104, s.size + 2);
           // slight angle change keeps paths interesting
           const a = Math.atan2(s.vy, s.vx) + rng.range(-0.15, 0.15);
           s.vx = Math.cos(a) * sp;
@@ -829,4 +830,5 @@
   }
 
   SQ.modes.brawl = { id: 'brawl', name: 'Weapon Brawl', create: (g, rng) => new Brawl(g, rng) };
+  SQ.modes.bounce = { id: 'bounce', name: 'Bounce Brawl', create: (g, rng) => new Brawl(g, rng, 'grow') };
 })();
