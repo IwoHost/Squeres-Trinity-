@@ -112,6 +112,7 @@
     const typed = $('seed').value.trim();
     if (seed == null && typed && /^\d+$/.test(typed)) seed = +typed;
     game.newMatch(seed);
+    keepAwake();
     $('seed').value = '';
     $('seed').placeholder = String(game.seed);
     $('overlay').hidden = true;
@@ -180,6 +181,80 @@
     if (tone) el.dataset.tone = tone;
     else delete el.dataset.tone;
   }
+
+  // ----- full screen -----
+  const stage = $('stage');
+  let barTimer = null;
+  function showBar() {
+    $('fs-bar').classList.remove('idle-hide');
+    clearTimeout(barTimer);
+    barTimer = setTimeout(() => $('fs-bar').classList.add('idle-hide'), 2800);
+  }
+  function enterFull() {
+    stage.classList.add('theater');
+    document.body.classList.add('theater-on');
+    // Native full screen hides the browser bars where it is allowed (not on iPhone);
+    // the theater layout above works either way.
+    const root = document.documentElement;
+    const req = root.requestFullscreen || root.webkitRequestFullscreen;
+    if (req && !fullEl()) {
+      try {
+        const pr = req.call(root, { navigationUI: 'hide' });
+        if (pr && pr.catch) pr.catch(() => {});
+      } catch (e) {}
+    }
+    keepAwake();
+    showBar();
+  }
+  function exitFull() {
+    stage.classList.remove('theater');
+    document.body.classList.remove('theater-on');
+    if (fullEl()) {
+      const ex = document.exitFullscreen || document.webkitExitFullscreen;
+      try {
+        const pr = ex.call(document);
+        if (pr && pr.catch) pr.catch(() => {});
+      } catch (e) {}
+    }
+  }
+  const fullEl = () => document.fullscreenElement || document.webkitFullscreenElement;
+  const onFsChange = () => {
+    if (!fullEl() && stage.classList.contains('theater')) {
+      stage.classList.remove('theater');
+      document.body.classList.remove('theater-on');
+    }
+  };
+  document.addEventListener('fullscreenchange', onFsChange);
+  document.addEventListener('webkitfullscreenchange', onFsChange);
+  $('fs-toggle').addEventListener('click', enterFull);
+  $('fs-open').addEventListener('click', enterFull);
+  $('fs-exit').addEventListener('click', exitFull);
+  $('fs-next').addEventListener('click', () => {
+    start();
+    showBar();
+  });
+  $('screen').addEventListener('pointerdown', () => {
+    if (stage.classList.contains('theater')) showBar();
+  });
+  $('screen').addEventListener('dblclick', () => (stage.classList.contains('theater') ? exitFull() : enterFull()));
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && stage.classList.contains('theater')) exitFull();
+    if ((e.key === 'f' || e.key === 'F') && document.activeElement === document.body) stage.classList.contains('theater') ? exitFull() : enterFull();
+  });
+
+  // Keep the screen awake while matches play, where the browser allows it.
+  let wakeLock = null;
+  async function keepAwake() {
+    try {
+      if (navigator.wakeLock && !wakeLock) {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', () => (wakeLock = null));
+      }
+    } catch (e) {}
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && game.phase !== 'idle') keepAwake();
+  });
 
   // keyboard: space or enter starts a match when nothing is focused
   document.addEventListener('keydown', (e) => {

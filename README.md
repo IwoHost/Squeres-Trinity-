@@ -10,6 +10,10 @@ be saved as a 1080×1920 video with sound, ready for Reels, Shorts or TikTok.
 - Download `dist/squares-trinity.html` (everything in one file, works offline) and open it on your phone, or
 - Turn on GitHub Pages (Settings → Pages → Source: GitHub Actions). The included workflow publishes the game on every push to `main`.
 
+Tap the full-screen button in the corner of the game (or double-tap it, or press F) to fill
+the screen. The whole 9:16 frame always stays visible. Tap the game to bring back the
+controls.
+
 ## Modes
 
 | Mode | What happens |
