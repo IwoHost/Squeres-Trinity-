@@ -22,7 +22,7 @@ controls.
 | Tile Wars | Pong-wars style. Each color's square bounces around and steals every tile it hits. Most tiles when the timer ends wins. |
 | Domain Duel | Big squares paint the floor. On their own settled paint they cannot be hurt. Segmented health bars and crits. |
 | Square Race | A random maze with breakable brick gates. The camera follows the leaders. |
-| Sword Brawl | Bouncing squares with spinning swords that grow with every hit, or a variant where every bounce makes you bigger. Last square standing. |
+| Weapon Brawl | Every square gets its own weapon: sword, axe, hammer, spear, daggers, flail, bow or boomerang. Every hit levels the weapon up (longer blades, bigger heads, more daggers, faster arrows). Variants: everyone with the same weapon, or Bounce Brawl where every bounce makes you bigger. Last square standing. |
 
 ### Power-ups
 
@@ -34,7 +34,7 @@ Items spawn at random spots and only work when a square touches them. They blink
 | Tile Wars | 🍄 Grow (10s) · 👻 Ghost (drift through everything, then pop and paint) · Turret (placed on the board, sprays tile-stealing shots for 8s) · 💣 Bomb (carried with a lit fuse, then explodes) · Grenade (held, then thrown in an arc at enemy ground) · ⚡ Speed · ✨ Multiball · 🖌️ Paint Rush · ❄️ Freeze · 🛡️ Lock |
 | Domain Duel | ❤️ Heal · 🛡️ Shield (invincible anywhere) · ⚡ Speed · 🌐 Expansion (instant 7×7 domain) · 🔥 Rage (double damage) · 🍄 Mega · ❄️ Freeze |
 | Square Race | ⚡ Boost · 🔪 Knife · 🍌 Banana · ❄️ Freeze · 🌀 Portal (jump ahead). Items reappear somewhere new after pickup. |
-| Sword Brawl | 🗡️ Sword · ❤️ Heal · ⚡ Speed · 🌵 Spikes · 🛡️ Shield · 🍄 Mega (bigger and hits harder) · 💣 Bomb |
+| Weapon Brawl | ⚔️ Weapon crate (new weapon, or +3 levels if it's yours) · ❤️ Heal · ⚡ Speed · 🌵 Spikes · 🛡️ Shield · 🍄 Mega (bigger and hits harder) · 💣 Bomb |
 
 **Tile Wars random events.** Every so often (not every match, and never in the first or last
 seconds) a roulette spins and lands on an event: Color Swap, Place Swap, Robin Hood (the leader

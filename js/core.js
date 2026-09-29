@@ -169,6 +169,7 @@
     banana: { icon: '🍌', color: '#ffd23f', label: 'BANANA DROP' },
     portal: { icon: '🌀', color: '#4f86ff', label: 'PORTAL!' },
     sword: { icon: '🗡️', color: '#c9d2e3', label: 'SWORD!' },
+    weapon: { icon: '⚔️', color: '#c9d2e3', label: 'WEAPON!' },
     spikes: { icon: '🌵', color: '#35d97a', label: 'SPIKES!' },
     grow: { icon: '🍄', color: '#ff6ac1', label: 'GROW 10s!' },
     ghost: { icon: '👻', color: '#b9c2d6', label: 'GHOST!' },
@@ -250,7 +251,7 @@
 
   // A power-up box: white tile, coloured rim, bobbing icon and a pulse so it reads on any floor.
   // t = seconds since it spawned; left = seconds until it disappears (blinks near the end).
-  SQ.drawItem = function (ctx, x, y, type, t, size, left) {
+  SQ.drawItem = function (ctx, x, y, type, t, size, left, icon) {
     const def = SQ.ITEMS[type] || { icon: '?', color: '#ffffff' };
     size = size || 50;
     const born = SQ.clamp(t * 3, 0, 1);
@@ -282,7 +283,7 @@
     ctx.strokeStyle = def.color;
     ctx.stroke();
     if (def.draw) def.draw(ctx, s * 0.62);
-    else SQ.drawEmoji(ctx, def.icon, 0, s * 0.03, s * 0.6);
+    else SQ.drawEmoji(ctx, icon || def.icon, 0, s * 0.03, s * 0.6);
     ctx.restore();
   };
 
