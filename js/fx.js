@@ -67,11 +67,17 @@
       return Math.max(1, this.zoom + this.kick);
     }
     // Applies the camera transform. The view never leaves the arena.
+    // The part of the world currently on screen, for culling in tall worlds.
+    view() {
+      const half = W() / 2 / this.z;
+      const cy = SQ.clamp(this.y, half, (this.worldH || W()) - half);
+      return { top: cy - half, bottom: cy + half };
+    }
     apply(ctx, rect) {
       const z = this.z;
       const half = W() / 2 / z;
       const cx = SQ.clamp(this.x, half, W() - half);
-      const cy = SQ.clamp(this.y, half, W() - half);
+      const cy = SQ.clamp(this.y, half, (this.worldH || W()) - half);
       const sx = (Math.random() * 2 - 1) * this.shakeAmt;
       const sy = (Math.random() * 2 - 1) * this.shakeAmt;
       const scale = (rect.size / W()) * z;

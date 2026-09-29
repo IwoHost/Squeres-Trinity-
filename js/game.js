@@ -2,7 +2,7 @@
 // drives the camera and slow motion, and draws the frame that gets recorded.
 (function () {
   const SQ = window.SQ;
-  const MODE_IDS = ['chase', 'territory', 'domain', 'race', 'brawl', 'bounce'];
+  const MODE_IDS = ['chase', 'territory', 'domain', 'race', 'brawl', 'bounce', 'marble'];
 
   class Recorder {
     get supported() {
@@ -103,6 +103,7 @@
       const seed = SQ.randomSeed();
       this.mode = SQ.modes.chase.create(this, SQ.makeRng(seed));
       this.modeInfo = SQ.modes.chase;
+      this.cam.worldH = SQ.WORLD;
       this.phase = 'idle';
     }
 
@@ -118,6 +119,7 @@
       this.fx.clear();
       this.cam.reset();
       this.cam.tracking = !!this.mode.camTracking;
+      this.cam.worldH = this.mode.worldH || SQ.WORLD;
       const start = this.mode.focusStart ? this.mode.focusStart() : { x: rng.range(250, 750), y: rng.range(250, 750) };
       this.cam.focus(start.x, start.y, 2.8, 0);
       this.cam.snap();
