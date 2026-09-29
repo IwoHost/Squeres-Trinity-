@@ -216,6 +216,16 @@
       this.cam.focus(x, y, Math.min(z, 1.8), dur, 3.5);
       if (slow) this.slowmo(Math.max(0.45, slow), dur * 0.7);
     }
+    // A snappy zoom-in with no slow motion. Allowed more often than highlights.
+    quickZoom(x, y, z, dur) {
+      if (this.phase !== 'play') return;
+      if (this.real - (this.lastQuickZoom || -10) < 2.2 || this.cam.hold > 0) return;
+      this.lastQuickZoom = this.real;
+      this.cam.focus(x, y, z, dur, 7);
+      this.cam.punch(0.06);
+      this.audio.whoosh();
+    }
+
     slowmo(scale, dur, muffle) {
       this.timeScale = scale;
       this.slowT = dur;

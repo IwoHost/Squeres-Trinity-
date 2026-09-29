@@ -81,6 +81,8 @@
         this.waveT = rng.range(14, 20);
         this.wave = { t: 0 };
         g.fx.banner('SHOCKWAVE!', 'everyone gets blasted out', '#1fd6f0', 1.2);
+        g.cam.punch(0.25);
+        g.cam.shake(12);
         g.audio.boom();
         g.hitstop(0.06);
         for (const s of this.sq) {
@@ -176,7 +178,11 @@
               if (-rel > 550) victim.stun = 0.9;
               if (-rel > 800) {
                 g.hitstop(0.05);
-                g.fx.text(victim.x, victim.y - 50, 'YEET', '#ffd23f', 40);
+                if (this.time - (this.yeetAt || -9) > 1.2) {
+                  this.yeetAt = this.time;
+                  g.fx.text(victim.x, victim.y - 50, 'YEET', '#ffd23f', 40);
+                }
+                g.quickZoom(victim.x, victim.y, 1.7, 0.7);
                 g.fx.maybeSay(victim, 'elim', 0.25);
               }
             }
@@ -199,7 +205,11 @@
       const kt = king ? king.team : -1;
       if (kt !== this.king) {
         if (king && this.time > 1) {
-          g.fx.text(king.x, king.y - 60, 'NEW KING', this.teams[kt].color, 38);
+          if (this.time - (this.kingAt || -9) > 1.5) {
+            this.kingAt = this.time;
+            g.fx.text(king.x, king.y - 60, 'NEW KING', this.teams[kt].color, 38);
+            if (Math.random() < 0.6) g.quickZoom(king.x, king.y, 1.5, 0.8);
+          }
           if (Math.random() < 0.5) g.fx.voice(king, 'lead');
           g.audio.pickup();
         }
@@ -211,7 +221,11 @@
         if (whole > (s.lastWhole || 0)) {
           s.lastWhole = whole;
           g.audio.pop(Math.min(9, whole), (s.x - 500) / 600);
-          if (whole === this.target - 2) g.fx.text(s.x, s.y - 60, 'MATCH POINT', '#ff4d5e', 36);
+          if (whole === this.target - 2) {
+            g.fx.text(s.x, s.y - 60, 'MATCH POINT', '#ff4d5e', 36);
+            g.lastQuickZoom = -10;
+            g.quickZoom(s.x, s.y, 1.9, 1.2);
+          }
         }
       }
 
