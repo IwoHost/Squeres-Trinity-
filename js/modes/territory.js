@@ -47,6 +47,7 @@
       this.tileFlash = new Float32Array(this.N * this.N);
       this.leader = -1;
       this.winner = null;
+      this.wideShot = true;
       this.lastTick = -1;
       this.dirty = [];
       this.recount();

@@ -143,6 +143,11 @@
           this.clash(a, b);
         }
 
+      for (const s of alive) {
+        const h = s.size / 2;
+        s.x = SQ.clamp(s.x, h, 1000 - h);
+        s.y = SQ.clamp(s.y, h, 1000 - h);
+      }
       alive.forEach((s) => (s.alive = s.hp > 0));
       this.counts = this.teams.map(() => 0);
       for (let i = 0; i < this.owner.length; i++) if (this.owner[i] >= 0) this.counts[this.owner[i]]++;

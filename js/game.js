@@ -149,9 +149,11 @@
     // Director hook used by modes: zoom to a moment, optionally in slow motion.
     highlight(x, y, z, dur, slow) {
       if (this.phase !== 'play') return;
-      if (this.real - this.lastHighlight < 6) return;
+      // crowded modes keep the full arena in view; zooming would crop squares at the edges
+      if (this.mode && this.mode.wideShot) return;
+      if (this.real - this.lastHighlight < 8) return;
       this.lastHighlight = this.real;
-      this.cam.focus(x, y, Math.min(z, 1.8), dur, 3.5);
+      this.cam.focus(x, y, Math.min(z, 1.35), Math.min(dur, 1), 3.5);
       if (slow) this.slowmo(Math.max(0.45, slow), dur * 0.7);
     }
     slowmo(scale, dur, muffle) {
@@ -199,7 +201,7 @@
           this.setPhase('play');
           this.audio.beep(true);
           this.audio.intensity = 0.5;
-          this.cam.punch(0.2);
+          if (!m.wideShot) this.cam.punch(0.1);
           this.cam.shake(8);
           this.fx.flash(0.35);
           this.fx.banner('GO!', null, '#ffd23f', 0.9, { size: 150 });
@@ -259,8 +261,8 @@
         if (steps >= 8) this.acc = 0;
       }
       if (P === 'play' && !this.cam.tracking && this.cam.hold <= 0) {
-        // slow breathing zoom keeps a static arena feeling alive
-        this.cam.setDefault(500, 500, 1 + 0.035 * (1 - Math.cos(this.phaseT * 0.35)));
+        // the resting view always shows the whole arena, edge to edge
+        this.cam.setDefault(500, 500, 1);
         this.cam.tx = this.cam.defaultView.x;
         this.cam.ty = this.cam.defaultView.y;
         this.cam.tz = this.cam.defaultView.z;

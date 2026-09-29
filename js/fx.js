@@ -49,6 +49,7 @@
           this.follow = 2.2;
         }
       } else if (this.hold <= 0 && this.tracking) {
+        this.follow = 4;
         const d = this.defaultView;
         this.tx = d.x;
         this.ty = d.y;
@@ -58,6 +59,7 @@
       this.x += (this.tx - this.x) * k;
       this.y += (this.ty - this.y) * k;
       this.zoom += (this.tz - this.zoom) * k;
+      if (Math.abs(this.tz - this.zoom) < 0.004) this.zoom = this.tz;
       this.kick *= Math.exp(-dt * 7);
       this.shakeAmt *= Math.exp(-dt * 6);
     }
@@ -168,13 +170,18 @@
       this.banners.push({ text, sub, color: color || '#fff', life: 0, max: dur || 1.6, opts: opts || {} });
     }
     // A full-screen meme moment: vine boom, zoom punch, red vignette, big caption.
+    // Rate limited so it stays special: once every 10 s (6 s on Chaos). Returns whether it played.
     memeMoment(caption, x, y) {
-      if (this.memeLevel === 0) return;
+      if (this.memeLevel === 0) return false;
+      const gap = this.memeLevel === 2 ? 6 : 10;
+      if (this.g.real - (this.lastMeme || -99) < gap) return false;
+      this.lastMeme = this.g.real;
       this.g.audio.boom();
-      this.g.cam.punch(0.35);
+      if (!this.g.mode.wideShot) this.g.cam.punch(0.1);
       this.g.cam.shake(10);
       this.vignette = 1;
       this.bigMeme = { caption, life: 0, max: 1.3 };
+      return true;
     }
     flash(a, color) {
       this.flashA = Math.max(this.flashA, a);

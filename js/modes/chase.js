@@ -75,6 +75,7 @@
       this.prey = this.teams.map((_, i) => (i + 1) % n);
       this.preyKey = this.prey.join(',');
       this.winner = null;
+      this.wideShot = true;
     }
 
     preyOf(ti) {
@@ -257,6 +258,12 @@
         }
       }
       for (const pk of this.pickups) pk.t += dt;
+      // pushes between squares must never shove one through the wall
+      for (const e of E) {
+        const h = e.size / 2;
+        e.x = SQ.clamp(e.x, h, 1000 - h);
+        e.y = SQ.clamp(e.y, h, 1000 - h);
+      }
 
       this.counts = this.teams.map((_, ti) => E.filter((e) => e.team === ti).length);
       this.relink();
@@ -294,10 +301,12 @@
       g.audio.pop(this.combo - 1, (prey.x - 500) / 600);
       if (this.combo === 5 || (this.combo >= 10 && this.combo % 10 === 0)) g.fx.text(prey.x, prey.y - 40, `x${this.combo} COMBO`, '#ffe066', 38);
       if (hunter.kills === 5 && !hunter.sigma && g.opts.memes > 0) {
+        // every streaker gets the 🗿 face; only the occasional one gets the full moment
         hunter.sigma = true;
-        g.fx.say(hunter, SQ.MEMES.streak[(Math.random() * SQ.MEMES.streak.length) | 0]);
-        g.highlight(hunter.x, hunter.y, 2.4, 1.1, 0.3);
-        g.fx.memeMoment('SIGMA 🗿', hunter.x, hunter.y);
+        if (g.fx.memeMoment('SIGMA 🗿', hunter.x, hunter.y)) {
+          g.fx.say(hunter, SQ.MEMES.streak[(Math.random() * SQ.MEMES.streak.length) | 0]);
+          g.highlight(hunter.x, hunter.y, 1.3, 0.9, 0.5);
+        }
       } else if (wasLonely && g.opts.memes > 0) {
         g.fx.say(hunter, SQ.MEMES.comeback[(Math.random() * SQ.MEMES.comeback.length) | 0]);
       } else if (!g.fx.maybeSay(prey, 'elim', 0.05)) g.fx.maybeSay(hunter, 'hunter', 0.03);

@@ -165,6 +165,12 @@
           this.damage(a, base * (b.size / 54) + (b.spikes > 0 ? 12 : 0), b);
         }
 
+      for (const s of alive) {
+        const h = s.size / 2;
+        s.x = SQ.clamp(s.x, lo + h, hi - h);
+        s.y = SQ.clamp(s.y, lo + h, hi - h);
+      }
+
       // sword hits
       for (const s of alive) {
         if (!s.sword || !s.alive) continue;

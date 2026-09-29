@@ -380,12 +380,16 @@
         g.audio.whoosh();
       }
       this.leader = lead.team;
-      const pack = order.filter((p) => !p.finished).slice(0, 2);
+      // Frame every racer still running, with a margin, so nobody leaves the screen.
+      const pack = order.filter((p) => !p.finished);
       if (pack.length) {
-        const fx = pack.reduce((s, p) => s + p.x, 0) / pack.length;
-        const fy = pack.reduce((s, p) => s + p.y, 0) / pack.length;
-        const spread = pack.length > 1 ? Math.max(Math.abs(pack[0].x - pack[1].x), Math.abs(pack[0].y - pack[1].y)) : 0;
-        g.cam.setDefault(fx, fy, SQ.clamp(1000 / (spread + 520), 1.25, 1.9));
+        const margin = this.tile * 1.6;
+        const x0 = Math.min(...pack.map((p) => p.x)) - margin;
+        const x1 = Math.max(...pack.map((p) => p.x)) + margin;
+        const y0 = Math.min(...pack.map((p) => p.y)) - margin;
+        const y1 = Math.max(...pack.map((p) => p.y)) + margin;
+        const span = Math.max(x1 - x0, y1 - y0, 1);
+        g.cam.setDefault((x0 + x1) / 2, (y0 + y1) / 2, SQ.clamp(1000 / span, 1, 1.5));
       }
 
       if (!this.winner && this.time >= this.duration) {

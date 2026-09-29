@@ -1429,6 +1429,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
           this.follow = 2.2;
         }
       } else if (this.hold <= 0 && this.tracking) {
+        this.follow = 4;
         const d = this.defaultView;
         this.tx = d.x;
         this.ty = d.y;
@@ -1438,6 +1439,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       this.x += (this.tx - this.x) * k;
       this.y += (this.ty - this.y) * k;
       this.zoom += (this.tz - this.zoom) * k;
+      if (Math.abs(this.tz - this.zoom) < 0.004) this.zoom = this.tz;
       this.kick *= Math.exp(-dt * 7);
       this.shakeAmt *= Math.exp(-dt * 6);
     }
@@ -1548,13 +1550,18 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       this.banners.push({ text, sub, color: color || '#fff', life: 0, max: dur || 1.6, opts: opts || {} });
     }
     // A full-screen meme moment: vine boom, zoom punch, red vignette, big caption.
+    // Rate limited so it stays special: once every 10 s (6 s on Chaos). Returns whether it played.
     memeMoment(caption, x, y) {
-      if (this.memeLevel === 0) return;
+      if (this.memeLevel === 0) return false;
+      const gap = this.memeLevel === 2 ? 6 : 10;
+      if (this.g.real - (this.lastMeme || -99) < gap) return false;
+      this.lastMeme = this.g.real;
       this.g.audio.boom();
-      this.g.cam.punch(0.35);
+      if (!this.g.mode.wideShot) this.g.cam.punch(0.1);
       this.g.cam.shake(10);
       this.vignette = 1;
       this.bigMeme = { caption, life: 0, max: 1.3 };
+      return true;
     }
     flash(a, color) {
       this.flashA = Math.max(this.flashA, a);
@@ -1826,6 +1833,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       this.prey = this.teams.map((_, i) => (i + 1) % n);
       this.preyKey = this.prey.join(',');
       this.winner = null;
+      this.wideShot = true;
     }
 
     preyOf(ti) {
@@ -2008,6 +2016,12 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         }
       }
       for (const pk of this.pickups) pk.t += dt;
+      // pushes between squares must never shove one through the wall
+      for (const e of E) {
+        const h = e.size / 2;
+        e.x = SQ.clamp(e.x, h, 1000 - h);
+        e.y = SQ.clamp(e.y, h, 1000 - h);
+      }
 
       this.counts = this.teams.map((_, ti) => E.filter((e) => e.team === ti).length);
       this.relink();
@@ -2045,10 +2059,12 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       g.audio.pop(this.combo - 1, (prey.x - 500) / 600);
       if (this.combo === 5 || (this.combo >= 10 && this.combo % 10 === 0)) g.fx.text(prey.x, prey.y - 40, `x${this.combo} COMBO`, '#ffe066', 38);
       if (hunter.kills === 5 && !hunter.sigma && g.opts.memes > 0) {
+        // every streaker gets the 🗿 face; only the occasional one gets the full moment
         hunter.sigma = true;
-        g.fx.say(hunter, SQ.MEMES.streak[(Math.random() * SQ.MEMES.streak.length) | 0]);
-        g.highlight(hunter.x, hunter.y, 2.4, 1.1, 0.3);
-        g.fx.memeMoment('SIGMA 🗿', hunter.x, hunter.y);
+        if (g.fx.memeMoment('SIGMA 🗿', hunter.x, hunter.y)) {
+          g.fx.say(hunter, SQ.MEMES.streak[(Math.random() * SQ.MEMES.streak.length) | 0]);
+          g.highlight(hunter.x, hunter.y, 1.3, 0.9, 0.5);
+        }
       } else if (wasLonely && g.opts.memes > 0) {
         g.fx.say(hunter, SQ.MEMES.comeback[(Math.random() * SQ.MEMES.comeback.length) | 0]);
       } else if (!g.fx.maybeSay(prey, 'elim', 0.05)) g.fx.maybeSay(hunter, 'hunter', 0.03);
@@ -2228,6 +2244,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       this.tileFlash = new Float32Array(this.N * this.N);
       this.leader = -1;
       this.winner = null;
+      this.wideShot = true;
       this.lastTick = -1;
       this.dirty = [];
       this.recount();
@@ -2609,6 +2626,11 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
           this.clash(a, b);
         }
 
+      for (const s of alive) {
+        const h = s.size / 2;
+        s.x = SQ.clamp(s.x, h, 1000 - h);
+        s.y = SQ.clamp(s.y, h, 1000 - h);
+      }
       alive.forEach((s) => (s.alive = s.hp > 0));
       this.counts = this.teams.map(() => 0);
       for (let i = 0; i < this.owner.length; i++) if (this.owner[i] >= 0) this.counts[this.owner[i]]++;
@@ -3113,12 +3135,16 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         g.audio.whoosh();
       }
       this.leader = lead.team;
-      const pack = order.filter((p) => !p.finished).slice(0, 2);
+      // Frame every racer still running, with a margin, so nobody leaves the screen.
+      const pack = order.filter((p) => !p.finished);
       if (pack.length) {
-        const fx = pack.reduce((s, p) => s + p.x, 0) / pack.length;
-        const fy = pack.reduce((s, p) => s + p.y, 0) / pack.length;
-        const spread = pack.length > 1 ? Math.max(Math.abs(pack[0].x - pack[1].x), Math.abs(pack[0].y - pack[1].y)) : 0;
-        g.cam.setDefault(fx, fy, SQ.clamp(1000 / (spread + 520), 1.25, 1.9));
+        const margin = this.tile * 1.6;
+        const x0 = Math.min(...pack.map((p) => p.x)) - margin;
+        const x1 = Math.max(...pack.map((p) => p.x)) + margin;
+        const y0 = Math.min(...pack.map((p) => p.y)) - margin;
+        const y1 = Math.max(...pack.map((p) => p.y)) + margin;
+        const span = Math.max(x1 - x0, y1 - y0, 1);
+        g.cam.setDefault((x0 + x1) / 2, (y0 + y1) / 2, SQ.clamp(1000 / span, 1, 1.5));
       }
 
       if (!this.winner && this.time >= this.duration) {
@@ -3546,6 +3572,12 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
           this.damage(a, base * (b.size / 54) + (b.spikes > 0 ? 12 : 0), b);
         }
 
+      for (const s of alive) {
+        const h = s.size / 2;
+        s.x = SQ.clamp(s.x, lo + h, hi - h);
+        s.y = SQ.clamp(s.y, lo + h, hi - h);
+      }
+
       // sword hits
       for (const s of alive) {
         if (!s.sword || !s.alive) continue;
@@ -3953,9 +3985,11 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     // Director hook used by modes: zoom to a moment, optionally in slow motion.
     highlight(x, y, z, dur, slow) {
       if (this.phase !== 'play') return;
-      if (this.real - this.lastHighlight < 6) return;
+      // crowded modes keep the full arena in view; zooming would crop squares at the edges
+      if (this.mode && this.mode.wideShot) return;
+      if (this.real - this.lastHighlight < 8) return;
       this.lastHighlight = this.real;
-      this.cam.focus(x, y, Math.min(z, 1.8), dur, 3.5);
+      this.cam.focus(x, y, Math.min(z, 1.35), Math.min(dur, 1), 3.5);
       if (slow) this.slowmo(Math.max(0.45, slow), dur * 0.7);
     }
     slowmo(scale, dur, muffle) {
@@ -4003,7 +4037,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
           this.setPhase('play');
           this.audio.beep(true);
           this.audio.intensity = 0.5;
-          this.cam.punch(0.2);
+          if (!m.wideShot) this.cam.punch(0.1);
           this.cam.shake(8);
           this.fx.flash(0.35);
           this.fx.banner('GO!', null, '#ffd23f', 0.9, { size: 150 });
@@ -4063,8 +4097,8 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         if (steps >= 8) this.acc = 0;
       }
       if (P === 'play' && !this.cam.tracking && this.cam.hold <= 0) {
-        // slow breathing zoom keeps a static arena feeling alive
-        this.cam.setDefault(500, 500, 1 + 0.035 * (1 - Math.cos(this.phaseT * 0.35)));
+        // the resting view always shows the whole arena, edge to edge
+        this.cam.setDefault(500, 500, 1);
         this.cam.tx = this.cam.defaultView.x;
         this.cam.ty = this.cam.defaultView.y;
         this.cam.tz = this.cam.defaultView.z;
