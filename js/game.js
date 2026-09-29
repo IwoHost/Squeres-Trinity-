@@ -594,7 +594,7 @@
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillStyle = 'rgba(255,255,255,0.55)';
-      const tag = this.phase === 'idle' ? 'SQUARES TRINITY' : this.tour ? `TRINITY CUP  ·  ${this.stage}  ·  ${m.title}` : `SQUARES TRINITY  ·  EP ${this.episode}  ·  ${m.title}`;
+      const tag = this.phase === 'idle' ? 'SQUARES TRINITY' : this.tour ? `TRINITY GAMES  ·  ${this.stage}  ·  ${m.title}` : `SQUARES TRINITY  ·  EP ${this.episode}  ·  ${m.title}`;
       ctx.fillText(spaced(tag), SQ.W / 2, 66, SQ.W - 120);
       // tri-color strip
       const sw = 60;
@@ -658,7 +658,7 @@
       const teams = m.teams || [];
       const n = teams.length;
       const size = Math.min(110, 760 / n);
-      const gap = size * 0.35;
+      const gap = n <= 4 ? size * 1.3 : size * 0.35; // room for the longer labels
       const total = n * size + (n - 1) * gap;
       ctx.save();
       ctx.globalAlpha = out;
@@ -670,7 +670,9 @@
         SQ.drawSquare(ctx, x, y, size * SQ.ease.outBack(kk), tm, { mood: i % 2 ? 'angry' : 'normal', lookX: Math.sin(t * 2 + i), squash: Math.sin(t * 10 + i) * 0.06 });
         SQ.outlinedText(ctx, tm.name, x, y + size * 0.85, Math.min(36, size * 0.36), tm.color, { stroke: 7 });
         const P = SQ.persona(tm);
-        SQ.outlinedText(ctx, P.title, x, y + size * 0.85 + Math.min(36, size * 0.36) * 0.95, Math.min(24, size * 0.24), '#ffffff', { stroke: 5, font: SQ.fontBody, weight: 700 });
+        const L = SQ.LORE[tm.base];
+        const home = L && teams.length <= 4 ? ` · ${L.sector.replace(/^(Sector|the) /, '')}` : '';
+        SQ.outlinedText(ctx, P.title + home, x, y + size * 0.85 + Math.min(36, size * 0.36) * 0.95, Math.min(24, size * 0.24), '#ffffff', { stroke: 5, font: SQ.fontBody, weight: 700 });
       });
       ctx.restore();
       if (t > 1.2) {
@@ -764,7 +766,7 @@
       ctx.save();
       if (champ) ctx.globalAlpha = 0.28;
       SQ.drawEmoji(ctx, '🏆', W / 2, 130, 100);
-      SQ.outlinedText(ctx, 'TRINITY CUP', W / 2, 250, 76, '#ffd23f', { stroke: 14 });
+      SQ.outlinedText(ctx, 'THE TRINITY GAMES', W / 2, 250, 64, '#ffd23f', { stroke: 12 });
       const cols = [150, 410, 670, 930];
       const labels = ['QUARTERS', 'SEMIS', 'FINAL', 'CHAMPION'];
       const top = 420;
@@ -865,7 +867,9 @@
         if (this.opts.memes > 0) SQ.drawSunglasses(ctx, 0, -12, 300);
         SQ.outlinedText(ctx, 'CHAMPION', 0, 290, 120, '#ffd23f', { stroke: 20 });
         SQ.outlinedText(ctx, c.name.toUpperCase(), 0, 420, 96, c.color, { stroke: 16 });
-        SQ.outlinedText(ctx, 'wins the Trinity Cup', 0, 520, 44, '#ffffff', { stroke: 9, font: SQ.fontBody, weight: 700 });
+        const lore = SQ.LORE[c.base];
+        SQ.outlinedText(ctx, 'survives the Trinity Games', 0, 520, 44, '#ffffff', { stroke: 9, font: SQ.fontBody, weight: 700 });
+        if (lore) SQ.outlinedText(ctx, `${lore.sector} gets one more cycle of peace`, 0, 580, 34, c.light, { stroke: 8, font: SQ.fontBody, weight: 700 });
         ctx.restore();
       }
     }

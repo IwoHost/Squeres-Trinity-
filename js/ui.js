@@ -150,6 +150,7 @@
       store.set('names', names);
       applyNames();
       renderStats();
+      renderLore();
     });
     const star = document.createElement('label');
     star.className = 'star';
@@ -172,6 +173,46 @@
   });
 
   renderStats();
+
+  // ----- lore -----
+  function renderLore() {
+    const box = $('lore');
+    box.innerHTML = '';
+    for (const para of SQ.WORLD_LORE) {
+      const p = document.createElement('p');
+      p.textContent = para;
+      box.appendChild(p);
+    }
+    for (const t of SQ.TEAMS) {
+      const L = SQ.LORE[t.base];
+      const P = SQ.persona(t);
+      if (!L) continue;
+      const d = document.createElement('details');
+      const sum = document.createElement('summary');
+      const sw = document.createElement('i');
+      sw.style.background = t.color;
+      const nm = document.createElement('b');
+      nm.textContent = `${t.name} · ${P.title}`;
+      const sub = document.createElement('small');
+      sub.textContent = `from ${L.sector}`;
+      sum.append(sw, nm, sub);
+      const body = document.createElement('div');
+      body.className = 'body';
+      const add = (cls, text) => {
+        const p = document.createElement('p');
+        if (cls) p.className = cls;
+        p.textContent = text;
+        body.appendChild(p);
+      };
+      add('meta', `Home: ${L.home}.`);
+      add('', L.story);
+      const rival = SQ.TEAMS.find((x) => x.base === L.rival);
+      add('meta', `Rival: ${rival ? rival.name : L.rival}, who ${L.rivalWhy}.`);
+      d.append(sum, body);
+      box.appendChild(d);
+    }
+  }
+  renderLore();
 
   // ----- restore preferences -----
   const prefs = store.get('prefs2', {});
