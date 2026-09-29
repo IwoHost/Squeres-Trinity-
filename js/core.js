@@ -175,6 +175,9 @@
       },
     },
   };
+  // Official names from the lore. Colors without one go by their color name.
+  SQ.CANON_NAMES = { Red: 'DoucheCube' };
+
   // The world of the Trinity Games, and where each square comes from.
   SQ.WORLD_LORE = [
     'Long after the Great Refresh wiped out the Old Screen, what is left of the world is a place called the Grid. It is ruled from the Frame: a glowing white border that floats over everything and sees everything.',
@@ -185,7 +188,7 @@
     Red: {
       sector: 'Sector Ember',
       home: 'the foundries that forge the arena walls',
-      story: 'Red grew up hammering the same walls it now bounces off. When its little sibling was drawn for the Games, Red volunteered in their place. Red hates the Frame, hates losing, and really hates being told to calm down.',
+      story: 'DoucheCube grew up hammering the same walls it now bounces off. When its little sibling was drawn for the Games, DoucheCube volunteered in their place. It hates the Frame, hates losing, and really hates being told to calm down.',
       rival: 'Blue',
       rivalWhy: 'thinks too much and hits too little',
     },
@@ -242,7 +245,9 @@
 
   SQ.TEAMS.forEach((t) => {
     t.base = t.name; // the color's own name; t.name can be renamed by the viewer
-    t.persona = SQ.PERSONAS[t.name];
+    t.canon = SQ.CANON_NAMES[t.base] || t.base; // the square's official name in the lore
+    t.name = t.canon;
+    t.persona = SQ.PERSONAS[t.base];
   });
   SQ.starred = []; // base names of colors that must be in every match
   SQ.persona = (team) => (team && team.persona) || SQ.PERSONAS.Green;

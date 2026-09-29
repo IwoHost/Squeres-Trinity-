@@ -128,7 +128,7 @@
   const names = store.get('names', {});
   SQ.starred = store.get('stars', []).filter((b) => SQ.TEAMS.some((t) => t.base === b));
   const applyNames = () => {
-    SQ.TEAMS.forEach((t) => (t.name = (names[t.base] || '').trim() || t.base));
+    SQ.TEAMS.forEach((t) => (t.name = (names[t.base] || '').trim() || t.canon));
     game.headerCache = null;
   };
   applyNames();
@@ -141,7 +141,7 @@
     inp.type = 'text';
     inp.id = 'name-' + t.base.toLowerCase();
     inp.maxLength = 10;
-    inp.placeholder = t.base;
+    inp.placeholder = t.canon;
     inp.value = names[t.base] || '';
     inp.autocomplete = 'off';
     inp.setAttribute('aria-label', `Name for ${t.base}`);
