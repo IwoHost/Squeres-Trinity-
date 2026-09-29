@@ -54,7 +54,7 @@
       this.cam = new SQ.Camera();
       this.fx = new SQ.FX(this);
       this.recorder = new Recorder();
-      this.opts = { mode: 'random', memes: 1, speed: 1, music: 'shuffle', record: false, autoNext: false, quality: 'auto' };
+      this.opts = { mode: 'random', memes: 1, speed: 1, music: 'shuffle', record: false, autoNext: false, quality: 'auto', voices: true };
       this.setQuality('auto');
       this.fixedDt = 1 / 60;
       this.hitstopT = 0;
@@ -222,10 +222,21 @@
           this.cam.shake(8);
           this.fx.flash(0.35);
           this.fx.banner('GO!', null, '#ffd23f', 0.9, { size: 150 });
+          this.chatT = 1.2;
+          this.startLines = 2;
         }
       }
       if (P === 'play') {
         this.audio.intensity = m.intensity ? m.intensity() : 0.6;
+        // now and then someone says something in their own voice
+        this.chatT -= realDt;
+        if (this.chatT <= 0) {
+          const a = this.actors();
+          const who = a[Math.floor(Math.random() * a.length)];
+          const ev = this.startLines > 0 ? 'start' : 'idle';
+          if (who && this.fx.voice(who, ev, this.startLines > 0) && this.startLines > 0) this.startLines--;
+          this.chatT = this.startLines > 0 ? 0.9 : this.opts.memes === 2 ? 2 + Math.random() * 2 : 3.5 + Math.random() * 3.5;
+        }
         if (m.winner) {
           this.setPhase('finale');
           this.slowmo(0.25, 1.5, true);
@@ -248,6 +259,10 @@
       if (P === 'outro') {
         const w = m.winnerEnt;
         if (w) this.cam.focus(w.x, w.y, 2.1, 0, 3);
+        if (this.phaseT > 0.9 && !this.winLine) {
+          this.winLine = true;
+          if (w) this.fx.voice(w, 'win', true);
+        }
         if (this.phaseT > 1.7 && !this.memeDone && this.opts.memes > 0) {
           this.memeDone = true;
           this.audio.boom();
@@ -264,7 +279,10 @@
       }
       if (P === 'champion' && this.phaseT > 7) this.finishTour();
       if (P === 'intro' || P === 'countdown' || P === 'bracket' || P === 'champion' || P === 'between') simulate = false;
-      if (P !== 'outro') this.memeDone = false;
+      if (P !== 'outro') {
+        this.memeDone = false;
+        this.winLine = false;
+      }
 
       if (this.hitstopT > 0) {
         this.hitstopT -= realDt;
@@ -293,6 +311,14 @@
       this.cam.update(realDt);
       this.fx.update(realDt * this.timeScale, realDt);
       if (this.trackToast > 0) this.trackToast -= realDt;
+    }
+
+    // Everyone on the field who could say something.
+    actors() {
+      const m = this.mode;
+      if (!m) return [];
+      const list = m.ents || m.balls || m.racers || m.marbles || m.sq || [];
+      return list.filter((e) => e.alive !== false && !e.finished);
     }
 
     // ---------------- tournament ----------------
@@ -565,6 +591,8 @@
         const y = A.y + A.size * 0.6 - Math.abs(Math.sin(t * 5 + i)) * 16;
         SQ.drawSquare(ctx, x, y, size * SQ.ease.outBack(kk), tm, { mood: i % 2 ? 'angry' : 'normal', lookX: Math.sin(t * 2 + i), squash: Math.sin(t * 10 + i) * 0.06 });
         SQ.outlinedText(ctx, tm.name, x, y + size * 0.85, Math.min(36, size * 0.36), tm.color, { stroke: 7 });
+        const P = SQ.persona(tm);
+        SQ.outlinedText(ctx, P.title, x, y + size * 0.85 + Math.min(36, size * 0.36) * 0.95, Math.min(24, size * 0.24), '#ffffff', { stroke: 5, font: SQ.fontBody, weight: 700 });
       });
       ctx.restore();
       if (t > 1.2) {

@@ -262,12 +262,13 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     </div>
 
     <div class="group">
-      <span class="label">Memes</span>
+      <span class="label">Memes and voices</span>
       <div class="chips" role="radiogroup" aria-label="Memes">
         <label class="chip"><input type="radio" name="memes" value="0" id="memes-off"><span>Off</span></label>
         <label class="chip"><input type="radio" name="memes" value="1" id="memes-on" checked><span>On</span></label>
         <label class="chip"><input type="radio" name="memes" value="2" id="memes-chaos"><span>💀 Chaos</span></label>
       </div>
+      <label class="toggle"><input type="checkbox" id="voices" checked> Voice lines (every color has its own personality)</label>
     </div>
 
     <div class="group">
@@ -336,6 +337,133 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     { name: 'Orange', color: '#ff8f33', dark: '#a8520f', light: '#ffd0a8' },
     { name: 'Pink', color: '#ff6ac1', dark: '#a0286e', light: '#ffc4e6' },
   ];
+
+  // Every color has a personality: how it moves and fights, how it sounds, and what it says.
+  // speed/aggro/fear/wander are gentle multipliers so no color becomes unbeatable.
+  SQ.PERSONAS = {
+    Red: {
+      title: 'Hothead', icon: '🔥', speed: 1.05, aggro: 1.4, fear: 0.6, wander: 0.8, smart: 0.5,
+      voice: { wave: 'square', base: 150, spread: 3, rate: 0.07, n: [4, 6] },
+      lines: {
+        start: ['LET ME AT EM', "I'm gonna win. obviously", 'FIGHT ME'],
+        hit: ['COME HERE!', 'too slow!', 'RAAAH', "who's next?", 'get wrecked'],
+        hurt: ['HEY!', 'you did NOT', "that's it!!", 'grrr'],
+        item: ['POWER!', 'even stronger now', 'MORE!'],
+        lead: ["I'm on fire 🔥", 'catch me if you can', 'EAT MY DUST'],
+        scared: ["I'm not scared. I'm ANGRY", 'bring it on'],
+        idle: ['someone fight me', "I'm bored. hit something", 'RAAH', 'where are you cowards'],
+        win: ['TOLD YOU', 'UNDEFEATED 🔥', 'who wants round 2?'],
+        lose: ['REMATCH!!', 'this is rigged', 'I let you win'],
+      },
+    },
+    Green: {
+      title: 'Chill', icon: '🌿', speed: 0.96, aggro: 0.8, fear: 0.8, wander: 1.1, smart: 0.5,
+      voice: { wave: 'sine', base: 190, spread: 2, rate: 0.12, n: [3, 4] },
+      lines: {
+        start: ['vibes only 🌿', 'no stress', "let's just chill"],
+        hit: ['oh. sorry man', 'my bad', 'it happens'],
+        hurt: ['ouch. ok', 'rude but fine', 'all good'],
+        item: ['oh nice', 'free stuff', 'cool cool'],
+        lead: ['wait am I winning?', 'huh. neat', 'taking it easy'],
+        scared: ['it is what it is', 'eh. whatever happens'],
+        idle: ['nice weather', 'we chillin', 'ok ok ok', 'this is fun'],
+        win: ['good game everyone', 'no stress ✌️', 'we did it I guess'],
+        lose: ['gg', 'was fun tho', 'naptime'],
+      },
+    },
+    Blue: {
+      title: 'Brainiac', icon: '🤓', speed: 1, aggro: 1, fear: 1, wander: 0.7, smart: 0.85,
+      voice: { wave: 'triangle', base: 320, spread: 4, rate: 0.06, n: [5, 7] },
+      lines: {
+        start: ['I ran the numbers', 'calculating…', 'my strategy is flawless'],
+        hit: ['calculated.', 'as predicted 🤓', 'physics!'],
+        hurt: ['that was not in my model', 'statistically unlikely', 'error 404'],
+        item: ['optimal pickup', 'efficiency +20%', 'as planned'],
+        lead: ['all according to plan', 'the math checks out', 'Q.E.D.'],
+        scared: ['recalculating…', 'odds are not great'],
+        idle: ['actually…', 'fun fact: squares have 4 sides', 'hmm. interesting', 'analyzing'],
+        win: ['I told you. math.', 'statistically inevitable', 'too easy 🤓'],
+        lose: ['impossible', 'I need more data', 'the numbers lied'],
+      },
+    },
+    Yellow: {
+      title: 'Hyper', icon: '⚡', speed: 1.08, aggro: 1.1, fear: 0.9, wander: 1.4, smart: 0.4,
+      voice: { wave: 'square', base: 520, spread: 5, rate: 0.045, n: [6, 9] },
+      lines: {
+        start: ["LET'S GOOO", 'WOOHOO!', 'I had 9 coffees'],
+        hit: ['BOOP!', 'zoom zoom ⚡', 'HAHA GOTCHA'],
+        hurt: ['WHEEE', 'OW OW OW', 'again again!'],
+        item: ['OOOH SHINY', 'MINE MINE MINE', 'YAAAY'],
+        lead: ["can't stop won't stop", 'FASTEST SQUARE ALIVE', 'NYOOOM'],
+        scared: ['AAAAAAA', 'too fast too fast'],
+        idle: ['WHEEE', 'is this a race?', 'zoom', 'AAAAA fun'],
+        win: ['I WON I WON I WON', 'ZOOOOM 🏆', 'AGAIN! AGAIN!'],
+        lose: ['awww', 'ok ok one more', 'I tripped'],
+      },
+    },
+    Purple: {
+      title: 'Royal', icon: '👑', speed: 1, aggro: 1.1, fear: 1, wander: 0.9, smart: 0.6,
+      voice: { wave: 'sawtooth', base: 230, spread: 2, rate: 0.1, n: [4, 5], vib: true },
+      lines: {
+        start: ['bow before me 👑', 'the royal square has arrived', 'peasants, all of you'],
+        hit: ['how dare you exist', 'kneel', 'slay 💅'],
+        hurt: ['HOW DARE YOU', 'do you know who I am?', 'my crown!'],
+        item: ['a gift for royalty', 'naturally', 'fit for a queen'],
+        lead: ["I'm the main character", 'iconic', 'as it should be'],
+        scared: ['guards? GUARDS?!', 'this is beneath me'],
+        idle: ['ugh, commoners', 'is this the VIP area?', 'my aura is unmatched'],
+        win: ['bow. now.', 'iconic behavior', 'the crown stays 👑'],
+        lose: ['I demand a recount', 'unacceptable', 'this never happened'],
+      },
+    },
+    Cyan: {
+      title: 'Scaredy', icon: '😰', speed: 1.02, aggro: 0.6, fear: 1.6, wander: 1, smart: 0.5,
+      voice: { wave: 'sine', base: 440, spread: 6, rate: 0.055, n: [5, 8], vib: true },
+      lines: {
+        start: ["I'm scared 😰", 'can we not?', 'I just wanted to watch'],
+        hit: ['sorry sorry sorry', 'I did not mean that', 'oh no I hit someone'],
+        hurt: ['AAAAA', 'why me', 'mommy'],
+        item: ['is this safe?', 'I found a thing!', 'please help me'],
+        lead: ["wait I'm winning?", 'this is scary', 'too much pressure'],
+        scared: ['nope nope nope', 'please no', "I'm just a little guy"],
+        idle: ['is it over yet?', 'I want to go home', 'what was that noise?'],
+        win: ['I… won? 🥹', 'I was so scared', 'nobody was more surprised'],
+        lose: ['I knew it', 'phew, it is over', 'can I go home now?'],
+      },
+    },
+    Orange: {
+      title: 'Clown', icon: '🤡', speed: 1, aggro: 1, fear: 0.8, wander: 1.8, smart: 0.3,
+      voice: { wave: 'square', base: 300, spread: 12, rate: 0.07, n: [4, 7] },
+      lines: {
+        start: ['honk honk 🤡', 'I have no plan', 'let the chaos begin'],
+        hit: ['BONK', 'hehe', 'I meant to do that'],
+        hurt: ['oops 🤡', 'I slipped', 'lol'],
+        item: ['what does this do?', 'ooh a button', 'hehehe'],
+        lead: ['how am I winning lol', 'skill? no. luck', 'SURPRISE'],
+        scared: ['this is fine 🔥', 'uh oh'],
+        idle: ['skibidi', 'lol', 'I forgot the rules', 'honk'],
+        win: ['I DID IT? LOL', 'chaos wins 🤡', 'nobody expected that'],
+        lose: ['worth it', 'lol gg', 'I was lagging'],
+      },
+    },
+    Pink: {
+      title: 'Sweetheart', icon: '💖', speed: 1, aggro: 0.9, fear: 1.1, wander: 1, smart: 0.55,
+      voice: { wave: 'sine', base: 600, spread: 4, rate: 0.065, n: [4, 6] },
+      lines: {
+        start: ['hi friends 💖', 'good luck everyone!', 'bestie time'],
+        hit: ['sowwy', 'boop 💖', 'love tap!'],
+        hurt: ['rude!!', 'meanie', 'ow 🥺'],
+        item: ['a present!', 'so cute', 'yay 💖'],
+        lead: ["I'm doing it!", 'look at me go 💖', 'eek!'],
+        scared: ['hugs? please?', 'be nice to me'],
+        idle: ['uwu', 'you all look so cute', 'friendship!', 'hehe'],
+        win: ['we are all winners 💖', 'yaaay!', 'love you all'],
+        lose: ['it was fun! 💖', 'next time!', 'hugs anyway'],
+      },
+    },
+  };
+  SQ.TEAMS.forEach((t) => (t.persona = SQ.PERSONAS[t.name]));
+  SQ.persona = (team) => (team && team.persona) || SQ.PERSONAS.Green;
 
   SQ.pickTeams = function (rng, n) {
     return rng.shuffle(SQ.TEAMS.map((t, i) => i)).slice(0, n).map((i) => SQ.TEAMS[i]);
@@ -1415,6 +1543,24 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       const t = this.now;
       [0, 2, 4, 7].forEach((d, k) => this.tone(t + k * 0.05, this.scaleFreq(d, 1), 0.08, { type: 'square', gain: 0.06, cutoff: 5000, rev: 0.3 }));
     }
+    // Animal-Crossing-style babble: a few quick blips in the speaker's own voice.
+    babble(v) {
+      if (!v || !this._ok('babble', 200)) return;
+      const t0 = this.now;
+      const n = v.n[0] + Math.floor(Math.random() * (v.n[1] - v.n[0] + 1));
+      for (let i = 0; i < n; i++) {
+        const f = v.base * Math.pow(2, ((Math.random() * 2 - 1) * v.spread) / 12);
+        this.tone(t0 + i * v.rate, f, v.rate * 0.75, {
+          type: v.wave,
+          gain: v.wave === 'sine' ? 0.12 : 0.05,
+          slideTo: f * (1 + (Math.random() - 0.3) * 0.15),
+          cutoff: 3200,
+          release: 0.03,
+          vibrato: v.vib,
+        });
+      }
+    }
+
     // soft sparkle when a power-up appears
     itemSpawn() {
       if (!this._ok('spawn', 150)) return;
@@ -1684,25 +1830,48 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       this.texts.push({ x: SQ.clamp(x, 140, 860), y: SQ.clamp(y, 60, 960), str, color: color || '#fff', size: size || 34, life: 0, max: 1.1 });
     }
     // Speech bubble that follows an entity.
-    say(ent, str, dur) {
-      if (!ent) return;
-      if (this.bubbles.some((b) => b.ent === ent)) return;
-      if (this.bubbles.length >= 3) return;
+    say(ent, str, dur, team) {
+      if (!ent) return false;
+      if (this.bubbles.some((b) => b.ent === ent)) return false;
+      if (this.bubbles.length >= 3) return false;
       // don't stack bubbles on top of each other
-      if (this.bubbles.some((b) => Math.abs(b.ent.x - ent.x) < 220 && Math.abs(b.ent.y - ent.y) < 90)) return;
-      this.bubbles.push({ ent, str, life: 0, max: dur || 1.6 });
+      if (this.bubbles.some((b) => Math.abs(b.ent.x - ent.x) < 220 && Math.abs(b.ent.y - ent.y) < 90)) return false;
+      this.bubbles.push({ ent, str, life: 0, max: dur || 1.6, team: team || this.teamOf(ent) });
+      return true;
     }
-    // Chance-based meme line, respecting the meme level.
+
+    teamOf(ent) {
+      const m = this.g.mode;
+      return m && m.teams && ent && ent.team != null ? m.teams[ent.team] : null;
+    }
+
+    // A personality voice line. event: start, hit, hurt, item, lead, scared, idle, win, lose.
+    voice(ent, event, force) {
+      if (!ent || !this.g.opts.voices) return false;
+      const team = this.teamOf(ent);
+      if (!team) return false;
+      const P = SQ.persona(team);
+      const lines = P.lines[event];
+      if (!lines) return false;
+      if (!force && this.g.real - (this.lastVoice || -9) < 1.1) return false;
+      if (!this.say(ent, lines[(Math.random() * lines.length) | 0], force ? 2.2 : 1.8, team)) return false;
+      this.lastVoice = this.g.real;
+      this.g.audio.babble(P.voice);
+      return true;
+    }
+
+    // Chance-based reaction: a personality line most of the time, a meme line otherwise.
     maybeSay(ent, kind, p) {
       const lvl = this.memeLevel;
+      const voices = this.g.opts.voices;
+      if (lvl === 0 && !voices) return false;
+      const mult = lvl === 2 ? 2.5 : 1;
+      if (Math.random() >= p * mult) return false;
+      const map = { elim: 'hurt', hunter: 'hit', streak: 'hit', lonely: 'scared', comeback: 'win', winner: 'win', random: 'idle' };
+      if (voices && (lvl === 0 || Math.random() < 0.65) && this.voice(ent, map[kind] || 'idle')) return true;
       if (lvl === 0) return false;
-      const mult = lvl === 2 ? 2.5 : 0.6;
-      if (Math.random() < p * mult) {
-        const list = MEMES[kind];
-        this.say(ent, list[(Math.random() * list.length) | 0]);
-        return true;
-      }
-      return false;
+      const list = MEMES[kind];
+      return this.say(ent, list[(Math.random() * list.length) | 0]);
     }
     banner(text, sub, color, dur, opts) {
       this.banners.push({ text, sub, color: color || '#fff', life: 0, max: dur || 1.6, opts: opts || {} });
@@ -1815,7 +1984,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         const e = b.ent;
         const k = b.life / b.max;
         const pop = k < 0.12 ? SQ.ease.outBack(k / 0.12) : k > 0.85 ? 1 - (k - 0.85) / 0.15 : 1;
-        const size = 26;
+        const size = 30;
         ctx.save();
         ctx.font = `700 ${size}px ${SQ.fontBody}`;
         const w = ctx.measureText(b.str).width + 26;
@@ -1826,8 +1995,8 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         ctx.translate(bx, by);
         ctx.scale(pop, pop);
         ctx.fillStyle = '#ffffff';
-        ctx.strokeStyle = '#0b0b10';
-        ctx.lineWidth = 4;
+        ctx.strokeStyle = b.team ? b.team.dark : '#0b0b10';
+        ctx.lineWidth = b.team ? 6 : 4;
         SQ.roundRect(ctx, -w / 2, -h / 2, w, h, 14);
         ctx.fill();
         ctx.stroke();
@@ -1925,6 +2094,8 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     { type: 'magnet', icon: '🧲' },
     { type: 'mega', icon: '🍄' },
   ];
+
+  const NEUTRAL = { speed: 1, aggro: 1, fear: 1, wander: 1 };
 
   class Chase {
     constructor(g, rng) {
@@ -2082,6 +2253,8 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
           continue;
         }
         const prey = this.preyOf(e.team);
+        // late in the match personalities stop mattering so the chase always ends
+        const P = this.time > 60 ? NEUTRAL : SQ.persona(this.teams[e.team]);
         let best = null;
         let bd = 1e12;
         let pred = null;
@@ -2112,20 +2285,20 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         e.mood = 'normal';
         if (best && bd < 420 * 420) {
           const d = Math.sqrt(bd) || 1;
-          dx += ((best.x - e.x) / d) * 1.0;
-          dy += ((best.y - e.y) / d) * 1.0;
+          dx += ((best.x - e.x) / d) * P.aggro;
+          dy += ((best.y - e.y) / d) * P.aggro;
           e.mood = 'angry';
         }
         if (pred && pd < 190 * 190 && e.shield <= 0) {
           const d = Math.sqrt(pd) || 1;
-          const w = 1.5 * (1 - d / 190) + 0.4;
+          const w = (1.5 * (1 - d / 190) + 0.4) * P.fear;
           dx -= ((pred.x - e.x) / d) * w;
           dy -= ((pred.y - e.y) / d) * w;
           e.mood = 'scared';
         }
         e.wander += rng.range(-2, 2) * dt;
-        dx += Math.cos(e.wander) * 0.35 + sepX * 0.5;
-        dy += Math.sin(e.wander) * 0.35 + sepY * 0.5;
+        dx += Math.cos(e.wander) * 0.35 * P.wander + sepX * 0.5;
+        dy += Math.sin(e.wander) * 0.35 * P.wander + sepY * 0.5;
         // keep away from walls
         const m = 70;
         if (e.x < m) dx += (m - e.x) / m;
@@ -2139,7 +2312,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
           dy += ((500 - e.y) / rc) * 2;
         }
         const len = Math.hypot(dx, dy) || 1;
-        const sp = e.speed * (e.boost > 0 ? 1.8 : 1) * (this.time > 35 ? 1.15 : 1);
+        const sp = e.speed * P.speed * (this.time > 60 && prey >= 0 ? 1.25 : 1) * (e.boost > 0 ? 1.8 : 1) * (this.time > 35 ? 1.15 : 1);
         const k = Math.min(1, dt * 3.2);
         e.vx += ((dx / len) * sp - e.vx) * k;
         e.vy += ((dy / len) * sp - e.vy) * k;
@@ -2257,6 +2430,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
 
     collect(e, pk) {
       const g = this.g;
+      g.fx.voice(e, 'item');
       const team = this.teams[e.team];
       g.audio.pickup();
       g.fx.ring(pk.x, pk.y, SQ.ITEMS[pk.type].color, 60);
@@ -2610,6 +2784,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       const lead = this.counts.indexOf(Math.max(...this.counts));
       if (lead !== this.leader && this.leader !== -1 && this.time > 5) {
         g.fx.text(500, 470, `${this.teams[lead].name.toUpperCase()} TAKES THE LEAD`, this.teams[lead].color, 44);
+        g.fx.voice(this.balls.find((b) => b.team === lead), 'lead');
       }
       this.leader = lead;
 
@@ -2669,6 +2844,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
 
     collect(b, it) {
       const g = this.g;
+      g.fx.voice(b, 'item');
       const team = this.teams[b.team];
       const def = SQ.ITEMS[it.type];
       g.audio.pickup();
@@ -3243,17 +3419,19 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         for (const k of ['shieldT', 'boost', 'rage', 'big', 'frozen']) s[k] -= dt;
         s.size = SQ.lerp(s.size, s.big > 0 ? 160 : s.base, Math.min(1, dt * 4));
         if (s.frozen > 0) continue;
-        const sp = (320 + Math.min(160, this.time * 1.6)) * (s.boost > 0 ? 1.6 : 1);
+        const P = SQ.persona(this.teams[s.team]);
+        const sp = (320 + Math.min(160, this.time * 1.6)) * P.speed * (s.boost > 0 ? 1.6 : 1);
         if (s.turnT <= 0) {
           s.turnT = rng.range(1.6, 3.2);
           let a;
           const others = alive.filter((o) => o !== s);
           // go for a nearby power-up about half the time
           const near = this.items.slice().sort((p, q) => SQ.dist2(p.x, p.y, s.x, s.y) - SQ.dist2(q.x, q.y, s.x, s.y))[0];
-          if (near && rng.chance(0.5)) {
+          // brainy squares go for items, hotheads go for enemies
+          if (near && rng.chance(P.smart)) {
             a = Math.atan2(near.y - s.y, near.x - s.x);
             s.turnT = rng.range(1, 1.8);
-          } else if (others.length && rng.chance(0.55)) {
+          } else if (others.length && rng.chance(Math.min(0.9, 0.55 * P.aggro))) {
             const o = rng.pick(others);
             a = Math.atan2(o.y - s.y, o.x - s.x) + rng.range(-0.3, 0.3);
           } else a = rng.range(0, 6.28);
@@ -3390,7 +3568,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
           g.audio.explode();
           g.fx.burst(v.x, v.y, this.teams[v.team].color, 60, 520, 18);
           g.fx.flash(0.6, this.teams[v.team].light);
-          g.fx.maybeSay(v, 'elim', 0.8);
+          g.fx.voice(v, 'lose', true);
           g.highlight(v.x, v.y, 2, 1.4, 0.25);
           // loser's paint becomes the attacker's
           for (let i = 0; i < this.owner.length; i++) if (this.owner[i] === v.team) (this.owner[i] = atk.team), (this.since[i] = this.time);
@@ -3434,6 +3612,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
 
     collect(s, it, alive) {
       const g = this.g;
+      g.fx.voice(s, 'item');
       const team = this.teams[s.team];
       const def = SQ.ITEMS[it.type];
       g.audio.pickup();
@@ -3794,7 +3973,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
           const ay = ty - p.y;
           const l = Math.hypot(ax, ay) || 1;
           const wob = Math.sin(this.time * 3 + p.team * 2) * 0.35;
-          const acc = p.accel * (p.boost > 0 ? 1.8 : 1);
+          const acc = p.accel * SQ.persona(this.teams[p.team]).speed * (p.boost > 0 ? 1.8 : 1);
           p.vx += ((ax / l) + wob * (ay / l)) * acc * dt;
           p.vy += ((ay / l) - wob * (ax / l)) * acc * dt;
         } else if (p.stun > 0) p.spin += dt * 14;
@@ -3802,7 +3981,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
           p.vx *= 0.8;
           p.vy *= 0.8;
         }
-        const max = p.max * (p.boost > 0 ? 1.7 : 1);
+        const max = p.max * SQ.persona(this.teams[p.team]).speed * (p.boost > 0 ? 1.7 : 1);
         const sp = Math.hypot(p.vx, p.vy);
         if (sp > max) (p.vx *= max / sp), (p.vy *= max / sp);
         p.vx *= Math.exp(-dt * 0.8);
@@ -3921,6 +4100,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       if (lead.team !== this.leader && this.leader !== -1 && this.time > 2 && !this.winner && this.time - (this.leadTold || 0) > 2.5) {
         this.leadTold = this.time;
         g.fx.text(lead.x, lead.y - 50, 'NEW LEADER', this.teams[lead.team].color, 34);
+        g.fx.voice(lead, 'lead');
         g.audio.whoosh();
       }
       this.leader = lead.team;
@@ -4005,6 +4185,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
 
     useItem(p, it) {
       const g = this.g;
+      g.fx.voice(p, 'item');
       g.audio.pickup();
       g.fx.ring(it.x, it.y, SQ.ITEMS[it.type].color, 50);
       g.fx.burst(it.x, it.y, SQ.ITEMS[it.type].color, 10, 220, 8);
@@ -4433,7 +4614,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         s.blink -= dt;
         if (s.blink < -0.12) s.blink = rng.range(2, 5);
         for (const k in s.hitCool) s.hitCool[k] -= dt;
-        const sp = s.speed * (s.boost > 0 ? 1.6 : 1) * (1 + Math.min(0.4, this.time / 150));
+        const sp = s.speed * SQ.persona(this.teams[s.team]).speed * (s.boost > 0 ? 1.6 : 1) * (1 + Math.min(0.4, this.time / 150));
         const cur = Math.hypot(s.vx, s.vy) || 1;
         s.vx = (s.vx / cur) * sp;
         s.vy = (s.vy / cur) * sp;
@@ -4596,6 +4777,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
 
     landHit(s, o, dmg) {
       const g = this.g;
+      if (!g.fx.maybeSay(o, 'elim', 0.1)) g.fx.maybeSay(s, 'hunter', 0.08);
       const heavy = s.w && s.w.type === 'hammer';
       g.audio.slash();
       g.audio.hit(heavy);
@@ -4689,6 +4871,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         v.hp = 0;
         v.alive = false;
         v.dead = 0;
+        g.fx.voice(v, 'lose', true);
         g.hitstop(0.14);
         g.audio.explode();
         g.fx.burst(v.x, v.y, this.teams[v.team].color, 60, 520, 14);
@@ -4709,6 +4892,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
 
     collect(s, d) {
       const g = this.g;
+      g.fx.voice(s, 'item');
       g.audio.pickup();
       g.fx.ring(d.x, d.y, SQ.ITEMS[d.type].color, 60);
       g.fx.burst(d.x, d.y, SQ.ITEMS[d.type].color, 12, 240, 9);
@@ -5274,6 +5458,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       if (lead.team !== this.leader && this.leader !== -1 && this.time > 2 && !this.winner && this.time - (this.leadTold || 0) > 2.5) {
         this.leadTold = this.time;
         g.fx.text(lead.x, lead.y - 50, 'NEW LEADER', this.teams[lead.team].color, 34);
+        g.fx.voice(lead, 'lead');
         g.audio.whoosh();
       }
       this.leader = lead.team;
@@ -5669,7 +5854,8 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
           const rivals = this.sq.filter((o) => o !== s && this.inZone(o));
           let tx = Z.x + rng.range(-60, 60);
           let ty = Z.y + rng.range(-60, 60);
-          if (rivals.length && rng.chance(inside ? 0.8 : 0.5)) {
+          const P = SQ.persona(this.teams[s.team]);
+          if (rivals.length && rng.chance(Math.min(0.95, (inside ? 0.8 : 0.5) * P.aggro))) {
             const o = rivals.sort((a, b) => SQ.dist2(a.x, a.y, s.x, s.y) - SQ.dist2(b.x, b.y, s.x, s.y))[0];
             tx = o.x;
             ty = o.y;
@@ -5678,7 +5864,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
           const dx = tx - s.x;
           const dy = ty - s.y;
           const d = Math.hypot(dx, dy) || 1;
-          const power = inside && !rivals.length ? 250 : rng.range(560, 760);
+          const power = (inside && !rivals.length ? 250 : rng.range(560, 760)) * (0.85 + 0.15 * P.aggro) * P.speed;
           s.vx += (dx / d) * power;
           s.vy += (dy / d) * power;
           s.dashT = inside ? rng.range(0.5, 1) : rng.range(0.6, 1.3);
@@ -5758,6 +5944,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       if (kt !== this.king) {
         if (king && this.time > 1) {
           g.fx.text(king.x, king.y - 60, 'NEW KING', this.teams[kt].color, 38);
+          if (Math.random() < 0.5) g.fx.voice(king, 'lead');
           g.audio.pickup();
         }
         this.king = kt;
@@ -5925,7 +6112,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       this.cam = new SQ.Camera();
       this.fx = new SQ.FX(this);
       this.recorder = new Recorder();
-      this.opts = { mode: 'random', memes: 1, speed: 1, music: 'shuffle', record: false, autoNext: false, quality: 'auto' };
+      this.opts = { mode: 'random', memes: 1, speed: 1, music: 'shuffle', record: false, autoNext: false, quality: 'auto', voices: true };
       this.setQuality('auto');
       this.fixedDt = 1 / 60;
       this.hitstopT = 0;
@@ -6093,10 +6280,21 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
           this.cam.shake(8);
           this.fx.flash(0.35);
           this.fx.banner('GO!', null, '#ffd23f', 0.9, { size: 150 });
+          this.chatT = 1.2;
+          this.startLines = 2;
         }
       }
       if (P === 'play') {
         this.audio.intensity = m.intensity ? m.intensity() : 0.6;
+        // now and then someone says something in their own voice
+        this.chatT -= realDt;
+        if (this.chatT <= 0) {
+          const a = this.actors();
+          const who = a[Math.floor(Math.random() * a.length)];
+          const ev = this.startLines > 0 ? 'start' : 'idle';
+          if (who && this.fx.voice(who, ev, this.startLines > 0) && this.startLines > 0) this.startLines--;
+          this.chatT = this.startLines > 0 ? 0.9 : this.opts.memes === 2 ? 2 + Math.random() * 2 : 3.5 + Math.random() * 3.5;
+        }
         if (m.winner) {
           this.setPhase('finale');
           this.slowmo(0.25, 1.5, true);
@@ -6119,6 +6317,10 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       if (P === 'outro') {
         const w = m.winnerEnt;
         if (w) this.cam.focus(w.x, w.y, 2.1, 0, 3);
+        if (this.phaseT > 0.9 && !this.winLine) {
+          this.winLine = true;
+          if (w) this.fx.voice(w, 'win', true);
+        }
         if (this.phaseT > 1.7 && !this.memeDone && this.opts.memes > 0) {
           this.memeDone = true;
           this.audio.boom();
@@ -6135,7 +6337,10 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       }
       if (P === 'champion' && this.phaseT > 7) this.finishTour();
       if (P === 'intro' || P === 'countdown' || P === 'bracket' || P === 'champion' || P === 'between') simulate = false;
-      if (P !== 'outro') this.memeDone = false;
+      if (P !== 'outro') {
+        this.memeDone = false;
+        this.winLine = false;
+      }
 
       if (this.hitstopT > 0) {
         this.hitstopT -= realDt;
@@ -6164,6 +6369,14 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       this.cam.update(realDt);
       this.fx.update(realDt * this.timeScale, realDt);
       if (this.trackToast > 0) this.trackToast -= realDt;
+    }
+
+    // Everyone on the field who could say something.
+    actors() {
+      const m = this.mode;
+      if (!m) return [];
+      const list = m.ents || m.balls || m.racers || m.marbles || m.sq || [];
+      return list.filter((e) => e.alive !== false && !e.finished);
     }
 
     // ---------------- tournament ----------------
@@ -6436,6 +6649,8 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         const y = A.y + A.size * 0.6 - Math.abs(Math.sin(t * 5 + i)) * 16;
         SQ.drawSquare(ctx, x, y, size * SQ.ease.outBack(kk), tm, { mood: i % 2 ? 'angry' : 'normal', lookX: Math.sin(t * 2 + i), squash: Math.sin(t * 10 + i) * 0.06 });
         SQ.outlinedText(ctx, tm.name, x, y + size * 0.85, Math.min(36, size * 0.36), tm.color, { stroke: 7 });
+        const P = SQ.persona(tm);
+        SQ.outlinedText(ctx, P.title, x, y + size * 0.85 + Math.min(36, size * 0.36) * 0.95, Math.min(24, size * 0.24), '#ffffff', { stroke: 5, font: SQ.fontBody, weight: 700 });
       });
       ctx.restore();
       if (t > 1.2) {
@@ -6675,7 +6890,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
 
   // ----- restore preferences -----
   const prefs = store.get('prefs2', {});
-  Object.assign(game.opts, { mode: prefs.mode || 'random', memes: prefs.memes != null ? prefs.memes : 1, speed: prefs.speed || 1, music: prefs.music || 'shuffle', record: prefs.record != null ? prefs.record : true, autoNext: !!prefs.autoNext, quality: prefs.quality || 'auto' });
+  Object.assign(game.opts, { mode: prefs.mode || 'random', memes: prefs.memes != null ? prefs.memes : 1, speed: prefs.speed || 1, music: prefs.music || 'shuffle', record: prefs.record != null ? prefs.record : true, autoNext: !!prefs.autoNext, quality: prefs.quality || 'auto', voices: prefs.voices !== false });
   if (game.opts.music.startsWith('up')) game.opts.music = 'shuffle';
   fillMusic();
   const setRadio = (name, value) => {
@@ -6689,6 +6904,8 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
   $('quality').value = game.opts.quality;
   game.setQuality(game.opts.quality);
   $('auto').checked = game.opts.autoNext;
+  $('voices').checked = game.opts.voices;
+  $('voices').addEventListener('change', (e) => ((game.opts.voices = e.target.checked), save()));
   if (prefs.musicVol != null) $('music-vol').value = prefs.musicVol;
   if (prefs.sfxVol != null) $('sfx-vol').value = prefs.sfxVol;
   game.audio.musicVol = +$('music-vol').value;

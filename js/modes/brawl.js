@@ -203,7 +203,7 @@
         s.blink -= dt;
         if (s.blink < -0.12) s.blink = rng.range(2, 5);
         for (const k in s.hitCool) s.hitCool[k] -= dt;
-        const sp = s.speed * (s.boost > 0 ? 1.6 : 1) * (1 + Math.min(0.4, this.time / 150));
+        const sp = s.speed * SQ.persona(this.teams[s.team]).speed * (s.boost > 0 ? 1.6 : 1) * (1 + Math.min(0.4, this.time / 150));
         const cur = Math.hypot(s.vx, s.vy) || 1;
         s.vx = (s.vx / cur) * sp;
         s.vy = (s.vy / cur) * sp;
@@ -366,6 +366,7 @@
 
     landHit(s, o, dmg) {
       const g = this.g;
+      if (!g.fx.maybeSay(o, 'elim', 0.1)) g.fx.maybeSay(s, 'hunter', 0.08);
       const heavy = s.w && s.w.type === 'hammer';
       g.audio.slash();
       g.audio.hit(heavy);
@@ -459,6 +460,7 @@
         v.hp = 0;
         v.alive = false;
         v.dead = 0;
+        g.fx.voice(v, 'lose', true);
         g.hitstop(0.14);
         g.audio.explode();
         g.fx.burst(v.x, v.y, this.teams[v.team].color, 60, 520, 14);
@@ -479,6 +481,7 @@
 
     collect(s, d) {
       const g = this.g;
+      g.fx.voice(s, 'item');
       g.audio.pickup();
       g.fx.ring(d.x, d.y, SQ.ITEMS[d.type].color, 60);
       g.fx.burst(d.x, d.y, SQ.ITEMS[d.type].color, 12, 240, 9);

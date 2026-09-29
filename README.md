@@ -62,6 +62,25 @@ is on, so a busy match plays a melody that fits the song. Chase combos climb up 
 
 You can also add your own audio files. Only use music you have the rights to.
 
+## Personalities and voice lines
+
+Every color has a personality that changes how it plays and what it says, with its own babble voice:
+
+| Color | Personality | How it plays |
+| --- | --- | --- |
+| Red | 🔥 Hothead | a little faster, chases and charges hard, rarely runs |
+| Green | 🌿 Chill | a little slower, relaxed, polite |
+| Blue | 🤓 Brainiac | steady, goes for power-ups |
+| Yellow | ⚡ Hyper | fastest, twitchy, loud |
+| Purple | 👑 Royal | dramatic, a bit aggressive |
+| Cyan | 😰 Scaredy | runs away from everything |
+| Orange | 🤡 Clown | wanders randomly, chaotic |
+| Pink | 💖 Sweetheart | friendly, apologises when it hits you |
+
+They talk at the start, when they hit or get hit, pick up items, take the lead, win or get knocked
+out, and now and then just chat. Speech bubbles are outlined in the speaker's color. Turn them off
+with "Voice lines". The differences are small multipliers, so every color can still win.
+
 ## Memes
 
 With memes on, squares react with captions ("skill issue", "it's so over", "we're so back",

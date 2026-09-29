@@ -10,6 +10,8 @@
     { type: 'mega', icon: '🍄' },
   ];
 
+  const NEUTRAL = { speed: 1, aggro: 1, fear: 1, wander: 1 };
+
   class Chase {
     constructor(g, rng) {
       this.g = g;
@@ -166,6 +168,8 @@
           continue;
         }
         const prey = this.preyOf(e.team);
+        // late in the match personalities stop mattering so the chase always ends
+        const P = this.time > 60 ? NEUTRAL : SQ.persona(this.teams[e.team]);
         let best = null;
         let bd = 1e12;
         let pred = null;
@@ -196,20 +200,20 @@
         e.mood = 'normal';
         if (best && bd < 420 * 420) {
           const d = Math.sqrt(bd) || 1;
-          dx += ((best.x - e.x) / d) * 1.0;
-          dy += ((best.y - e.y) / d) * 1.0;
+          dx += ((best.x - e.x) / d) * P.aggro;
+          dy += ((best.y - e.y) / d) * P.aggro;
           e.mood = 'angry';
         }
         if (pred && pd < 190 * 190 && e.shield <= 0) {
           const d = Math.sqrt(pd) || 1;
-          const w = 1.5 * (1 - d / 190) + 0.4;
+          const w = (1.5 * (1 - d / 190) + 0.4) * P.fear;
           dx -= ((pred.x - e.x) / d) * w;
           dy -= ((pred.y - e.y) / d) * w;
           e.mood = 'scared';
         }
         e.wander += rng.range(-2, 2) * dt;
-        dx += Math.cos(e.wander) * 0.35 + sepX * 0.5;
-        dy += Math.sin(e.wander) * 0.35 + sepY * 0.5;
+        dx += Math.cos(e.wander) * 0.35 * P.wander + sepX * 0.5;
+        dy += Math.sin(e.wander) * 0.35 * P.wander + sepY * 0.5;
         // keep away from walls
         const m = 70;
         if (e.x < m) dx += (m - e.x) / m;
@@ -223,7 +227,7 @@
           dy += ((500 - e.y) / rc) * 2;
         }
         const len = Math.hypot(dx, dy) || 1;
-        const sp = e.speed * (e.boost > 0 ? 1.8 : 1) * (this.time > 35 ? 1.15 : 1);
+        const sp = e.speed * P.speed * (this.time > 60 && prey >= 0 ? 1.25 : 1) * (e.boost > 0 ? 1.8 : 1) * (this.time > 35 ? 1.15 : 1);
         const k = Math.min(1, dt * 3.2);
         e.vx += ((dx / len) * sp - e.vx) * k;
         e.vy += ((dy / len) * sp - e.vy) * k;
@@ -341,6 +345,7 @@
 
     collect(e, pk) {
       const g = this.g;
+      g.fx.voice(e, 'item');
       const team = this.teams[e.team];
       g.audio.pickup();
       g.fx.ring(pk.x, pk.y, SQ.ITEMS[pk.type].color, 60);

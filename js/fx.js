@@ -154,25 +154,48 @@
       this.texts.push({ x: SQ.clamp(x, 140, 860), y: SQ.clamp(y, 60, 960), str, color: color || '#fff', size: size || 34, life: 0, max: 1.1 });
     }
     // Speech bubble that follows an entity.
-    say(ent, str, dur) {
-      if (!ent) return;
-      if (this.bubbles.some((b) => b.ent === ent)) return;
-      if (this.bubbles.length >= 3) return;
+    say(ent, str, dur, team) {
+      if (!ent) return false;
+      if (this.bubbles.some((b) => b.ent === ent)) return false;
+      if (this.bubbles.length >= 3) return false;
       // don't stack bubbles on top of each other
-      if (this.bubbles.some((b) => Math.abs(b.ent.x - ent.x) < 220 && Math.abs(b.ent.y - ent.y) < 90)) return;
-      this.bubbles.push({ ent, str, life: 0, max: dur || 1.6 });
+      if (this.bubbles.some((b) => Math.abs(b.ent.x - ent.x) < 220 && Math.abs(b.ent.y - ent.y) < 90)) return false;
+      this.bubbles.push({ ent, str, life: 0, max: dur || 1.6, team: team || this.teamOf(ent) });
+      return true;
     }
-    // Chance-based meme line, respecting the meme level.
+
+    teamOf(ent) {
+      const m = this.g.mode;
+      return m && m.teams && ent && ent.team != null ? m.teams[ent.team] : null;
+    }
+
+    // A personality voice line. event: start, hit, hurt, item, lead, scared, idle, win, lose.
+    voice(ent, event, force) {
+      if (!ent || !this.g.opts.voices) return false;
+      const team = this.teamOf(ent);
+      if (!team) return false;
+      const P = SQ.persona(team);
+      const lines = P.lines[event];
+      if (!lines) return false;
+      if (!force && this.g.real - (this.lastVoice || -9) < 1.1) return false;
+      if (!this.say(ent, lines[(Math.random() * lines.length) | 0], force ? 2.2 : 1.8, team)) return false;
+      this.lastVoice = this.g.real;
+      this.g.audio.babble(P.voice);
+      return true;
+    }
+
+    // Chance-based reaction: a personality line most of the time, a meme line otherwise.
     maybeSay(ent, kind, p) {
       const lvl = this.memeLevel;
+      const voices = this.g.opts.voices;
+      if (lvl === 0 && !voices) return false;
+      const mult = lvl === 2 ? 2.5 : 1;
+      if (Math.random() >= p * mult) return false;
+      const map = { elim: 'hurt', hunter: 'hit', streak: 'hit', lonely: 'scared', comeback: 'win', winner: 'win', random: 'idle' };
+      if (voices && (lvl === 0 || Math.random() < 0.65) && this.voice(ent, map[kind] || 'idle')) return true;
       if (lvl === 0) return false;
-      const mult = lvl === 2 ? 2.5 : 0.6;
-      if (Math.random() < p * mult) {
-        const list = MEMES[kind];
-        this.say(ent, list[(Math.random() * list.length) | 0]);
-        return true;
-      }
-      return false;
+      const list = MEMES[kind];
+      return this.say(ent, list[(Math.random() * list.length) | 0]);
     }
     banner(text, sub, color, dur, opts) {
       this.banners.push({ text, sub, color: color || '#fff', life: 0, max: dur || 1.6, opts: opts || {} });
@@ -285,7 +308,7 @@
         const e = b.ent;
         const k = b.life / b.max;
         const pop = k < 0.12 ? SQ.ease.outBack(k / 0.12) : k > 0.85 ? 1 - (k - 0.85) / 0.15 : 1;
-        const size = 26;
+        const size = 30;
         ctx.save();
         ctx.font = `700 ${size}px ${SQ.fontBody}`;
         const w = ctx.measureText(b.str).width + 26;
@@ -296,8 +319,8 @@
         ctx.translate(bx, by);
         ctx.scale(pop, pop);
         ctx.fillStyle = '#ffffff';
-        ctx.strokeStyle = '#0b0b10';
-        ctx.lineWidth = 4;
+        ctx.strokeStyle = b.team ? b.team.dark : '#0b0b10';
+        ctx.lineWidth = b.team ? 6 : 4;
         SQ.roundRect(ctx, -w / 2, -h / 2, w, h, 14);
         ctx.fill();
         ctx.stroke();

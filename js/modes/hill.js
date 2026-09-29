@@ -110,7 +110,8 @@
           const rivals = this.sq.filter((o) => o !== s && this.inZone(o));
           let tx = Z.x + rng.range(-60, 60);
           let ty = Z.y + rng.range(-60, 60);
-          if (rivals.length && rng.chance(inside ? 0.8 : 0.5)) {
+          const P = SQ.persona(this.teams[s.team]);
+          if (rivals.length && rng.chance(Math.min(0.95, (inside ? 0.8 : 0.5) * P.aggro))) {
             const o = rivals.sort((a, b) => SQ.dist2(a.x, a.y, s.x, s.y) - SQ.dist2(b.x, b.y, s.x, s.y))[0];
             tx = o.x;
             ty = o.y;
@@ -119,7 +120,7 @@
           const dx = tx - s.x;
           const dy = ty - s.y;
           const d = Math.hypot(dx, dy) || 1;
-          const power = inside && !rivals.length ? 250 : rng.range(560, 760);
+          const power = (inside && !rivals.length ? 250 : rng.range(560, 760)) * (0.85 + 0.15 * P.aggro) * P.speed;
           s.vx += (dx / d) * power;
           s.vy += (dy / d) * power;
           s.dashT = inside ? rng.range(0.5, 1) : rng.range(0.6, 1.3);
@@ -199,6 +200,7 @@
       if (kt !== this.king) {
         if (king && this.time > 1) {
           g.fx.text(king.x, king.y - 60, 'NEW KING', this.teams[kt].color, 38);
+          if (Math.random() < 0.5) g.fx.voice(king, 'lead');
           g.audio.pickup();
         }
         this.king = kt;

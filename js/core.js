@@ -51,6 +51,133 @@
     { name: 'Pink', color: '#ff6ac1', dark: '#a0286e', light: '#ffc4e6' },
   ];
 
+  // Every color has a personality: how it moves and fights, how it sounds, and what it says.
+  // speed/aggro/fear/wander are gentle multipliers so no color becomes unbeatable.
+  SQ.PERSONAS = {
+    Red: {
+      title: 'Hothead', icon: '🔥', speed: 1.05, aggro: 1.4, fear: 0.6, wander: 0.8, smart: 0.5,
+      voice: { wave: 'square', base: 150, spread: 3, rate: 0.07, n: [4, 6] },
+      lines: {
+        start: ['LET ME AT EM', "I'm gonna win. obviously", 'FIGHT ME'],
+        hit: ['COME HERE!', 'too slow!', 'RAAAH', "who's next?", 'get wrecked'],
+        hurt: ['HEY!', 'you did NOT', "that's it!!", 'grrr'],
+        item: ['POWER!', 'even stronger now', 'MORE!'],
+        lead: ["I'm on fire 🔥", 'catch me if you can', 'EAT MY DUST'],
+        scared: ["I'm not scared. I'm ANGRY", 'bring it on'],
+        idle: ['someone fight me', "I'm bored. hit something", 'RAAH', 'where are you cowards'],
+        win: ['TOLD YOU', 'UNDEFEATED 🔥', 'who wants round 2?'],
+        lose: ['REMATCH!!', 'this is rigged', 'I let you win'],
+      },
+    },
+    Green: {
+      title: 'Chill', icon: '🌿', speed: 0.96, aggro: 0.8, fear: 0.8, wander: 1.1, smart: 0.5,
+      voice: { wave: 'sine', base: 190, spread: 2, rate: 0.12, n: [3, 4] },
+      lines: {
+        start: ['vibes only 🌿', 'no stress', "let's just chill"],
+        hit: ['oh. sorry man', 'my bad', 'it happens'],
+        hurt: ['ouch. ok', 'rude but fine', 'all good'],
+        item: ['oh nice', 'free stuff', 'cool cool'],
+        lead: ['wait am I winning?', 'huh. neat', 'taking it easy'],
+        scared: ['it is what it is', 'eh. whatever happens'],
+        idle: ['nice weather', 'we chillin', 'ok ok ok', 'this is fun'],
+        win: ['good game everyone', 'no stress ✌️', 'we did it I guess'],
+        lose: ['gg', 'was fun tho', 'naptime'],
+      },
+    },
+    Blue: {
+      title: 'Brainiac', icon: '🤓', speed: 1, aggro: 1, fear: 1, wander: 0.7, smart: 0.85,
+      voice: { wave: 'triangle', base: 320, spread: 4, rate: 0.06, n: [5, 7] },
+      lines: {
+        start: ['I ran the numbers', 'calculating…', 'my strategy is flawless'],
+        hit: ['calculated.', 'as predicted 🤓', 'physics!'],
+        hurt: ['that was not in my model', 'statistically unlikely', 'error 404'],
+        item: ['optimal pickup', 'efficiency +20%', 'as planned'],
+        lead: ['all according to plan', 'the math checks out', 'Q.E.D.'],
+        scared: ['recalculating…', 'odds are not great'],
+        idle: ['actually…', 'fun fact: squares have 4 sides', 'hmm. interesting', 'analyzing'],
+        win: ['I told you. math.', 'statistically inevitable', 'too easy 🤓'],
+        lose: ['impossible', 'I need more data', 'the numbers lied'],
+      },
+    },
+    Yellow: {
+      title: 'Hyper', icon: '⚡', speed: 1.08, aggro: 1.1, fear: 0.9, wander: 1.4, smart: 0.4,
+      voice: { wave: 'square', base: 520, spread: 5, rate: 0.045, n: [6, 9] },
+      lines: {
+        start: ["LET'S GOOO", 'WOOHOO!', 'I had 9 coffees'],
+        hit: ['BOOP!', 'zoom zoom ⚡', 'HAHA GOTCHA'],
+        hurt: ['WHEEE', 'OW OW OW', 'again again!'],
+        item: ['OOOH SHINY', 'MINE MINE MINE', 'YAAAY'],
+        lead: ["can't stop won't stop", 'FASTEST SQUARE ALIVE', 'NYOOOM'],
+        scared: ['AAAAAAA', 'too fast too fast'],
+        idle: ['WHEEE', 'is this a race?', 'zoom', 'AAAAA fun'],
+        win: ['I WON I WON I WON', 'ZOOOOM 🏆', 'AGAIN! AGAIN!'],
+        lose: ['awww', 'ok ok one more', 'I tripped'],
+      },
+    },
+    Purple: {
+      title: 'Royal', icon: '👑', speed: 1, aggro: 1.1, fear: 1, wander: 0.9, smart: 0.6,
+      voice: { wave: 'sawtooth', base: 230, spread: 2, rate: 0.1, n: [4, 5], vib: true },
+      lines: {
+        start: ['bow before me 👑', 'the royal square has arrived', 'peasants, all of you'],
+        hit: ['how dare you exist', 'kneel', 'slay 💅'],
+        hurt: ['HOW DARE YOU', 'do you know who I am?', 'my crown!'],
+        item: ['a gift for royalty', 'naturally', 'fit for a queen'],
+        lead: ["I'm the main character", 'iconic', 'as it should be'],
+        scared: ['guards? GUARDS?!', 'this is beneath me'],
+        idle: ['ugh, commoners', 'is this the VIP area?', 'my aura is unmatched'],
+        win: ['bow. now.', 'iconic behavior', 'the crown stays 👑'],
+        lose: ['I demand a recount', 'unacceptable', 'this never happened'],
+      },
+    },
+    Cyan: {
+      title: 'Scaredy', icon: '😰', speed: 1.02, aggro: 0.6, fear: 1.6, wander: 1, smart: 0.5,
+      voice: { wave: 'sine', base: 440, spread: 6, rate: 0.055, n: [5, 8], vib: true },
+      lines: {
+        start: ["I'm scared 😰", 'can we not?', 'I just wanted to watch'],
+        hit: ['sorry sorry sorry', 'I did not mean that', 'oh no I hit someone'],
+        hurt: ['AAAAA', 'why me', 'mommy'],
+        item: ['is this safe?', 'I found a thing!', 'please help me'],
+        lead: ["wait I'm winning?", 'this is scary', 'too much pressure'],
+        scared: ['nope nope nope', 'please no', "I'm just a little guy"],
+        idle: ['is it over yet?', 'I want to go home', 'what was that noise?'],
+        win: ['I… won? 🥹', 'I was so scared', 'nobody was more surprised'],
+        lose: ['I knew it', 'phew, it is over', 'can I go home now?'],
+      },
+    },
+    Orange: {
+      title: 'Clown', icon: '🤡', speed: 1, aggro: 1, fear: 0.8, wander: 1.8, smart: 0.3,
+      voice: { wave: 'square', base: 300, spread: 12, rate: 0.07, n: [4, 7] },
+      lines: {
+        start: ['honk honk 🤡', 'I have no plan', 'let the chaos begin'],
+        hit: ['BONK', 'hehe', 'I meant to do that'],
+        hurt: ['oops 🤡', 'I slipped', 'lol'],
+        item: ['what does this do?', 'ooh a button', 'hehehe'],
+        lead: ['how am I winning lol', 'skill? no. luck', 'SURPRISE'],
+        scared: ['this is fine 🔥', 'uh oh'],
+        idle: ['skibidi', 'lol', 'I forgot the rules', 'honk'],
+        win: ['I DID IT? LOL', 'chaos wins 🤡', 'nobody expected that'],
+        lose: ['worth it', 'lol gg', 'I was lagging'],
+      },
+    },
+    Pink: {
+      title: 'Sweetheart', icon: '💖', speed: 1, aggro: 0.9, fear: 1.1, wander: 1, smart: 0.55,
+      voice: { wave: 'sine', base: 600, spread: 4, rate: 0.065, n: [4, 6] },
+      lines: {
+        start: ['hi friends 💖', 'good luck everyone!', 'bestie time'],
+        hit: ['sowwy', 'boop 💖', 'love tap!'],
+        hurt: ['rude!!', 'meanie', 'ow 🥺'],
+        item: ['a present!', 'so cute', 'yay 💖'],
+        lead: ["I'm doing it!", 'look at me go 💖', 'eek!'],
+        scared: ['hugs? please?', 'be nice to me'],
+        idle: ['uwu', 'you all look so cute', 'friendship!', 'hehe'],
+        win: ['we are all winners 💖', 'yaaay!', 'love you all'],
+        lose: ['it was fun! 💖', 'next time!', 'hugs anyway'],
+      },
+    },
+  };
+  SQ.TEAMS.forEach((t) => (t.persona = SQ.PERSONAS[t.name]));
+  SQ.persona = (team) => (team && team.persona) || SQ.PERSONAS.Green;
+
   SQ.pickTeams = function (rng, n) {
     return rng.shuffle(SQ.TEAMS.map((t, i) => i)).slice(0, n).map((i) => SQ.TEAMS[i]);
   };

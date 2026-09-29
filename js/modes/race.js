@@ -263,7 +263,7 @@
           const ay = ty - p.y;
           const l = Math.hypot(ax, ay) || 1;
           const wob = Math.sin(this.time * 3 + p.team * 2) * 0.35;
-          const acc = p.accel * (p.boost > 0 ? 1.8 : 1);
+          const acc = p.accel * SQ.persona(this.teams[p.team]).speed * (p.boost > 0 ? 1.8 : 1);
           p.vx += ((ax / l) + wob * (ay / l)) * acc * dt;
           p.vy += ((ay / l) - wob * (ax / l)) * acc * dt;
         } else if (p.stun > 0) p.spin += dt * 14;
@@ -271,7 +271,7 @@
           p.vx *= 0.8;
           p.vy *= 0.8;
         }
-        const max = p.max * (p.boost > 0 ? 1.7 : 1);
+        const max = p.max * SQ.persona(this.teams[p.team]).speed * (p.boost > 0 ? 1.7 : 1);
         const sp = Math.hypot(p.vx, p.vy);
         if (sp > max) (p.vx *= max / sp), (p.vy *= max / sp);
         p.vx *= Math.exp(-dt * 0.8);
@@ -390,6 +390,7 @@
       if (lead.team !== this.leader && this.leader !== -1 && this.time > 2 && !this.winner && this.time - (this.leadTold || 0) > 2.5) {
         this.leadTold = this.time;
         g.fx.text(lead.x, lead.y - 50, 'NEW LEADER', this.teams[lead.team].color, 34);
+        g.fx.voice(lead, 'lead');
         g.audio.whoosh();
       }
       this.leader = lead.team;
@@ -474,6 +475,7 @@
 
     useItem(p, it) {
       const g = this.g;
+      g.fx.voice(p, 'item');
       g.audio.pickup();
       g.fx.ring(it.x, it.y, SQ.ITEMS[it.type].color, 50);
       g.fx.burst(it.x, it.y, SQ.ITEMS[it.type].color, 10, 220, 8);

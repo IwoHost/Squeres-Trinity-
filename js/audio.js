@@ -591,6 +591,24 @@
       const t = this.now;
       [0, 2, 4, 7].forEach((d, k) => this.tone(t + k * 0.05, this.scaleFreq(d, 1), 0.08, { type: 'square', gain: 0.06, cutoff: 5000, rev: 0.3 }));
     }
+    // Animal-Crossing-style babble: a few quick blips in the speaker's own voice.
+    babble(v) {
+      if (!v || !this._ok('babble', 200)) return;
+      const t0 = this.now;
+      const n = v.n[0] + Math.floor(Math.random() * (v.n[1] - v.n[0] + 1));
+      for (let i = 0; i < n; i++) {
+        const f = v.base * Math.pow(2, ((Math.random() * 2 - 1) * v.spread) / 12);
+        this.tone(t0 + i * v.rate, f, v.rate * 0.75, {
+          type: v.wave,
+          gain: v.wave === 'sine' ? 0.12 : 0.05,
+          slideTo: f * (1 + (Math.random() - 0.3) * 0.15),
+          cutoff: 3200,
+          release: 0.03,
+          vibrato: v.vib,
+        });
+      }
+    }
+
     // soft sparkle when a power-up appears
     itemSpawn() {
       if (!this._ok('spawn', 150)) return;

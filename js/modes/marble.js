@@ -203,6 +203,7 @@
       if (lead.team !== this.leader && this.leader !== -1 && this.time > 2 && !this.winner && this.time - (this.leadTold || 0) > 2.5) {
         this.leadTold = this.time;
         g.fx.text(lead.x, lead.y - 50, 'NEW LEADER', this.teams[lead.team].color, 34);
+        g.fx.voice(lead, 'lead');
         g.audio.whoosh();
       }
       this.leader = lead.team;

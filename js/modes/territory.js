@@ -222,6 +222,7 @@
       const lead = this.counts.indexOf(Math.max(...this.counts));
       if (lead !== this.leader && this.leader !== -1 && this.time > 5) {
         g.fx.text(500, 470, `${this.teams[lead].name.toUpperCase()} TAKES THE LEAD`, this.teams[lead].color, 44);
+        g.fx.voice(this.balls.find((b) => b.team === lead), 'lead');
       }
       this.leader = lead;
 
@@ -281,6 +282,7 @@
 
     collect(b, it) {
       const g = this.g;
+      g.fx.voice(b, 'item');
       const team = this.teams[b.team];
       const def = SQ.ITEMS[it.type];
       g.audio.pickup();

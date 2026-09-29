@@ -77,17 +77,19 @@
         for (const k of ['shieldT', 'boost', 'rage', 'big', 'frozen']) s[k] -= dt;
         s.size = SQ.lerp(s.size, s.big > 0 ? 160 : s.base, Math.min(1, dt * 4));
         if (s.frozen > 0) continue;
-        const sp = (320 + Math.min(160, this.time * 1.6)) * (s.boost > 0 ? 1.6 : 1);
+        const P = SQ.persona(this.teams[s.team]);
+        const sp = (320 + Math.min(160, this.time * 1.6)) * P.speed * (s.boost > 0 ? 1.6 : 1);
         if (s.turnT <= 0) {
           s.turnT = rng.range(1.6, 3.2);
           let a;
           const others = alive.filter((o) => o !== s);
           // go for a nearby power-up about half the time
           const near = this.items.slice().sort((p, q) => SQ.dist2(p.x, p.y, s.x, s.y) - SQ.dist2(q.x, q.y, s.x, s.y))[0];
-          if (near && rng.chance(0.5)) {
+          // brainy squares go for items, hotheads go for enemies
+          if (near && rng.chance(P.smart)) {
             a = Math.atan2(near.y - s.y, near.x - s.x);
             s.turnT = rng.range(1, 1.8);
-          } else if (others.length && rng.chance(0.55)) {
+          } else if (others.length && rng.chance(Math.min(0.9, 0.55 * P.aggro))) {
             const o = rng.pick(others);
             a = Math.atan2(o.y - s.y, o.x - s.x) + rng.range(-0.3, 0.3);
           } else a = rng.range(0, 6.28);
@@ -224,7 +226,7 @@
           g.audio.explode();
           g.fx.burst(v.x, v.y, this.teams[v.team].color, 60, 520, 18);
           g.fx.flash(0.6, this.teams[v.team].light);
-          g.fx.maybeSay(v, 'elim', 0.8);
+          g.fx.voice(v, 'lose', true);
           g.highlight(v.x, v.y, 2, 1.4, 0.25);
           // loser's paint becomes the attacker's
           for (let i = 0; i < this.owner.length; i++) if (this.owner[i] === v.team) (this.owner[i] = atk.team), (this.since[i] = this.time);
@@ -268,6 +270,7 @@
 
     collect(s, it, alive) {
       const g = this.g;
+      g.fx.voice(s, 'item');
       const team = this.teams[s.team];
       const def = SQ.ITEMS[it.type];
       g.audio.pickup();
