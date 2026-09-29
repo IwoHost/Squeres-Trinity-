@@ -151,9 +151,9 @@
       if (this.phase !== 'play') return;
       // crowded modes keep the full arena in view; zooming would crop squares at the edges
       if (this.mode && this.mode.wideShot) return;
-      if (this.real - this.lastHighlight < 8) return;
+      if (this.real - this.lastHighlight < 6) return;
       this.lastHighlight = this.real;
-      this.cam.focus(x, y, Math.min(z, 1.35), Math.min(dur, 1), 3.5);
+      this.cam.focus(x, y, Math.min(z, 1.8), dur, 3.5);
       if (slow) this.slowmo(Math.max(0.45, slow), dur * 0.7);
     }
     slowmo(scale, dur, muffle) {

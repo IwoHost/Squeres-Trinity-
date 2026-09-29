@@ -299,7 +299,7 @@
       this.combo++;
       this.comboT = 0.9;
       g.audio.pop(this.combo - 1, (prey.x - 500) / 600);
-      if (this.combo === 5 || (this.combo >= 10 && this.combo % 10 === 0)) g.fx.text(prey.x, prey.y - 40, `x${this.combo} COMBO`, '#ffe066', 38);
+      if (this.combo === 10 || this.combo === 25 || this.combo === 50 || this.combo === 100) g.fx.text(prey.x, prey.y - 40, `x${this.combo} COMBO`, '#ffe066', 38);
       if (hunter.kills === 5 && !hunter.sigma && g.opts.memes > 0) {
         // every streaker gets the 🗿 face; only the occasional one gets the full moment
         hunter.sigma = true;

@@ -151,7 +151,9 @@
     say(ent, str, dur) {
       if (!ent) return;
       if (this.bubbles.some((b) => b.ent === ent)) return;
-      if (this.bubbles.length > 5) return;
+      if (this.bubbles.length >= 3) return;
+      // don't stack bubbles on top of each other
+      if (this.bubbles.some((b) => Math.abs(b.ent.x - ent.x) < 220 && Math.abs(b.ent.y - ent.y) < 90)) return;
       this.bubbles.push({ ent, str, life: 0, max: dur || 1.6 });
     }
     // Chance-based meme line, respecting the meme level.
