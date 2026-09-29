@@ -95,6 +95,15 @@ phones (smooth) and 1080p on computers; you can force either one. It changes at 
 Edge save MP4 where supported, otherwise WebM; Firefox saves WebM. Recording uses the browser's
 built-in `MediaRecorder`, so no upload or server is involved.
 
+## Clip farm
+
+Leave the game running and come back to a folder of clips. In the Clip farm panel, optionally
+press **Choose folder** (Chrome and Edge on a computer), set **Stop after**, and press
+**Start clip farm**. Every match is recorded and saved as its own numbered file
+(`001-marble-123456.mp4`, `002-…`), then the next one starts. Without a chosen folder the clips go
+to Downloads; the browser asks once whether the site may download multiple files. Keep the tab
+open and visible: browsers pause games in minimised or hidden tabs.
+
 ## Code
 
 - `js/core.js`: random numbers, teams and the square renderer (faces, moods, sunglasses)

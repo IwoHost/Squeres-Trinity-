@@ -130,7 +130,77 @@
   $('overlay-start').addEventListener('click', () => start());
   $('replay').addEventListener('click', () => start(game.seed != null ? game.seed : undefined));
 
-  game.on('done', ({ winner, video }) => {
+  // ----- clip farm: back-to-back matches, each saved as its own file -----
+  const farm = { on: false, dir: null, saved: 0, max: 30 };
+  if (!window.showDirectoryPicker) {
+    $('farm-folder').hidden = true;
+  }
+  $('farm-folder').addEventListener('click', async () => {
+    try {
+      farm.dir = await window.showDirectoryPicker({ id: 'squares-clips', mode: 'readwrite' });
+      farmStatus(`Clips go to the folder "${farm.dir.name}".`);
+    } catch (e) {
+      if (e && e.name !== 'AbortError') farmStatus('This browser would not open a folder. Clips will go to Downloads.', 'bad');
+    }
+  });
+  $('farm-start').addEventListener('click', () => {
+    if (farm.on) return stopFarm('Clip farm stopped.');
+    const max = parseInt($('farm-max').value, 10);
+    farm.max = max > 0 ? max : Infinity;
+    farm.saved = 0;
+    farm.on = true;
+    game.opts.record = true;
+    $('record').checked = true;
+    game.opts.autoNext = false; // the farm starts the next match itself, after saving
+    $('auto').checked = false;
+    $('farm-start').textContent = 'Stop clip farm';
+    farmStatus('Recording clip 1…');
+    if (game.phase === 'idle' || game.phase === 'done') start();
+  });
+  function stopFarm(msg) {
+    farm.on = false;
+    $('farm-start').textContent = 'Start clip farm';
+    farmStatus(msg);
+  }
+  function farmStatus(text, tone) {
+    const el = $('farm-status');
+    el.textContent = text;
+    if (tone) el.dataset.tone = tone;
+    else delete el.dataset.tone;
+  }
+  function clipName(v) {
+    const n = String(farm.saved + 1).padStart(3, '0');
+    return `${n}-${v.name.replace(/^squares-trinity-/, '')}`;
+  }
+  async function farmSave(v) {
+    const name = clipName(v);
+    try {
+      if (farm.dir) {
+        const fh = await farm.dir.getFileHandle(name, { create: true });
+        const w = await fh.createWritable();
+        await w.write(v.blob);
+        await w.close();
+      } else await saveVideo(Object.assign({}, v, { name }), true);
+      farm.saved++;
+      v.blob = null; // free the memory once it is on disk
+      return true;
+    } catch (e) {
+      farmStatus(`Could not save ${name}. The farm stopped.`, 'bad');
+      stopFarm(`Could not save ${name}. The farm stopped.`);
+      return false;
+    }
+  }
+
+  game.on('done', async ({ winner, video }) => {
+    if (farm.on) {
+      if (video && !(await farmSave(video))) return;
+      game.video = null;
+      $('save').hidden = true;
+      if (farm.saved >= farm.max) return stopFarm(`Done: saved ${farm.saved} clips.`);
+      farmStatus(`Saved ${farm.saved} clip${farm.saved === 1 ? '' : 's'}. Recording the next one…`);
+      setTimeout(() => farm.on && start(), 2500);
+      return;
+    }
     $('overlay-title').textContent = winner ? winner.text : 'Match over';
     $('overlay-text').textContent = 'Ready for another one?';
     $('overlay-start').textContent = game.tour ? 'New tournament' : 'Next match';
@@ -154,7 +224,11 @@
 
   // ----- saving -----
   // one save button per tournament part
-  game.on('part', (v) => {
+  game.on('part', async (v) => {
+    if (farm.on) {
+      if (await farmSave(v)) farmStatus(`Saved ${farm.saved} clip${farm.saved === 1 ? '' : 's'}. Recording the next one…`);
+      return;
+    }
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'btn btn-save';
@@ -168,8 +242,8 @@
 
   $('save').addEventListener('click', () => saveVideo(game.video));
 
-  async function saveVideo(v) {
-    if (!v) return;
+  async function saveVideo(v, quiet) {
+    if (!v || !v.blob) return;
     // Inside a Claude artifact, files are offered through the downloads capability.
     if (window.claude && typeof window.claude.use === 'function') {
       try {
@@ -192,7 +266,7 @@
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10000);
-    status('Video saved to your downloads.');
+    if (!quiet) status('Video saved to your downloads.');
   }
 
   function status(text, tone) {
