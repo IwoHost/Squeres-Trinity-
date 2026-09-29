@@ -151,6 +151,7 @@
       applyNames();
       renderStats();
       renderLore();
+      renderPosters();
     });
     const star = document.createElement('label');
     star.className = 'star';
@@ -213,6 +214,30 @@
     }
   }
   renderLore();
+
+  // ----- propaganda posters -----
+  const posterHandle = () => ($('poster-handle').value.trim() || '@squeretrinity');
+  function renderPosters() {
+    const box = $('posters');
+    box.innerHTML = '';
+    for (const p of SQ.POSTERS) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.title = `Save "${p.name}" as PNG`;
+      const c = document.createElement('canvas');
+      SQ.drawPoster(c, p.id, posterHandle());
+      const cap = document.createElement('span');
+      cap.textContent = p.name;
+      b.append(c, cap);
+      b.addEventListener('click', () => c.toBlob((blob) => blob && saveVideo({ name: `squares-trinity-${p.id}.png`, blob }, true, 'Poster saved.'), 'image/png'));
+      box.appendChild(b);
+    }
+  }
+  $('poster-handle').value = store.get('handle', '');
+  $('poster-handle').addEventListener('change', (e) => (store.set('handle', e.target.value.trim()), renderPosters()));
+  renderPosters();
+  // redraw once the display font has arrived, so the headlines are not in the fallback font
+  if (document.fonts && document.fonts.load) Promise.all([document.fonts.load('100px Bungee'), document.fonts.load('700 40px "Chakra Petch"')]).then(renderPosters, () => {});
 
   // ----- restore preferences -----
   const prefs = store.get('prefs2', {});
@@ -421,7 +446,7 @@
 
   $('save').addEventListener('click', () => saveVideo(game.video));
 
-  async function saveVideo(v, quiet) {
+  async function saveVideo(v, quiet, done) {
     if (!v || !v.blob) return;
     // Inside a Claude artifact, files are offered through the downloads capability.
     if (window.claude && typeof window.claude.use === 'function') {
@@ -429,7 +454,7 @@
         const dl = await window.claude.use('downloads');
         if (dl) {
           await dl.save({ filename: v.name, data: v.blob });
-          status('Video saved.');
+          status(done || 'Video saved.');
           return;
         }
       } catch (err) {
@@ -445,7 +470,7 @@
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10000);
-    if (!quiet) status('Video saved to your downloads.');
+    if (!quiet || done) status(done ? done : 'Video saved to your downloads.');
   }
 
   function status(text, tone) {

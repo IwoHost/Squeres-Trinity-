@@ -153,6 +153,11 @@ body.theater-on .desk { visibility: hidden; }
 .stats td:first-child { display: flex; align-items: center; gap: 8px; font-weight: 700; }
 .stats td i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; flex: none; }
 .stats .bar { display: inline-block; height: 6px; border-radius: 3px; background: var(--gold); vertical-align: middle; margin-right: 6px; }
+.posters { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.posters button { padding: 0; border: 0; background: var(--panel); border-radius: 6px; overflow: hidden; cursor: pointer; box-shadow: inset 0 0 0 1px var(--line); display: flex; flex-direction: column; color: var(--muted); font: 600 11px/1.3 var(--font-body); }
+.posters button:hover, .posters button:focus-visible { box-shadow: 0 0 0 2px var(--gold); color: var(--fg); }
+.posters canvas { width: 100%; height: auto; display: block; }
+.posters span { padding: 5px 6px 6px; text-align: left; }
 .lore { display: flex; flex-direction: column; gap: 8px; }
 .lore p { margin: 0; color: var(--muted); max-width: 65ch; }
 .lore details { background: var(--panel); border-radius: var(--radius); box-shadow: inset 0 0 0 1px var(--line); }
@@ -331,6 +336,13 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     </div>
 
     <div class="group">
+      <span class="label">Posters</span>
+      <p class="hint">Propaganda from the Grid, starring DoucheCube. Tap a poster to save it as a 1080×1350 PNG (the feed size on Instagram and Facebook).</p>
+      <div class="field"><label for="poster-handle">Handle on posters</label><input type="text" id="poster-handle" placeholder="@squeretrinity" autocomplete="off" maxlength="30"></div>
+      <div class="posters" id="posters"></div>
+    </div>
+
+    <div class="group">
       <span class="label">Match</span>
       <div class="chips" role="radiogroup" aria-label="Speed">
         <label class="chip"><input type="radio" name="speed" value="1" id="speed-1" checked><span>1×</span></label>
@@ -353,6 +365,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
 <script src="js/modes/brawl.js"></script>
 <script src="js/modes/marble.js"></script>
 <script src="js/modes/hill.js"></script>
+<script src="js/posters.js"></script>
 <script src="js/game.js"></script>
 <script src="js/ui.js"></script>
 <!-- /body -->

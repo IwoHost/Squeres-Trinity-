@@ -91,6 +91,16 @@ Cache (archives), Yellow from Volt (power plants), Purple from the Crown Quarter
 Cyan from Coolant (freezing vents), Orange from Carnival (the broadcast district) and Pink from
 Candy (sweet factories).
 
+## Posters
+
+The Posters panel has 11 propaganda posters from the Grid, starring DoucheCube, the mascot: "DoucheCube
+wants you", "Volunteer!", "Tune in every cycle", "Follow for the Games", "Send this to a friend who
+would lose", "The Frame is watching", "Pick a color, pick a side", "Wanted: Cyan", "The lava is
+random", "Obey the bounce" and "Sweets are mandatory". They are 1080×1350 (the 4:5 feed size on
+Instagram and Facebook). Type your handle once and it is printed on every poster; tap a poster
+to save it as a PNG. Custom names show up on the posters too. Ready-made copies with the default
+handle are in `posters/`.
+
 ## Custom names
 
 In the Names panel you can rename any color (up to 10 characters), for example to a friend's
@@ -141,6 +151,7 @@ open and visible: browsers pause games in minimised or hidden tabs.
 - `js/fx.js`: camera, particles, speech bubbles, banners, confetti
 - `js/modes/*.js`: one file per mode
 - `js/game.js`: match director (intro → countdown → play → finale → outro) and recorder
+- `js/posters.js`: the propaganda posters and the poster-style DoucheCube
 - `js/ui.js`: controls
 - `tools/build_single.py`: bundles everything into `dist/squares-trinity.html`
 
