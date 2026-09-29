@@ -39,7 +39,7 @@
 
   // ----- restore preferences -----
   const prefs = store.get('prefs2', {});
-  Object.assign(game.opts, { mode: prefs.mode || 'random', memes: prefs.memes != null ? prefs.memes : 1, speed: prefs.speed || 1, music: prefs.music || 'shuffle', record: prefs.record != null ? prefs.record : true, autoNext: !!prefs.autoNext, quality: prefs.quality || 'auto', voices: prefs.voices !== false });
+  Object.assign(game.opts, { mode: prefs.mode || 'random', memes: prefs.memes != null ? prefs.memes : 1, speed: prefs.speed || 1, music: prefs.music || 'shuffle', record: prefs.record != null ? prefs.record : true, autoNext: !!prefs.autoNext, quality: prefs.quality || 'auto', voices: prefs.voices !== false, reel: prefs.reel !== false });
   if (game.opts.music.startsWith('up')) game.opts.music = 'shuffle';
   fillMusic();
   const setRadio = (name, value) => {
@@ -54,6 +54,8 @@
   game.setQuality(game.opts.quality);
   $('auto').checked = game.opts.autoNext;
   $('voices').checked = game.opts.voices;
+  $('reel').checked = game.opts.reel;
+  $('reel').addEventListener('change', (e) => ((game.opts.reel = e.target.checked), save()));
   $('voices').addEventListener('change', (e) => ((game.opts.voices = e.target.checked), save()));
   if (prefs.musicVol != null) $('music-vol').value = prefs.musicVol;
   if (prefs.sfxVol != null) $('sfx-vol').value = prefs.sfxVol;

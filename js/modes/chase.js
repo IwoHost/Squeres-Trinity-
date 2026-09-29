@@ -13,7 +13,10 @@
   const NEUTRAL = { speed: 1, aggro: 1, fear: 1, wander: 1 };
 
   class Chase {
-    constructor(g, rng) {
+    constructor(g, rng, opts) {
+      opts = opts || {};
+      this.stormAt = opts.quick ? 18 : 35;
+      this.calmAt = opts.quick ? 38 : 60;
       this.g = g;
       this.rng = rng;
       const n = rng.pick([3, 3, 3, 3, 4, 5]);
@@ -133,7 +136,7 @@
       this.time += dt;
       this.comboT -= dt;
       if (this.comboT <= 0) this.combo = 0;
-      if (this.time > 35) this.storm = Math.max(170, this.storm - dt * 16);
+      if (this.time > this.stormAt) this.storm = Math.max(170, this.storm - dt * 16);
       const E = this.ents;
 
       // pickups
@@ -169,7 +172,7 @@
         }
         const prey = this.preyOf(e.team);
         // late in the match personalities stop mattering so the chase always ends
-        const P = this.time > 60 ? NEUTRAL : SQ.persona(this.teams[e.team]);
+        const P = this.time > this.calmAt ? NEUTRAL : SQ.persona(this.teams[e.team]);
         let best = null;
         let bd = 1e12;
         let pred = null;
@@ -227,7 +230,7 @@
           dy += ((500 - e.y) / rc) * 2;
         }
         const len = Math.hypot(dx, dy) || 1;
-        const sp = e.speed * P.speed * (this.time > 60 && prey >= 0 ? 1.25 : 1) * (e.boost > 0 ? 1.8 : 1) * (this.time > 35 ? 1.15 : 1);
+        const sp = e.speed * P.speed * (this.time > this.calmAt && prey >= 0 ? 1.25 : 1) * (e.boost > 0 ? 1.8 : 1) * (this.time > this.stormAt ? 1.15 : 1);
         const k = Math.min(1, dt * 3.2);
         e.vx += ((dx / len) * sp - e.vx) * k;
         e.vy += ((dy / len) * sp - e.vy) * k;
@@ -470,5 +473,5 @@
     }
   }
 
-  SQ.modes.chase = { id: 'chase', name: 'Color Chase', create: (g, rng) => new Chase(g, rng) };
+  SQ.modes.chase = { id: 'chase', name: 'Color Chase', create: (g, rng, opts) => new Chase(g, rng, opts) };
 })();

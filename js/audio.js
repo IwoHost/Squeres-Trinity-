@@ -389,7 +389,7 @@
 
     // ---------- synth voices ----------
     tone(t, freq, dur, o) {
-      if (!this.ctx) return;
+      if (!this.ctx || (this.muted && o.out !== this.musicOut)) return;
       const ctx = this.ctx;
       const out = o.out || this.sfxBus;
       const g = ctx.createGain();
@@ -449,7 +449,7 @@
     }
 
     noiseHit(t, dur, o) {
-      if (!this.ctx) return;
+      if (!this.ctx || (this.muted && o.out !== this.musicOut)) return;
       const ctx = this.ctx;
       const src = ctx.createBufferSource();
       src.buffer = this.noise;
@@ -477,7 +477,7 @@
     }
 
     kick(t, v, out) {
-      if (!this.ctx) return;
+      if (!this.ctx || (this.muted && out !== this.musicOut)) return;
       const ctx = this.ctx;
       const o = ctx.createOscillator();
       const g = ctx.createGain();

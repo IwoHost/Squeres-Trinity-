@@ -240,6 +240,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     <div class="group">
       <span class="label">Video</span>
       <label class="toggle"><input type="checkbox" id="record" checked> Record each match with sound</label>
+      <label class="toggle"><input type="checkbox" id="reel" checked> Reel mode: no intro, a hook line, shorter matches</label>
       <div class="field"><label for="quality">Quality</label><select id="quality">
         <option value="auto">Auto (720p on phones)</option>
         <option value="720">720p, smoothest</option>
@@ -1354,7 +1355,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
 
     // ---------- synth voices ----------
     tone(t, freq, dur, o) {
-      if (!this.ctx) return;
+      if (!this.ctx || (this.muted && o.out !== this.musicOut)) return;
       const ctx = this.ctx;
       const out = o.out || this.sfxBus;
       const g = ctx.createGain();
@@ -1414,7 +1415,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     }
 
     noiseHit(t, dur, o) {
-      if (!this.ctx) return;
+      if (!this.ctx || (this.muted && o.out !== this.musicOut)) return;
       const ctx = this.ctx;
       const src = ctx.createBufferSource();
       src.buffer = this.noise;
@@ -1442,7 +1443,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     }
 
     kick(t, v, out) {
-      if (!this.ctx) return;
+      if (!this.ctx || (this.muted && out !== this.musicOut)) return;
       const ctx = this.ctx;
       const o = ctx.createOscillator();
       const g = ctx.createGain();
@@ -2111,7 +2112,10 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
   const NEUTRAL = { speed: 1, aggro: 1, fear: 1, wander: 1 };
 
   class Chase {
-    constructor(g, rng) {
+    constructor(g, rng, opts) {
+      opts = opts || {};
+      this.stormAt = opts.quick ? 18 : 35;
+      this.calmAt = opts.quick ? 38 : 60;
       this.g = g;
       this.rng = rng;
       const n = rng.pick([3, 3, 3, 3, 4, 5]);
@@ -2231,7 +2235,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       this.time += dt;
       this.comboT -= dt;
       if (this.comboT <= 0) this.combo = 0;
-      if (this.time > 35) this.storm = Math.max(170, this.storm - dt * 16);
+      if (this.time > this.stormAt) this.storm = Math.max(170, this.storm - dt * 16);
       const E = this.ents;
 
       // pickups
@@ -2267,7 +2271,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         }
         const prey = this.preyOf(e.team);
         // late in the match personalities stop mattering so the chase always ends
-        const P = this.time > 60 ? NEUTRAL : SQ.persona(this.teams[e.team]);
+        const P = this.time > this.calmAt ? NEUTRAL : SQ.persona(this.teams[e.team]);
         let best = null;
         let bd = 1e12;
         let pred = null;
@@ -2325,7 +2329,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
           dy += ((500 - e.y) / rc) * 2;
         }
         const len = Math.hypot(dx, dy) || 1;
-        const sp = e.speed * P.speed * (this.time > 60 && prey >= 0 ? 1.25 : 1) * (e.boost > 0 ? 1.8 : 1) * (this.time > 35 ? 1.15 : 1);
+        const sp = e.speed * P.speed * (this.time > this.calmAt && prey >= 0 ? 1.25 : 1) * (e.boost > 0 ? 1.8 : 1) * (this.time > this.stormAt ? 1.15 : 1);
         const k = Math.min(1, dt * 3.2);
         e.vx += ((dx / len) * sp - e.vx) * k;
         e.vy += ((dy / len) * sp - e.vy) * k;
@@ -2568,7 +2572,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     }
   }
 
-  SQ.modes.chase = { id: 'chase', name: 'Color Chase', create: (g, rng) => new Chase(g, rng) };
+  SQ.modes.chase = { id: 'chase', name: 'Color Chase', create: (g, rng, opts) => new Chase(g, rng, opts) };
 })();
 
 </script>
@@ -2623,7 +2627,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       const n = this.teams.length;
       this.N = rng.pick([20, 25]);
       this.cell = 1000 / this.N;
-      this.duration = opts.quick ? 40 : rng.pick([50, 60, 60]);
+      this.duration = opts.quick ? 30 : rng.pick([50, 60, 60]);
       this.title = 'TILE WARS';
       this.rules = [
         [{ t: 'Every bounce ', c: '#ffffff' }, { t: 'steals', c: '#ffd23f' }, { t: ' a tile', c: '#ffffff' }],
@@ -6349,6 +6353,18 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
   const SQ = window.SQ;
   // modes that work as 1v1 matches in a tournament
   const TOUR_MODES = ['territory', 'domain', 'race', 'brawl', 'bounce', 'marble', 'hill'];
+  // First-second hooks for Reel mode: a mode-specific line or a general one.
+  const HOOKS = {
+    all: ['WHICH COLOR WINS?', 'ONLY ONE SURVIVES', 'PICK A COLOR. NOW.', 'WAIT FOR THE ENDING', 'YOUR COLOR = YOUR LUCK'],
+    marble: ['THE FLOOR IS LAVA', 'LAST ONE GETS COOKED'],
+    race: ['FIRST TO THE FLAG WINS', 'THE MAZE IS RANDOM'],
+    brawl: ['EVERY HIT LEVELS UP', 'PICK A WEAPON'],
+    bounce: ['EVERY BOUNCE = BIGGER', 'HOW BIG CAN IT GET?'],
+    territory: ['STEAL EVERY TILE', 'MOST TILES WINS'],
+    hill: ['HOLD THE ZONE TO WIN', 'KING OF THE HILL'],
+    domain: ['INVINCIBLE AT HOME', 'STAY IN YOUR DOMAIN'],
+    chase: ['ROCK PAPER SQUARES', 'WHO GETS EATEN FIRST?'],
+  };
   const MODE_IDS = ['chase', 'territory', 'domain', 'race', 'brawl', 'bounce', 'marble', 'hill'];
 
   class Recorder {
@@ -6399,7 +6415,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       this.cam = new SQ.Camera();
       this.fx = new SQ.FX(this);
       this.recorder = new Recorder();
-      this.opts = { mode: 'random', memes: 1, speed: 1, music: 'shuffle', record: false, autoNext: false, quality: 'auto', voices: true };
+      this.opts = { mode: 'random', memes: 1, speed: 1, music: 'shuffle', record: false, autoNext: false, quality: 'auto', voices: true, reel: true };
       this.setQuality('auto');
       this.fixedDt = 1 / 60;
       this.hitstopT = 0;
@@ -6468,7 +6484,10 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       let id = o.mode || this.opts.mode;
       if (id === 'random' || !SQ.modes[id]) id = MODE_IDS[Math.floor(rng() * MODE_IDS.length)];
       this.modeInfo = SQ.modes[id];
-      this.mode = this.modeInfo.create(this, SQ.makeRng(mseed ^ 0x9e3779b9), o.teams ? { teams: o.teams, quick: true } : undefined);
+      const reel = this.opts.reel && !o.tour;
+      // Reel mode uses the quick settings (the race is already short; quick makes it longer)
+      const mopts = o.teams ? { teams: o.teams, quick: true } : reel && id !== 'race' ? { quick: true } : undefined;
+      this.mode = this.modeInfo.create(this, SQ.makeRng(mseed ^ 0x9e3779b9), mopts);
       this.fx.clear();
       this.cam.reset();
       this.cam.tracking = !!this.mode.camTracking;
@@ -6488,8 +6507,11 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         this.audio.playTrack(this.track);
         this.trackToast = 4;
       }
-      this.audio.riser(2.6);
-      this.audio.whoosh();
+      if (reel) this.startReel(id);
+      else {
+        this.audio.riser(2.6);
+        this.audio.whoosh();
+      }
       if (o.tour) {
         this.emit('match', { mode: this.modeInfo, seed: this.seed, track: this.track, tour: true });
         return;
@@ -6500,6 +6522,31 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         this.recorder.start(this.canvas, this.audio.streamDest && this.audio.streamDest.stream, 30, SQ.RES === 1 ? 9_000_000 : 5_000_000);
       }
       this.emit('match', { mode: this.modeInfo, seed: this.seed, track: this.track });
+    }
+
+    // Reel mode: no title card or countdown. The match is already moving in the first frame.
+    startReel(id) {
+      const m = this.mode;
+      this.audio.muted = true;
+      for (let i = 0; i < 50; i++) m.update(this.fixedDt);
+      this.audio.muted = false;
+      this.hitstopT = 0;
+      this.timeScale = 1;
+      this.slowT = 0;
+      this.fx.clear();
+      this.cam.hold = 0;
+      const d = this.cam.defaultView;
+      this.cam.focus(d.x, d.y, d.z, 0, 3);
+      this.cam.snap();
+      this.setPhase('play');
+      this.audio.intensity = 0.6;
+      this.audio.beep(true);
+      this.cam.punch(0.08);
+      this.chatT = 0.5;
+      this.startLines = 1;
+      const own = HOOKS[id] || [];
+      const list = own.length && Math.random() < 0.6 ? own : HOOKS.all;
+      this.hook = { text: list[Math.floor(Math.random() * list.length)], t: 0, dur: 2.6 };
     }
 
     setPhase(p) {
@@ -6616,7 +6663,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
           this.winnerCaption = list[Math.floor(Math.random() * list.length)];
         }
         if (this.phaseT > 5.4 && !this.tour) this.audio.stopMusic(1.2);
-        if (this.phaseT > (this.tour ? 4 : 6.2)) this.finish();
+        if (this.phaseT > (this.tour ? 4 : this.opts.reel ? 3.6 : 6.2)) this.finish();
       }
       if (P === 'bracket' && this.phaseT > 4.4) {
         const nx = this.tour.next;
@@ -6656,6 +6703,10 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       this.cam.update(realDt);
       this.fx.update(realDt * this.timeScale, realDt);
       if (this.trackToast > 0) this.trackToast -= realDt;
+      if (this.hook) {
+        this.hook.t += realDt;
+        if (this.hook.t > this.hook.dur || this.phase !== 'play') this.hook = null;
+      }
     }
 
     // Everyone on the field who could say something.
@@ -6810,6 +6861,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
 
       this.drawBelow(ctx);
       if (m.drawScreen && this.phase !== 'idle') m.drawScreen(ctx);
+      if (this.hook) this.drawHook(ctx);
       if (this.phase === 'intro') this.drawIntro(ctx);
       if (this.phase === 'countdown') this.drawCountdown(ctx);
       this.fx.drawScreen(ctx);
@@ -6947,6 +6999,24 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         SQ.outlinedText(ctx, 'WHO WILL WIN?', SQ.W / 2, A.y + A.size * 0.84, 64, '#ffffff', { stroke: 12 });
         ctx.restore();
       }
+    }
+
+    // The Reel mode hook: a big line over the header for the first seconds.
+    drawHook(ctx) {
+      const h = this.hook;
+      const inK = SQ.ease.outBack(SQ.clamp(h.t / 0.25, 0, 1));
+      const outK = 1 - SQ.clamp((h.t - (h.dur - 0.35)) / 0.35, 0, 1);
+      ctx.save();
+      ctx.globalAlpha = outK;
+      ctx.fillStyle = '#0c0d14';
+      ctx.fillRect(0, 0, SQ.W, SQ.ARENA.y - 12);
+      ctx.translate(SQ.W / 2, 250);
+      const pulse = 1 + 0.03 * Math.sin(h.t * 14);
+      ctx.scale(inK * pulse, inK * pulse);
+      const size = SQ.fitSize(ctx, [{ t: h.text }], SQ.W - 80, 104);
+      SQ.outlinedText(ctx, h.text, 0, -10, size, '#ffd23f', { stroke: size * 0.18 });
+      SQ.outlinedText(ctx, 'comment your pick', 0, size * 0.85, 42, '#ffffff', { stroke: 9, font: SQ.fontBody, weight: 700 });
+      ctx.restore();
     }
 
     drawCountdown(ctx) {
@@ -7177,7 +7247,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
 
   // ----- restore preferences -----
   const prefs = store.get('prefs2', {});
-  Object.assign(game.opts, { mode: prefs.mode || 'random', memes: prefs.memes != null ? prefs.memes : 1, speed: prefs.speed || 1, music: prefs.music || 'shuffle', record: prefs.record != null ? prefs.record : true, autoNext: !!prefs.autoNext, quality: prefs.quality || 'auto', voices: prefs.voices !== false });
+  Object.assign(game.opts, { mode: prefs.mode || 'random', memes: prefs.memes != null ? prefs.memes : 1, speed: prefs.speed || 1, music: prefs.music || 'shuffle', record: prefs.record != null ? prefs.record : true, autoNext: !!prefs.autoNext, quality: prefs.quality || 'auto', voices: prefs.voices !== false, reel: prefs.reel !== false });
   if (game.opts.music.startsWith('up')) game.opts.music = 'shuffle';
   fillMusic();
   const setRadio = (name, value) => {
@@ -7192,6 +7262,8 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
   game.setQuality(game.opts.quality);
   $('auto').checked = game.opts.autoNext;
   $('voices').checked = game.opts.voices;
+  $('reel').checked = game.opts.reel;
+  $('reel').addEventListener('change', (e) => ((game.opts.reel = e.target.checked), save()));
   $('voices').addEventListener('change', (e) => ((game.opts.voices = e.target.checked), save()));
   if (prefs.musicVol != null) $('music-vol').value = prefs.musicVol;
   if (prefs.sfxVol != null) $('sfx-vol').value = prefs.sfxVol;

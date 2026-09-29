@@ -95,6 +95,13 @@ phones (smooth) and 1080p on computers; you can force either one. It changes at 
 Edge save MP4 where supported, otherwise WebM; Firefox saves WebM. Recording uses the browser's
 built-in `MediaRecorder`, so no upload or server is involved.
 
+## Reel mode
+
+On by default. Matches skip the title card and countdown, so the recording starts with the squares
+already moving, and a big hook line ("THE FLOOR IS LAVA", "WHICH COLOR WINS?", "comment your pick")
+covers the top for the first seconds. Modes use their quick settings, so most matches last
+10-40 seconds, and the winner screen is shorter. Turn it off for the full intro.
+
 ## Clip farm
 
 Leave the game running and come back to a folder of clips. In the Clip farm panel, optionally

@@ -4,6 +4,18 @@
   const SQ = window.SQ;
   // modes that work as 1v1 matches in a tournament
   const TOUR_MODES = ['territory', 'domain', 'race', 'brawl', 'bounce', 'marble', 'hill'];
+  // First-second hooks for Reel mode: a mode-specific line or a general one.
+  const HOOKS = {
+    all: ['WHICH COLOR WINS?', 'ONLY ONE SURVIVES', 'PICK A COLOR. NOW.', 'WAIT FOR THE ENDING', 'YOUR COLOR = YOUR LUCK'],
+    marble: ['THE FLOOR IS LAVA', 'LAST ONE GETS COOKED'],
+    race: ['FIRST TO THE FLAG WINS', 'THE MAZE IS RANDOM'],
+    brawl: ['EVERY HIT LEVELS UP', 'PICK A WEAPON'],
+    bounce: ['EVERY BOUNCE = BIGGER', 'HOW BIG CAN IT GET?'],
+    territory: ['STEAL EVERY TILE', 'MOST TILES WINS'],
+    hill: ['HOLD THE ZONE TO WIN', 'KING OF THE HILL'],
+    domain: ['INVINCIBLE AT HOME', 'STAY IN YOUR DOMAIN'],
+    chase: ['ROCK PAPER SQUARES', 'WHO GETS EATEN FIRST?'],
+  };
   const MODE_IDS = ['chase', 'territory', 'domain', 'race', 'brawl', 'bounce', 'marble', 'hill'];
 
   class Recorder {
@@ -54,7 +66,7 @@
       this.cam = new SQ.Camera();
       this.fx = new SQ.FX(this);
       this.recorder = new Recorder();
-      this.opts = { mode: 'random', memes: 1, speed: 1, music: 'shuffle', record: false, autoNext: false, quality: 'auto', voices: true };
+      this.opts = { mode: 'random', memes: 1, speed: 1, music: 'shuffle', record: false, autoNext: false, quality: 'auto', voices: true, reel: true };
       this.setQuality('auto');
       this.fixedDt = 1 / 60;
       this.hitstopT = 0;
@@ -123,7 +135,10 @@
       let id = o.mode || this.opts.mode;
       if (id === 'random' || !SQ.modes[id]) id = MODE_IDS[Math.floor(rng() * MODE_IDS.length)];
       this.modeInfo = SQ.modes[id];
-      this.mode = this.modeInfo.create(this, SQ.makeRng(mseed ^ 0x9e3779b9), o.teams ? { teams: o.teams, quick: true } : undefined);
+      const reel = this.opts.reel && !o.tour;
+      // Reel mode uses the quick settings (the race is already short; quick makes it longer)
+      const mopts = o.teams ? { teams: o.teams, quick: true } : reel && id !== 'race' ? { quick: true } : undefined;
+      this.mode = this.modeInfo.create(this, SQ.makeRng(mseed ^ 0x9e3779b9), mopts);
       this.fx.clear();
       this.cam.reset();
       this.cam.tracking = !!this.mode.camTracking;
@@ -143,8 +158,11 @@
         this.audio.playTrack(this.track);
         this.trackToast = 4;
       }
-      this.audio.riser(2.6);
-      this.audio.whoosh();
+      if (reel) this.startReel(id);
+      else {
+        this.audio.riser(2.6);
+        this.audio.whoosh();
+      }
       if (o.tour) {
         this.emit('match', { mode: this.modeInfo, seed: this.seed, track: this.track, tour: true });
         return;
@@ -155,6 +173,31 @@
         this.recorder.start(this.canvas, this.audio.streamDest && this.audio.streamDest.stream, 30, SQ.RES === 1 ? 9_000_000 : 5_000_000);
       }
       this.emit('match', { mode: this.modeInfo, seed: this.seed, track: this.track });
+    }
+
+    // Reel mode: no title card or countdown. The match is already moving in the first frame.
+    startReel(id) {
+      const m = this.mode;
+      this.audio.muted = true;
+      for (let i = 0; i < 50; i++) m.update(this.fixedDt);
+      this.audio.muted = false;
+      this.hitstopT = 0;
+      this.timeScale = 1;
+      this.slowT = 0;
+      this.fx.clear();
+      this.cam.hold = 0;
+      const d = this.cam.defaultView;
+      this.cam.focus(d.x, d.y, d.z, 0, 3);
+      this.cam.snap();
+      this.setPhase('play');
+      this.audio.intensity = 0.6;
+      this.audio.beep(true);
+      this.cam.punch(0.08);
+      this.chatT = 0.5;
+      this.startLines = 1;
+      const own = HOOKS[id] || [];
+      const list = own.length && Math.random() < 0.6 ? own : HOOKS.all;
+      this.hook = { text: list[Math.floor(Math.random() * list.length)], t: 0, dur: 2.6 };
     }
 
     setPhase(p) {
@@ -271,7 +314,7 @@
           this.winnerCaption = list[Math.floor(Math.random() * list.length)];
         }
         if (this.phaseT > 5.4 && !this.tour) this.audio.stopMusic(1.2);
-        if (this.phaseT > (this.tour ? 4 : 6.2)) this.finish();
+        if (this.phaseT > (this.tour ? 4 : this.opts.reel ? 3.6 : 6.2)) this.finish();
       }
       if (P === 'bracket' && this.phaseT > 4.4) {
         const nx = this.tour.next;
@@ -311,6 +354,10 @@
       this.cam.update(realDt);
       this.fx.update(realDt * this.timeScale, realDt);
       if (this.trackToast > 0) this.trackToast -= realDt;
+      if (this.hook) {
+        this.hook.t += realDt;
+        if (this.hook.t > this.hook.dur || this.phase !== 'play') this.hook = null;
+      }
     }
 
     // Everyone on the field who could say something.
@@ -465,6 +512,7 @@
 
       this.drawBelow(ctx);
       if (m.drawScreen && this.phase !== 'idle') m.drawScreen(ctx);
+      if (this.hook) this.drawHook(ctx);
       if (this.phase === 'intro') this.drawIntro(ctx);
       if (this.phase === 'countdown') this.drawCountdown(ctx);
       this.fx.drawScreen(ctx);
@@ -602,6 +650,24 @@
         SQ.outlinedText(ctx, 'WHO WILL WIN?', SQ.W / 2, A.y + A.size * 0.84, 64, '#ffffff', { stroke: 12 });
         ctx.restore();
       }
+    }
+
+    // The Reel mode hook: a big line over the header for the first seconds.
+    drawHook(ctx) {
+      const h = this.hook;
+      const inK = SQ.ease.outBack(SQ.clamp(h.t / 0.25, 0, 1));
+      const outK = 1 - SQ.clamp((h.t - (h.dur - 0.35)) / 0.35, 0, 1);
+      ctx.save();
+      ctx.globalAlpha = outK;
+      ctx.fillStyle = '#0c0d14';
+      ctx.fillRect(0, 0, SQ.W, SQ.ARENA.y - 12);
+      ctx.translate(SQ.W / 2, 250);
+      const pulse = 1 + 0.03 * Math.sin(h.t * 14);
+      ctx.scale(inK * pulse, inK * pulse);
+      const size = SQ.fitSize(ctx, [{ t: h.text }], SQ.W - 80, 104);
+      SQ.outlinedText(ctx, h.text, 0, -10, size, '#ffd23f', { stroke: size * 0.18 });
+      SQ.outlinedText(ctx, 'comment your pick', 0, size * 0.85, 42, '#ffffff', { stroke: 9, font: SQ.fontBody, weight: 700 });
+      ctx.restore();
     }
 
     drawCountdown(ctx) {
