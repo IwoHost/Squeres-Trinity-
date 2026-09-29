@@ -24,7 +24,7 @@ controls.
 | Square Race | A random maze with breakable brick gates. The camera follows the leaders. |
 | Weapon Brawl | Every square gets its own weapon: sword, axe, hammer, spear, daggers, flail, bow or boomerang. Every hit levels the weapon up (longer blades, bigger heads, more daggers, faster arrows). Sometimes everyone gets the same weapon. Last square standing. |
 | Bounce Brawl | No weapons and no power-ups: every wall bounce makes a square 10% bigger, with no cap (only the walls stop them), and bigger squares hit harder. Last square standing. |
-| Marble Race | Squares tumble down a tall random obstacle course: peg fields, zigzag ramps, spinning bars, pinball bumpers and funnels. The camera follows the leader down. First to the bottom wins. |
+| Marble Race | Squares tumble down a tall random obstacle course: peg fields, steep zigzag ramps, spinning bars, pinball bumpers, funnels and trapdoor floors that take turns dropping open. Boost rings launch you, mystery portals send you ahead (SHORTCUT!) or back up (UNLUCKY!), and rising lava chases the pack and eliminates stragglers. The camera follows the leader. First to the bottom wins. |
 | King of the Hill | Whoever is closest to the centre of the zone scores. Squares charge each other to shove rivals out; hard hits leave them dizzy. The zone moves every few seconds and a shockwave sometimes blasts everyone out. |
 
 ### Power-ups
