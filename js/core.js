@@ -170,6 +170,82 @@
     portal: { icon: '🌀', color: '#4f86ff', label: 'PORTAL!' },
     sword: { icon: '🗡️', color: '#c9d2e3', label: 'SWORD!' },
     spikes: { icon: '🌵', color: '#35d97a', label: 'SPIKES!' },
+    grow: { icon: '🍄', color: '#ff6ac1', label: 'GROW 10s!' },
+    ghost: { icon: '👻', color: '#b9c2d6', label: 'GHOST!' },
+    turret: { color: '#8a93a8', label: 'TURRET!', draw: (ctx, k) => SQ.drawTurret(ctx, k * 1.1, '#8a93a8', '#3c4252', -0.5) },
+    grenade: { color: '#5c8a3a', label: 'GRENADE!', draw: (ctx, k) => SQ.drawGrenade(ctx, k * 1.05) },
+  };
+
+  // A hand grenade, drawn in code (there is no emoji for it), centred on 0,0.
+  SQ.drawGrenade = function (ctx, k) {
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.fillStyle = '#4f7a31';
+    ctx.strokeStyle = '#1b2a10';
+    ctx.lineWidth = k * 0.07;
+    ctx.beginPath();
+    ctx.ellipse(0, k * 0.1, k * 0.3, k * 0.36, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+    ctx.lineWidth = k * 0.045;
+    ctx.beginPath();
+    ctx.moveTo(-k * 0.28, k * 0.1);
+    ctx.lineTo(k * 0.28, k * 0.1);
+    ctx.moveTo(0, -k * 0.24);
+    ctx.lineTo(0, k * 0.44);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.beginPath();
+    ctx.ellipse(-k * 0.12, -k * 0.04, k * 0.07, k * 0.12, -0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#8f95a0';
+    ctx.fillRect(-k * 0.12, -k * 0.38, k * 0.24, k * 0.14);
+    ctx.fillStyle = '#c3c9d3';
+    ctx.beginPath();
+    ctx.moveTo(k * 0.08, -k * 0.38);
+    ctx.lineTo(k * 0.36, -k * 0.3);
+    ctx.lineTo(k * 0.32, k * 0.06);
+    ctx.lineTo(k * 0.24, k * 0.04);
+    ctx.lineTo(k * 0.26, -k * 0.24);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#e6c24a';
+    ctx.lineWidth = k * 0.05;
+    ctx.beginPath();
+    ctx.arc(-k * 0.24, -k * 0.36, k * 0.1, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  // A little twin-barrel turret, centred on 0,0; angle a points the barrels.
+  SQ.drawTurret = function (ctx, k, color, dark, a) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    SQ.roundRect(ctx, -k * 0.42, -k * 0.34, k * 0.84, k * 0.84, k * 0.16);
+    ctx.fill();
+    ctx.fillStyle = '#4a5063';
+    SQ.roundRect(ctx, -k * 0.42, -k * 0.42, k * 0.84, k * 0.84, k * 0.16);
+    ctx.fill();
+    ctx.strokeStyle = '#23262f';
+    ctx.lineWidth = k * 0.06;
+    ctx.stroke();
+    ctx.rotate(a || 0);
+    ctx.fillStyle = '#2b2f3a';
+    ctx.fillRect(0, -k * 0.08, k * 0.52, k * 0.16);
+    ctx.fillRect(-k * 0.52, -k * 0.08, k * 0.52, k * 0.16);
+    ctx.fillStyle = color;
+    ctx.strokeStyle = dark;
+    ctx.lineWidth = k * 0.06;
+    ctx.beginPath();
+    ctx.arc(0, 0, k * 0.24, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.beginPath();
+    ctx.arc(-k * 0.07, -k * 0.07, k * 0.08, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   };
 
   // A power-up box: white tile, coloured rim, bobbing icon and a pulse so it reads on any floor.
@@ -205,7 +281,8 @@
     ctx.lineWidth = s * 0.11;
     ctx.strokeStyle = def.color;
     ctx.stroke();
-    SQ.drawEmoji(ctx, def.icon, 0, s * 0.03, s * 0.6);
+    if (def.draw) def.draw(ctx, s * 0.62);
+    else SQ.drawEmoji(ctx, def.icon, 0, s * 0.03, s * 0.6);
     ctx.restore();
   };
 

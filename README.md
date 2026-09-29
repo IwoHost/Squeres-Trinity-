@@ -31,10 +31,15 @@ Items spawn at random spots and only work when a square touches them. They blink
 | Mode | Items |
 | --- | --- |
 | Color Chase | ⚡ Speed · 🛡️ Shield (can't be tagged) · 💣 Bomb (tags everyone nearby) · ❄️ Freeze (freezes your hunters) · 🧲 Magnet (pulls prey in) · 🍄 Mega (grow bigger) |
-| Tile Wars | ⚡ Speed · 🍄 Mega · ✨ Multiball (an extra square) · 💣 Bomb (paints a 5×5 block) · ❄️ Freeze (stops the others) · 🖌️ Paint Rush (plow through enemy tiles) · 🛡️ Lock (your tiles can't be stolen for 5s) |
+| Tile Wars | 🍄 Grow (10s) · 👻 Ghost (drift through everything, then pop and paint) · Turret (placed on the board, sprays tile-stealing shots for 8s) · 💣 Bomb (carried with a lit fuse, then explodes) · Grenade (held, then thrown in an arc at enemy ground) · ⚡ Speed · ✨ Multiball · 🖌️ Paint Rush · ❄️ Freeze · 🛡️ Lock |
 | Domain Duel | ❤️ Heal · 🛡️ Shield (invincible anywhere) · ⚡ Speed · 🌐 Expansion (instant 7×7 domain) · 🔥 Rage (double damage) · 🍄 Mega · ❄️ Freeze |
 | Square Race | ⚡ Boost · 🔪 Knife · 🍌 Banana · ❄️ Freeze · 🌀 Portal (jump ahead). Items reappear somewhere new after pickup. |
 | Sword Brawl | 🗡️ Sword · ❤️ Heal · ⚡ Speed · 🌵 Spikes · 🛡️ Shield · 🍄 Mega (bigger and hits harder) · 💣 Bomb |
+
+**Tile Wars random events.** Every so often (not every match, and never in the first or last
+seconds) a roulette spins and lands on an event: Color Swap, Place Swap, Robin Hood (the leader
+gives tiles to last place), Tile Rain, Speed Frenzy, Giant Mode, Item Rain or Mirror Flip. The
+last 10 seconds speed everyone up.
 
 **Random** picks a mode and all its settings from the seed. Type a seed to replay a match exactly.
 

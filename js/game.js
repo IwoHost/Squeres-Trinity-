@@ -319,6 +319,7 @@
       ctx.restore();
 
       this.drawBelow(ctx);
+      if (m.drawScreen && this.phase !== 'idle') m.drawScreen(ctx);
       if (this.phase === 'intro') this.drawIntro(ctx);
       if (this.phase === 'countdown') this.drawCountdown(ctx);
       this.fx.drawScreen(ctx);
