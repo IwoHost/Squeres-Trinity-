@@ -24,6 +24,8 @@ controls.
 | Square Race | A random maze with breakable brick gates. The camera follows the leaders. |
 | Weapon Brawl | Every square gets its own weapon: sword, axe, hammer, spear, daggers, flail, bow or boomerang. Every hit levels the weapon up (longer blades, bigger heads, more daggers, faster arrows). Sometimes everyone gets the same weapon. Last square standing. |
 | Bounce Brawl | No weapons and no power-ups: every wall bounce makes a square a little bigger (up to about twice its size), and bigger squares hit harder. Last square standing. |
+| Marble Race | Squares tumble down a tall random obstacle course: peg fields, zigzag ramps, spinning bars, pinball bumpers and funnels. The camera follows the leader down. First to the bottom wins. |
+| King of the Hill | Whoever is closest to the centre of the zone scores. Squares charge each other to shove rivals out; hard hits leave them dizzy. The zone moves every few seconds and a shockwave sometimes blasts everyone out. |
 
 ### Power-ups
 
@@ -41,6 +43,10 @@ Items spawn at random spots and only work when a square touches them. They blink
 seconds) a roulette spins and lands on an event: Color Swap, Place Swap, Robin Hood (the leader
 gives tiles to last place), Tile Rain, Speed Frenzy, Giant Mode, Item Rain or Mirror Flip. The
 last 10 seconds speed everyone up.
+
+**Tournament.** Pick 🏆 Tournament to run the Trinity Cup: 8 colors play 1v1 matches (quarterfinals,
+semifinals, final) in random modes, with the bracket shown between matches and a champion screen
+at the end. With recording on, every match is saved as its own part, ready for a multi-part series.
 
 **Random** picks a mode and all its settings from the seed. Type a seed to replay a match exactly.
 

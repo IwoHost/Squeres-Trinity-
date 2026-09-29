@@ -40,14 +40,15 @@
   }
 
   class Territory {
-    constructor(g, rng) {
+    constructor(g, rng, opts) {
+      opts = opts || {};
       this.g = g;
       this.rng = rng;
-      const n = rng.pick([2, 2, 3, 4]);
-      this.teams = SQ.pickTeams(rng, n);
+      this.teams = opts.teams || SQ.pickTeams(rng, rng.pick([2, 2, 3, 4]));
+      const n = this.teams.length;
       this.N = rng.pick([20, 25]);
       this.cell = 1000 / this.N;
-      this.duration = rng.pick([50, 60, 60]);
+      this.duration = opts.quick ? 40 : rng.pick([50, 60, 60]);
       this.title = 'TILE WARS';
       this.rules = [
         [{ t: 'Every bounce ', c: '#ffffff' }, { t: 'steals', c: '#ffd23f' }, { t: ' a tile', c: '#ffffff' }],
@@ -770,5 +771,5 @@
     }
   }
 
-  SQ.modes.territory = { id: 'territory', name: 'Tile Wars', create: (g, rng) => new Territory(g, rng) };
+  SQ.modes.territory = { id: 'territory', name: 'Tile Wars', create: (g, rng, opts) => new Territory(g, rng, opts) };
 })();

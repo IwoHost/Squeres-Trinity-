@@ -111,13 +111,16 @@
   function start(seed) {
     const typed = $('seed').value.trim();
     if (seed == null && typed && /^\d+$/.test(typed)) seed = +typed;
-    game.newMatch(seed);
+    if (game.opts.mode === 'tournament') game.newTournament(seed);
+    else game.newMatch(seed);
     keepAwake();
+    $('parts').innerHTML = '';
+    $('parts').hidden = true;
     $('seed').value = '';
     $('seed').placeholder = String(game.seed);
     $('overlay').hidden = true;
     $('save').hidden = true;
-    if (game.recorder.active) status('Recording this match…');
+    if (game.recorder.active) status(game.tour ? 'Recording the tournament. Each match is saved as its own part.' : 'Recording this match…');
     else if (game.opts.record && !game.recorder.supported) status('This browser cannot record video. Try Chrome, Edge or Firefox.', 'bad');
     else status(game.opts.record ? 'The next match will be recorded.' : 'Recording is off.');
   }
@@ -128,9 +131,10 @@
   game.on('done', ({ winner, video }) => {
     $('overlay-title').textContent = winner ? winner.text : 'Match over';
     $('overlay-text').textContent = 'Ready for another one?';
-    $('overlay-start').textContent = 'Next match';
+    $('overlay-start').textContent = game.tour ? 'New tournament' : 'Next match';
     $('overlay').classList.add('compact');
     $('overlay').hidden = !!game.opts.autoNext;
+    if (game.tour && game.videos.length) status(`Tournament recorded in ${game.videos.length} parts. Save the ones you want.`);
     if (video) {
       const mb = (video.blob.size / 1048576).toFixed(1);
       $('save').hidden = false;
@@ -147,8 +151,22 @@
   }, 250);
 
   // ----- saving -----
-  $('save').addEventListener('click', async () => {
-    const v = game.video;
+  // one save button per tournament part
+  game.on('part', (v) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn btn-save';
+    b.textContent = `Save part ${v.part}`;
+    b.title = `${(v.blob.size / 1048576).toFixed(1)} MB`;
+    b.addEventListener('click', () => saveVideo(v));
+    $('parts').appendChild(b);
+    $('parts').hidden = false;
+    status(`Part ${v.part} recorded.`);
+  });
+
+  $('save').addEventListener('click', () => saveVideo(game.video));
+
+  async function saveVideo(v) {
     if (!v) return;
     // Inside a Claude artifact, files are offered through the downloads capability.
     if (window.claude && typeof window.claude.use === 'function') {
@@ -173,7 +191,7 @@
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10000);
     status('Video saved to your downloads.');
-  });
+  }
 
   function status(text, tone) {
     const el = $('rec-status');

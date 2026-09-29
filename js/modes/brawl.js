@@ -26,11 +26,15 @@
   const WEAPON_IDS = Object.keys(WEAPONS);
 
   class Brawl {
-    constructor(g, rng, forced) {
+    constructor(g, rng, opts) {
+      opts = opts || {};
+      const forced = opts.variant;
       this.g = g;
       this.rng = rng;
-      const n = rng.int(4, 7);
-      this.teams = SQ.pickTeams(rng, n);
+      this.teams = opts.teams || SQ.pickTeams(rng, rng.int(4, 7));
+      const n = this.teams.length;
+      this.maxHp = opts.quick ? 55 : 100;
+      this.stormAt = opts.quick ? 18 : 45;
       this.variant = forced || rng.pick(['mixed', 'mixed', 'mixed', 'same']);
       this.sameWeapon = rng.pick(WEAPON_IDS);
       if (this.variant === 'mixed') {
@@ -64,7 +68,7 @@
           vy: Math.sin(va) * sp,
           speed: sp,
           size: 54,
-          hp: 100,
+          hp: this.maxHp,
           alive: true,
           w: null,
           spikes: 0,
@@ -157,7 +161,7 @@
       const g = this.g;
       const rng = this.rng;
       this.time += dt;
-      if (this.time > 45) this.storm = Math.min(300, this.storm + dt * 7);
+      if (this.time > this.stormAt) this.storm = Math.min(300, this.storm + dt * 7);
       const lo = this.storm;
       const hi = 1000 - this.storm;
       const alive = this.sq.filter((s) => s.alive);
@@ -503,7 +507,7 @@
         g.fx.text(d.x, d.y - 60, 'BOOM!', '#ffffff', 56);
         for (const o of this.sq) if (o !== s && o.alive && SQ.dist2(o.x, o.y, d.x, d.y) < 230 * 230) this.damage(o, 22, s);
       } else if (d.type === 'heal') {
-        s.hp = Math.min(100, s.hp + 30);
+        s.hp = Math.min(this.maxHp, s.hp + 30);
         g.fx.text(s.x, s.y - 50, '+30 HP', '#7dffa8', 38);
       } else if (d.type === 'speed') {
         s.boost = 4;
@@ -567,7 +571,7 @@
           squash: s.squash,
           flash: s.flash,
           blink: s.blink < 0,
-          mood: s.hp < 30 ? 'scared' : s.w ? 'angry' : 'normal',
+          mood: s.hp < this.maxHp * 0.3 ? 'scared' : s.w ? 'angry' : 'normal',
           glow: s.boost > 0 || s.megaT > 0 ? 18 : 0,
           glowColor: s.megaT > 0 ? '#ff6ac1' : null,
           shield: s.shieldT,
@@ -576,8 +580,8 @@
         const w = s.size;
         ctx.fillStyle = 'rgba(0,0,0,0.5)';
         ctx.fillRect(s.x - w / 2, s.y - s.size / 2 - 16, w, 8);
-        ctx.fillStyle = s.hp > 50 ? '#7dffa8' : s.hp > 25 ? '#ffd23f' : '#ff5c5c';
-        ctx.fillRect(s.x - w / 2, s.y - s.size / 2 - 16, (w * s.hp) / 100, 8);
+        ctx.fillStyle = s.hp > this.maxHp * 0.5 ? '#7dffa8' : s.hp > this.maxHp * 0.25 ? '#ffd23f' : '#ff5c5c';
+        ctx.fillRect(s.x - w / 2, s.y - s.size / 2 - 16, (w * s.hp) / this.maxHp, 8);
       }
       for (const p of this.proj) {
         ctx.save();
@@ -771,7 +775,7 @@
         ctx.fillStyle = 'rgba(255,255,255,0.1)';
         ctx.fillRect(barX, cy + 8, barW, 18);
         ctx.fillStyle = t.color;
-        ctx.fillRect(barX, cy + 8, (barW * s.hp) / 100, 18);
+        ctx.fillRect(barX, cy + 8, (barW * s.hp) / this.maxHp, 18);
         if (s.w) {
           SQ.drawEmoji(ctx, WEAPONS[s.w.type].icon, barX + barW + 26, cy + 17, 28);
           SQ.outlinedText(ctx, String(s.w.lvl), barX + barW + 70, cy + 18, 26, '#ffffff', { stroke: 6 });
@@ -829,6 +833,6 @@
     ctx.stroke();
   }
 
-  SQ.modes.brawl = { id: 'brawl', name: 'Weapon Brawl', create: (g, rng) => new Brawl(g, rng) };
-  SQ.modes.bounce = { id: 'bounce', name: 'Bounce Brawl', create: (g, rng) => new Brawl(g, rng, 'grow') };
+  SQ.modes.brawl = { id: 'brawl', name: 'Weapon Brawl', create: (g, rng, opts) => new Brawl(g, rng, opts) };
+  SQ.modes.bounce = { id: 'bounce', name: 'Bounce Brawl', create: (g, rng, opts) => new Brawl(g, rng, Object.assign({}, opts, { variant: 'grow' })) };
 })();

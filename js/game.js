@@ -2,6 +2,8 @@
 // drives the camera and slow motion, and draws the frame that gets recorded.
 (function () {
   const SQ = window.SQ;
+  // modes that work as 1v1 matches in a tournament
+  const TOUR_MODES = ['territory', 'domain', 'race', 'brawl', 'bounce', 'marble', 'hill'];
   const MODE_IDS = ['chase', 'territory', 'domain', 'race', 'brawl', 'bounce', 'marble', 'hill'];
 
   class Recorder {
@@ -107,15 +109,21 @@
       this.phase = 'idle';
     }
 
-    newMatch(seed) {
+    // o: { tour, mode, teams } when the match is part of a tournament
+    newMatch(seed, o) {
+      o = o || {};
       this.audio.init();
-      this.episode++;
-      this.seed = seed != null ? seed >>> 0 : SQ.randomSeed();
-      const rng = SQ.makeRng(this.seed);
-      let id = this.opts.mode;
-      if (id === 'random') id = MODE_IDS[Math.floor(rng() * MODE_IDS.length)];
+      if (!o.tour) {
+        this.tour = null;
+        this.episode++;
+        this.seed = seed != null ? seed >>> 0 : SQ.randomSeed();
+      }
+      const mseed = o.tour ? seed >>> 0 : this.seed;
+      const rng = SQ.makeRng(mseed);
+      let id = o.mode || this.opts.mode;
+      if (id === 'random' || !SQ.modes[id]) id = MODE_IDS[Math.floor(rng() * MODE_IDS.length)];
       this.modeInfo = SQ.modes[id];
-      this.mode = this.modeInfo.create(this, SQ.makeRng(this.seed ^ 0x9e3779b9));
+      this.mode = this.modeInfo.create(this, SQ.makeRng(mseed ^ 0x9e3779b9), o.teams ? { teams: o.teams, quick: true } : undefined);
       this.fx.clear();
       this.cam.reset();
       this.cam.tracking = !!this.mode.camTracking;
@@ -128,12 +136,19 @@
       this.slowT = 0;
       this.acc = 0;
       this.setPhase('intro');
-      this.track = this.audio.pickTrack(this.opts.music);
-      this.audio.intensity = 0.12;
-      this.audio.playTrack(this.track);
+      // a tournament keeps one song going across its matches
+      if (!o.tour || !this.audio.playing) {
+        this.track = this.audio.pickTrack(this.opts.music);
+        this.audio.intensity = 0.12;
+        this.audio.playTrack(this.track);
+        this.trackToast = 4;
+      }
       this.audio.riser(2.6);
       this.audio.whoosh();
-      this.trackToast = 4;
+      if (o.tour) {
+        this.emit('match', { mode: this.modeInfo, seed: this.seed, track: this.track, tour: true });
+        return;
+      }
       this.video = null;
       this.setQuality(this.opts.quality);
       if (this.opts.record && this.recorder.supported) {
@@ -240,10 +255,15 @@
           const list = SQ.MEMES.winner;
           this.winnerCaption = list[Math.floor(Math.random() * list.length)];
         }
-        if (this.phaseT > 5.4) this.audio.stopMusic(1.2);
-        if (this.phaseT > 6.2) this.finish();
+        if (this.phaseT > 5.4 && !this.tour) this.audio.stopMusic(1.2);
+        if (this.phaseT > (this.tour ? 4 : 6.2)) this.finish();
       }
-      if (P === 'intro' || P === 'countdown') simulate = false;
+      if (P === 'bracket' && this.phaseT > 4.4) {
+        const nx = this.tour.next;
+        this.newMatch(nx.seed, { tour: true, mode: nx.id, teams: nx.pair });
+      }
+      if (P === 'champion' && this.phaseT > 7) this.finishTour();
+      if (P === 'intro' || P === 'countdown' || P === 'bracket' || P === 'champion' || P === 'between') simulate = false;
       if (P !== 'outro') this.memeDone = false;
 
       if (this.hitstopT > 0) {
@@ -275,7 +295,98 @@
       if (this.trackToast > 0) this.trackToast -= realDt;
     }
 
+    // ---------------- tournament ----------------
+    newTournament(seed) {
+      this.audio.init();
+      this.episode++;
+      this.seed = seed != null ? seed >>> 0 : SQ.randomSeed();
+      const rng = SQ.makeRng(this.seed);
+      this.tour = { seed: this.seed, rng, rounds: [rng.shuffle(SQ.TEAMS)], results: [[], [], []], round: 0, match: 0, part: 0, lastMode: null, champion: null, lastResult: null };
+      this.videos = [];
+      this.video = null;
+      this.setQuality(this.opts.quality);
+      this.fx.clear();
+      this.cam.reset();
+      this.cam.worldH = SQ.WORLD;
+      this.track = this.audio.pickTrack(this.opts.music);
+      this.audio.intensity = 0.35;
+      this.audio.playTrack(this.track);
+      this.trackToast = 4;
+      this.emit('match', { tour: true, seed: this.seed, track: this.track });
+      this.enterBracket();
+    }
+
+    roundName(n) {
+      return n === 8 ? 'QUARTERFINAL' : n === 4 ? 'SEMIFINAL' : n === 2 ? 'FINAL' : 'CHAMPION';
+    }
+
+    enterBracket() {
+      const t = this.tour;
+      const list = t.rounds[t.round];
+      const pair = [list[t.match * 2], list[t.match * 2 + 1]];
+      let id;
+      do id = t.rng.pick(TOUR_MODES);
+      while (id === t.lastMode);
+      t.lastMode = id;
+      t.next = { pair, id, seed: t.rng.int(1, 1e9) };
+      t.part++;
+      this.stage = list.length === 2 ? 'FINAL' : `${this.roundName(list.length)} ${t.match + 1}`;
+      this.fx.clear();
+      this.setPhase('bracket');
+      this.audio.whoosh();
+      this.audio.intensity = 0.35;
+      // each match is saved as its own part, which suits a multi-part series of reels
+      if (this.opts.record && this.recorder.supported && !this.recorder.active) {
+        this.recorder.start(this.canvas, this.audio.streamDest && this.audio.streamDest.stream, 30, SQ.RES === 1 ? 9_000_000 : 5_000_000);
+      }
+    }
+
+    async finishTourMatch() {
+      const t = this.tour;
+      const w = this.mode.winner.team;
+      t.results[t.round][t.match] = w;
+      t.lastResult = { r: t.round, i: t.match };
+      t.match++;
+      if (t.match * 2 >= t.rounds[t.round].length) {
+        t.rounds.push(t.results[t.round].slice());
+        t.round++;
+        t.match = 0;
+      }
+      if (t.rounds[t.round].length === 1) {
+        t.champion = t.rounds[t.round][0];
+        this.stage = 'CHAMPION';
+        this.fx.clear();
+        this.setPhase('champion');
+        this.audio.fanfare();
+        this.audio.intensity = 1;
+        this.fx.confettiBurst([t.champion.color, t.champion.light, '#ffd23f', '#ffffff'], 260);
+        return;
+      }
+      this.setPhase('between');
+      await this.savePart();
+      this.enterBracket();
+    }
+
+    async savePart() {
+      if (!this.recorder.active) return;
+      const blob = await this.recorder.stop();
+      if (!blob || !blob.size) return;
+      const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
+      const v = { blob, ext, part: this.tour.part, name: `squares-trinity-cup-${this.tour.seed}-part${this.tour.part}.${ext}` };
+      this.videos.push(v);
+      this.emit('part', v);
+    }
+
+    async finishTour() {
+      this.setPhase('done');
+      this.audio.stopMusic(1.5);
+      await this.savePart();
+      const c = this.tour.champion;
+      this.emit('done', { winner: { team: c, text: `${c.name.toUpperCase()} IS THE CHAMPION` }, video: null, tour: true });
+    }
+
     async finish() {
+      if (this.tour) return this.finishTourMatch();
       this.setPhase('done');
       if (this.recorder.active) {
         const blob = await this.recorder.stop();
@@ -299,6 +410,12 @@
       const m = this.mode;
       ctx.setTransform(SQ.RES, 0, 0, SQ.RES, 0, 0);
       this.drawBackdrop(ctx);
+      if (this.tour && (this.phase === 'bracket' || this.phase === 'champion' || (this.phase === 'done' && this.tour.champion))) {
+        this.drawBracket(ctx);
+        this.fx.drawScreen(ctx);
+        this.drawFooter(ctx);
+        return;
+      }
       this.drawHeader(ctx);
 
       // arena frame with a soft halo
@@ -351,7 +468,7 @@
     drawHeader(ctx) {
       // The header only changes when the rules change, so outside the intro it is cached.
       if (this.phase === 'intro') return this.drawHeaderLive(ctx);
-      const key = this.phase + '|' + this.episode + '|' + this.mode.title + '|' + JSON.stringify(this.mode.rules);
+      const key = this.phase + '|' + (this.tour ? this.stage : '') + '|' + this.episode + '|' + this.mode.title + '|' + JSON.stringify(this.mode.rules);
       if (!this.headerCache || this.headerCache.key !== key) {
         const c = document.createElement('canvas');
         c.width = Math.round(SQ.W * SQ.RES);
@@ -373,7 +490,7 @@
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillStyle = 'rgba(255,255,255,0.55)';
-      const tag = this.phase === 'idle' ? 'SQUARES TRINITY' : `SQUARES TRINITY  ·  EP ${this.episode}  ·  ${m.title}`;
+      const tag = this.phase === 'idle' ? 'SQUARES TRINITY' : this.tour ? `TRINITY CUP  ·  ${this.stage}  ·  ${m.title}` : `SQUARES TRINITY  ·  EP ${this.episode}  ·  ${m.title}`;
       ctx.fillText(spaced(tag), SQ.W / 2, 66, SQ.W - 120);
       // tri-color strip
       const sw = 60;
@@ -502,6 +619,120 @@
       SQ.outlinedText(ctx, w.text, SQ.W / 2, A.y + 620, 96, w.team.color, { stroke: 16 });
       SQ.outlinedText(ctx, 'Follow for the next episode', SQ.W / 2, A.y + 720, 40, '#ffffff', { stroke: 8, font: SQ.fontBody, weight: 700 });
       ctx.restore();
+    }
+
+    // The cup bracket: quarterfinals, semis, final and the champion, in four columns.
+    drawBracket(ctx) {
+      const t = this.tour;
+      const T = this.phaseT;
+      const W = SQ.W;
+      const champ = this.phase !== 'bracket';
+      ctx.save();
+      if (champ) ctx.globalAlpha = 0.28;
+      SQ.drawEmoji(ctx, '🏆', W / 2, 130, 100);
+      SQ.outlinedText(ctx, 'TRINITY CUP', W / 2, 250, 76, '#ffd23f', { stroke: 14 });
+      const cols = [150, 410, 670, 930];
+      const labels = ['QUARTERS', 'SEMIS', 'FINAL', 'CHAMPION'];
+      const top = 420;
+      const bottom = 1600;
+      const span = (bottom - top) / 8;
+      const yOf = (r, i) => top + span * (i + 0.5) * (1 << r);
+      ctx.font = `700 26px ${SQ.fontBody}`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      labels.forEach((l, r) => ctx.fillText(l.split('').join('\u200A'), cols[r], 360));
+      // connectors
+      ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+      ctx.lineWidth = 4;
+      for (let r = 0; r < 3; r++) {
+        const n = 8 >> r;
+        for (let p = 0; p < n / 2; p++) {
+          const y1 = yOf(r, p * 2);
+          const y2 = yOf(r, p * 2 + 1);
+          const ym = yOf(r + 1, p);
+          const x1 = cols[r] + 105;
+          const xm = (cols[r] + 105 + cols[r + 1] - 105) / 2;
+          const w = t.results[r] && t.results[r][p];
+          if (w) ctx.strokeStyle = SQ.rgba(w.color, 0.8);
+          else ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(xm, y1);
+          ctx.lineTo(xm, y2);
+          ctx.lineTo(x1, y2);
+          ctx.moveTo(xm, ym);
+          ctx.lineTo(cols[r + 1] - 105, ym);
+          ctx.stroke();
+        }
+      }
+      // slots
+      for (let r = 0; r < 4; r++) {
+        const n = 8 >> r;
+        for (let i = 0; i < n; i++) {
+          const team = r === 0 ? t.rounds[0][i] : t.results[r - 1] && t.results[r - 1][i];
+          const x = cols[r];
+          const y = yOf(r, i);
+          const res = t.results[r] && t.results[r][Math.floor(i / 2)];
+          const lost = team && res && res !== team;
+          const isNext = this.phase === 'bracket' && r === t.round && Math.floor(i / 2) === t.match;
+          const fresh = t.lastResult && r === t.lastResult.r + 1 && i === t.lastResult.i && this.phase === 'bracket';
+          const pop = fresh ? SQ.ease.outBack(SQ.clamp((T - 0.3) / 0.5, 0, 1)) : 1;
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.scale(pop, pop);
+          ctx.globalAlpha = (champ ? 0.28 : 1) * (lost ? 0.35 : 1);
+          ctx.fillStyle = '#1b1e2b';
+          SQ.roundRect(ctx, -105, -44, 210, 88, 16);
+          ctx.fill();
+          ctx.lineWidth = isNext ? 6 + 3 * Math.sin(T * 8) : 4;
+          ctx.strokeStyle = isNext ? '#ffd23f' : team ? team.color : 'rgba(255,255,255,0.2)';
+          ctx.stroke();
+          if (team) {
+            SQ.drawSquare(ctx, -62, 0, 50, team, { mood: lost ? 'dead' : res === team || r === 3 ? 'happy' : isNext ? 'angry' : 'normal' });
+            ctx.font = `700 30px ${SQ.fontBody}`;
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(team.name, -26, 2, 124);
+          } else {
+            SQ.outlinedText(ctx, '?', 0, 2, 44, 'rgba(255,255,255,0.35)', { stroke: 0 });
+          }
+          ctx.restore();
+        }
+      }
+      if (this.phase === 'bracket') {
+        const nx = t.next;
+        const [a, b] = nx.pair;
+        const inK = SQ.ease.outBack(SQ.clamp(T / 0.4, 0, 1));
+        ctx.save();
+        ctx.translate(W / 2, 1700);
+        ctx.scale(inK, inK);
+        SQ.outlinedText(ctx, `NEXT UP  ·  ${this.stage}`, 0, -58, 34, '#ffd23f', { stroke: 7 });
+        const size = SQ.fitSize(ctx, [{ t: a.name + ' VS ' + b.name }], W - 120, 72);
+        SQ.richLine(ctx, [{ t: a.name.toUpperCase(), c: a.color }, { t: '  VS  ', c: '#ffffff' }, { t: b.name.toUpperCase(), c: b.color }], 0, 14, size);
+        SQ.outlinedText(ctx, SQ.modes[nx.id].name, 0, 88, 42, '#ffffff', { stroke: 8, font: SQ.fontBody, weight: 700 });
+        ctx.restore();
+        ctx.fillStyle = 'rgba(255,255,255,0.15)';
+        ctx.fillRect(140, 1830, W - 280, 8);
+        ctx.fillStyle = '#ffd23f';
+        ctx.fillRect(140, 1830, (W - 280) * SQ.clamp(T / 4.4, 0, 1), 8);
+      }
+      ctx.restore();
+
+      if (champ && t.champion) {
+        const c = t.champion;
+        const k = SQ.ease.outBack(SQ.clamp(T / 0.6, 0, 1));
+        ctx.save();
+        ctx.translate(W / 2, 900);
+        ctx.scale(k, k);
+        SQ.drawEmoji(ctx, '👑', 0, -250 - Math.abs(Math.sin(this.real * 3)) * 16, 130);
+        SQ.drawSquare(ctx, 0, 0, 320, c, { mood: 'happy', squash: Math.sin(this.real * 6) * 0.04 });
+        if (this.opts.memes > 0) SQ.drawSunglasses(ctx, 0, -12, 300);
+        SQ.outlinedText(ctx, 'CHAMPION', 0, 290, 120, '#ffd23f', { stroke: 20 });
+        SQ.outlinedText(ctx, c.name.toUpperCase(), 0, 420, 96, c.color, { stroke: 16 });
+        SQ.outlinedText(ctx, 'wins the Trinity Cup', 0, 520, 44, '#ffffff', { stroke: 9, font: SQ.fontBody, weight: 700 });
+        ctx.restore();
+      }
     }
 
     drawFooter(ctx) {

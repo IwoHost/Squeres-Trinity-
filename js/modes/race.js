@@ -14,15 +14,16 @@
   ];
 
   class Race {
-    constructor(g, rng) {
+    constructor(g, rng, opts) {
+      opts = opts || {};
       this.g = g;
       this.rng = rng;
-      this.mw = rng.pick([5, 6, 6, 7]);
+      this.mw = opts.quick ? rng.pick([6, 7]) : rng.pick([5, 6, 6, 7]);
       this.T = this.mw * 2 + 1;
       this.tile = 1000 / this.T;
       this.buildMaze();
-      const n = rng.int(4, 6);
-      this.teams = SQ.pickTeams(rng, n);
+      this.teams = opts.teams || SQ.pickTeams(rng, rng.int(4, 6));
+      const n = this.teams.length;
       this.title = 'SQUARE RACE';
       this.rules = [[{ t: 'Choose a square', c: '#ffffff' }], [{ t: 'First to the ', c: '#ffffff' }, { t: 'flag', c: '#ffd23f' }, { t: ' wins', c: '#ffffff' }]];
       const size = Math.min(34, this.tile * 0.42);
@@ -691,5 +692,5 @@
     }
   }
 
-  SQ.modes.race = { id: 'race', name: 'Square Race', create: (g, rng) => new Race(g, rng) };
+  SQ.modes.race = { id: 'race', name: 'Square Race', create: (g, rng, opts) => new Race(g, rng, opts) };
 })();

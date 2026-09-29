@@ -143,6 +143,8 @@ body.theater-on .desk { visibility: hidden; }
 .btn-save { background: var(--green); color: #04210f; box-shadow: 0 4px 0 #16803f; }
 .btn-save:hover { background: #5fe396; }
 .row { display: flex; gap: 10px; flex-wrap: wrap; }
+.parts { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
+.parts .btn { padding: 11px 10px; font-size: 13px; }
 .row > .btn { flex: 1 1 auto; }
 
 .group { display: flex; flex-direction: column; gap: 10px; padding-top: 16px; border-top: 1px solid var(--line); }
@@ -223,6 +225,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       <span class="label">Mode</span>
       <div class="chips" id="modes" role="radiogroup" aria-label="Mode">
         <label class="chip"><input type="radio" name="mode" value="random" id="mode-random" checked><span>🎲 Random</span></label>
+        <label class="chip"><input type="radio" name="mode" value="tournament" id="mode-tournament"><span>🏆 Tournament</span></label>
         <label class="chip"><input type="radio" name="mode" value="chase" id="mode-chase"><span><b style="background:var(--red)"></b>Color Chase</span></label>
         <label class="chip"><input type="radio" name="mode" value="territory" id="mode-territory"><span><b style="background:#a95cff"></b>Tile Wars</span></label>
         <label class="chip"><input type="radio" name="mode" value="domain" id="mode-domain"><span><b style="background:#1fd6f0"></b>Domain Duel</span></label>
@@ -244,6 +247,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       </select></div>
       <p class="status" id="rec-status" aria-live="polite">The next match will be recorded.</p>
       <button class="btn btn-save" id="save" type="button" hidden>Save video</button>
+      <div class="parts" id="parts" hidden></div>
     </div>
 
     <div class="group">

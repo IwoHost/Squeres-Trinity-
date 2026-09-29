@@ -143,6 +143,8 @@ body.theater-on .desk { visibility: hidden; }
 .btn-save { background: var(--green); color: #04210f; box-shadow: 0 4px 0 #16803f; }
 .btn-save:hover { background: #5fe396; }
 .row { display: flex; gap: 10px; flex-wrap: wrap; }
+.parts { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
+.parts .btn { padding: 11px 10px; font-size: 13px; }
 .row > .btn { flex: 1 1 auto; }
 
 .group { display: flex; flex-direction: column; gap: 10px; padding-top: 16px; border-top: 1px solid var(--line); }
@@ -223,12 +225,15 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       <span class="label">Mode</span>
       <div class="chips" id="modes" role="radiogroup" aria-label="Mode">
         <label class="chip"><input type="radio" name="mode" value="random" id="mode-random" checked><span>🎲 Random</span></label>
+        <label class="chip"><input type="radio" name="mode" value="tournament" id="mode-tournament"><span>🏆 Tournament</span></label>
         <label class="chip"><input type="radio" name="mode" value="chase" id="mode-chase"><span><b style="background:var(--red)"></b>Color Chase</span></label>
         <label class="chip"><input type="radio" name="mode" value="territory" id="mode-territory"><span><b style="background:#a95cff"></b>Tile Wars</span></label>
         <label class="chip"><input type="radio" name="mode" value="domain" id="mode-domain"><span><b style="background:#1fd6f0"></b>Domain Duel</span></label>
         <label class="chip"><input type="radio" name="mode" value="race" id="mode-race"><span><b style="background:var(--gold)"></b>Square Race</span></label>
         <label class="chip"><input type="radio" name="mode" value="brawl" id="mode-brawl"><span><b style="background:#dfe6ff"></b>Weapon Brawl</span></label>
         <label class="chip"><input type="radio" name="mode" value="bounce" id="mode-bounce"><span><b style="background:#ff8f33"></b>Bounce Brawl</span></label>
+        <label class="chip"><input type="radio" name="mode" value="marble" id="mode-marble"><span><b style="background:#ff4d8d"></b>Marble Race</span></label>
+        <label class="chip"><input type="radio" name="mode" value="hill" id="mode-hill"><span>👑 King of the Hill</span></label>
       </div>
     </div>
 
@@ -242,6 +247,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       </select></div>
       <p class="status" id="rec-status" aria-live="polite">The next match will be recorded.</p>
       <button class="btn btn-save" id="save" type="button" hidden>Save video</button>
+      <div class="parts" id="parts" hidden></div>
     </div>
 
     <div class="group">
@@ -1591,11 +1597,17 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       return Math.max(1, this.zoom + this.kick);
     }
     // Applies the camera transform. The view never leaves the arena.
+    // The part of the world currently on screen, for culling in tall worlds.
+    view() {
+      const half = W() / 2 / this.z;
+      const cy = SQ.clamp(this.y, half, (this.worldH || W()) - half);
+      return { top: cy - half, bottom: cy + half };
+    }
     apply(ctx, rect) {
       const z = this.z;
       const half = W() / 2 / z;
       const cx = SQ.clamp(this.x, half, W() - half);
-      const cy = SQ.clamp(this.y, half, W() - half);
+      const cy = SQ.clamp(this.y, half, (this.worldH || W()) - half);
       const sx = (Math.random() * 2 - 1) * this.shakeAmt;
       const sy = (Math.random() * 2 - 1) * this.shakeAmt;
       const scale = (rect.size / W()) * z;
@@ -2416,14 +2428,15 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
   }
 
   class Territory {
-    constructor(g, rng) {
+    constructor(g, rng, opts) {
+      opts = opts || {};
       this.g = g;
       this.rng = rng;
-      const n = rng.pick([2, 2, 3, 4]);
-      this.teams = SQ.pickTeams(rng, n);
+      this.teams = opts.teams || SQ.pickTeams(rng, rng.pick([2, 2, 3, 4]));
+      const n = this.teams.length;
       this.N = rng.pick([20, 25]);
       this.cell = 1000 / this.N;
-      this.duration = rng.pick([50, 60, 60]);
+      this.duration = opts.quick ? 40 : rng.pick([50, 60, 60]);
       this.title = 'TILE WARS';
       this.rules = [
         [{ t: 'Every bounce ', c: '#ffffff' }, { t: 'steals', c: '#ffd23f' }, { t: ' a tile', c: '#ffffff' }],
@@ -3146,7 +3159,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     }
   }
 
-  SQ.modes.territory = { id: 'territory', name: 'Tile Wars', create: (g, rng) => new Territory(g, rng) };
+  SQ.modes.territory = { id: 'territory', name: 'Tile Wars', create: (g, rng, opts) => new Territory(g, rng, opts) };
 })();
 
 </script>
@@ -3157,11 +3170,12 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
   const SETTLE = 1.4; // seconds before fresh paint counts as your domain
 
   class Domain {
-    constructor(g, rng) {
+    constructor(g, rng, opts) {
+      opts = opts || {};
       this.g = g;
       this.rng = rng;
-      const n = rng.pick([2, 2, 2, 3, 4]);
-      this.teams = SQ.pickTeams(rng, n);
+      this.teams = opts.teams || SQ.pickTeams(rng, rng.pick([2, 2, 2, 3, 4]));
+      const n = this.teams.length;
       this.N = 20;
       this.cell = 50;
       this.title = n === 2 ? `${this.teams[0].name.toUpperCase()} VS ${this.teams[1].name.toUpperCase()}` : 'DOMAIN BRAWL';
@@ -3181,7 +3195,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         [this.N - 5, 1],
         [1, this.N - 5],
       ]);
-      const maxHp = rng.pick([10, 12, 15]);
+      const maxHp = opts.quick ? 8 : rng.pick([10, 12, 15]);
       this.maxHp = maxHp;
       this.sq = this.teams.map((t, ti) => {
         const [cx, cy] = corners[ti];
@@ -3510,7 +3524,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     }
   }
 
-  SQ.modes.domain = { id: 'domain', name: 'Domain Duel', create: (g, rng) => new Domain(g, rng) };
+  SQ.modes.domain = { id: 'domain', name: 'Domain Duel', create: (g, rng, opts) => new Domain(g, rng, opts) };
 })();
 
 </script>
@@ -3531,15 +3545,16 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
   ];
 
   class Race {
-    constructor(g, rng) {
+    constructor(g, rng, opts) {
+      opts = opts || {};
       this.g = g;
       this.rng = rng;
-      this.mw = rng.pick([5, 6, 6, 7]);
+      this.mw = opts.quick ? rng.pick([6, 7]) : rng.pick([5, 6, 6, 7]);
       this.T = this.mw * 2 + 1;
       this.tile = 1000 / this.T;
       this.buildMaze();
-      const n = rng.int(4, 6);
-      this.teams = SQ.pickTeams(rng, n);
+      this.teams = opts.teams || SQ.pickTeams(rng, rng.int(4, 6));
+      const n = this.teams.length;
       this.title = 'SQUARE RACE';
       this.rules = [[{ t: 'Choose a square', c: '#ffffff' }], [{ t: 'First to the ', c: '#ffffff' }, { t: 'flag', c: '#ffd23f' }, { t: ' wins', c: '#ffffff' }]];
       const size = Math.min(34, this.tile * 0.42);
@@ -4208,7 +4223,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     }
   }
 
-  SQ.modes.race = { id: 'race', name: 'Square Race', create: (g, rng) => new Race(g, rng) };
+  SQ.modes.race = { id: 'race', name: 'Square Race', create: (g, rng, opts) => new Race(g, rng, opts) };
 })();
 
 </script>
@@ -4241,11 +4256,15 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
   const WEAPON_IDS = Object.keys(WEAPONS);
 
   class Brawl {
-    constructor(g, rng, forced) {
+    constructor(g, rng, opts) {
+      opts = opts || {};
+      const forced = opts.variant;
       this.g = g;
       this.rng = rng;
-      const n = rng.int(4, 7);
-      this.teams = SQ.pickTeams(rng, n);
+      this.teams = opts.teams || SQ.pickTeams(rng, rng.int(4, 7));
+      const n = this.teams.length;
+      this.maxHp = opts.quick ? 55 : 100;
+      this.stormAt = opts.quick ? 18 : 45;
       this.variant = forced || rng.pick(['mixed', 'mixed', 'mixed', 'same']);
       this.sameWeapon = rng.pick(WEAPON_IDS);
       if (this.variant === 'mixed') {
@@ -4279,7 +4298,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
           vy: Math.sin(va) * sp,
           speed: sp,
           size: 54,
-          hp: 100,
+          hp: this.maxHp,
           alive: true,
           w: null,
           spikes: 0,
@@ -4372,7 +4391,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       const g = this.g;
       const rng = this.rng;
       this.time += dt;
-      if (this.time > 45) this.storm = Math.min(300, this.storm + dt * 7);
+      if (this.time > this.stormAt) this.storm = Math.min(300, this.storm + dt * 7);
       const lo = this.storm;
       const hi = 1000 - this.storm;
       const alive = this.sq.filter((s) => s.alive);
@@ -4718,7 +4737,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         g.fx.text(d.x, d.y - 60, 'BOOM!', '#ffffff', 56);
         for (const o of this.sq) if (o !== s && o.alive && SQ.dist2(o.x, o.y, d.x, d.y) < 230 * 230) this.damage(o, 22, s);
       } else if (d.type === 'heal') {
-        s.hp = Math.min(100, s.hp + 30);
+        s.hp = Math.min(this.maxHp, s.hp + 30);
         g.fx.text(s.x, s.y - 50, '+30 HP', '#7dffa8', 38);
       } else if (d.type === 'speed') {
         s.boost = 4;
@@ -4782,7 +4801,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
           squash: s.squash,
           flash: s.flash,
           blink: s.blink < 0,
-          mood: s.hp < 30 ? 'scared' : s.w ? 'angry' : 'normal',
+          mood: s.hp < this.maxHp * 0.3 ? 'scared' : s.w ? 'angry' : 'normal',
           glow: s.boost > 0 || s.megaT > 0 ? 18 : 0,
           glowColor: s.megaT > 0 ? '#ff6ac1' : null,
           shield: s.shieldT,
@@ -4791,8 +4810,8 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         const w = s.size;
         ctx.fillStyle = 'rgba(0,0,0,0.5)';
         ctx.fillRect(s.x - w / 2, s.y - s.size / 2 - 16, w, 8);
-        ctx.fillStyle = s.hp > 50 ? '#7dffa8' : s.hp > 25 ? '#ffd23f' : '#ff5c5c';
-        ctx.fillRect(s.x - w / 2, s.y - s.size / 2 - 16, (w * s.hp) / 100, 8);
+        ctx.fillStyle = s.hp > this.maxHp * 0.5 ? '#7dffa8' : s.hp > this.maxHp * 0.25 ? '#ffd23f' : '#ff5c5c';
+        ctx.fillRect(s.x - w / 2, s.y - s.size / 2 - 16, (w * s.hp) / this.maxHp, 8);
       }
       for (const p of this.proj) {
         ctx.save();
@@ -4986,7 +5005,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         ctx.fillStyle = 'rgba(255,255,255,0.1)';
         ctx.fillRect(barX, cy + 8, barW, 18);
         ctx.fillStyle = t.color;
-        ctx.fillRect(barX, cy + 8, (barW * s.hp) / 100, 18);
+        ctx.fillRect(barX, cy + 8, (barW * s.hp) / this.maxHp, 18);
         if (s.w) {
           SQ.drawEmoji(ctx, WEAPONS[s.w.type].icon, barX + barW + 26, cy + 17, 28);
           SQ.outlinedText(ctx, String(s.w.lvl), barX + barW + 70, cy + 18, 26, '#ffffff', { stroke: 6 });
@@ -5044,8 +5063,808 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     ctx.stroke();
   }
 
-  SQ.modes.brawl = { id: 'brawl', name: 'Weapon Brawl', create: (g, rng) => new Brawl(g, rng) };
-  SQ.modes.bounce = { id: 'bounce', name: 'Bounce Brawl', create: (g, rng) => new Brawl(g, rng, 'grow') };
+  SQ.modes.brawl = { id: 'brawl', name: 'Weapon Brawl', create: (g, rng, opts) => new Brawl(g, rng, opts) };
+  SQ.modes.bounce = { id: 'bounce', name: 'Bounce Brawl', create: (g, rng, opts) => new Brawl(g, rng, Object.assign({}, opts, { variant: 'grow' })) };
+})();
+
+</script>
+<script>/* js/modes/marble.js */
+// Marble Race: squares tumble down a tall random obstacle course. First to the bottom wins.
+(function () {
+  const SQ = window.SQ;
+  const GRAV = 1000;
+  const SEC_H = 540;
+
+  class Marble {
+    constructor(g, rng, opts) {
+      opts = opts || {};
+      this.g = g;
+      this.rng = rng;
+      this.teams = opts.teams || SQ.pickTeams(rng, rng.int(5, 8));
+      this.title = 'MARBLE RACE';
+      this.rules = [[{ t: 'Squares vs gravity', c: '#ffffff' }], [{ t: 'First to the ', c: '#ffffff' }, { t: 'bottom', c: '#ffd23f' }, { t: ' wins', c: '#ffffff' }]];
+      this.segs = [];
+      this.pegs = [];
+      this.bumpers = [];
+      this.spinners = [];
+      this.sections = opts.quick ? rng.int(4, 5) : rng.int(7, 9);
+      this.build();
+      this.worldH = this.finishY + 320;
+      this.camTracking = true;
+      const r = 15;
+      const n = this.teams.length;
+      this.marbles = this.teams.map((t, i) => ({
+        team: i,
+        x: 500 + (i - (n - 1) / 2) * 62 + rng.range(-6, 6),
+        y: 120 + rng.range(-10, 10),
+        vx: rng.range(-40, 40),
+        vy: 0,
+        r,
+        rot: 0,
+        finished: false,
+        place: 0,
+        slow: 0,
+        trail: [],
+        flash: 0,
+      }));
+      this.time = 0;
+      this.duration = opts.quick ? 50 : 75;
+      this.places = [];
+      this.winner = null;
+      this.leader = -1;
+    }
+
+    focusStart() {
+      return { x: 500, y: 200 };
+    }
+
+    // ---------- course ----------
+    wall(x1, y1, x2, y2, w) {
+      this.segs.push({ x1, y1, x2, y2, r: (w || 12) / 2 });
+    }
+
+    build() {
+      const rng = this.rng;
+      const L = 30;
+      const R = 970;
+      this.top = 260;
+      const kinds = ['pegs', 'zigzag', 'spinners', 'bumpers', 'funnel', 'mix'];
+      let y = this.top;
+      let last = '';
+      const plan = [];
+      for (let s = 0; s < this.sections; s++) {
+        let k = s === 0 ? rng.pick(['pegs', 'funnel']) : rng.pick(kinds);
+        if (k === last) k = rng.pick(kinds.filter((x) => x !== last));
+        last = k;
+        plan.push(k);
+      }
+      // at least two zigzag sections so a race can't be over in a few seconds
+      for (let s = 2; plan.filter((k) => k === 'zigzag').length < 2 && s < plan.length; s += 2) plan[s] = 'zigzag';
+      for (const k of plan) {
+        this['sec_' + k](y, L, R);
+        y += SEC_H;
+      }
+      this.finishY = y + 80;
+      // side walls and a floor under the finish line
+      this.wall(L - 10, 0, L - 10, this.finishY + 320, 20);
+      this.wall(R + 10, 0, R + 10, this.finishY + 320, 20);
+      this.wall(L, this.finishY + 300, R, this.finishY + 300, 20);
+      // a wide funnel so the start is fair
+      this.wall(L, 150, 380, 230, 12);
+      this.wall(R, 150, 620, 230, 12);
+      // Pegs too close to a wall, bumper or spinner make pockets where marbles get stuck.
+      const segD = (p, s) => {
+        const dx = s.x2 - s.x1;
+        const dy = s.y2 - s.y1;
+        const t = SQ.clamp(((p.x - s.x1) * dx + (p.y - s.y1) * dy) / (dx * dx + dy * dy || 1), 0, 1);
+        return Math.hypot(p.x - (s.x1 + dx * t), p.y - (s.y1 + dy * t));
+      };
+      this.pegs = this.pegs.filter(
+        (p) =>
+          !this.segs.some((s) => segD(p, s) < p.r + s.r + 40) &&
+          !this.bumpers.some((b) => Math.hypot(b.x - p.x, b.y - p.y) < b.r + p.r + 40) &&
+          !this.spinners.some((sp) => Math.hypot(sp.x - p.x, sp.y - p.y) < sp.len / 2 + p.r + 40)
+      );
+    }
+
+    sec_pegs(y0, L, R) {
+      const rows = 6;
+      for (let r = 0; r < rows; r++) {
+        const off = r % 2 ? 45 : 0;
+        for (let x = L + 60 + off; x < R - 40; x += 90) {
+          if (this.rng.chance(0.12)) continue;
+          this.pegs.push({ x, y: y0 + 60 + r * 78, r: 12, flash: 0 });
+        }
+      }
+    }
+
+    sec_zigzag(y0, L, R) {
+      const rng = this.rng;
+      const gap = rng.range(130, 170);
+      for (let k = 0; k < 3; k++) {
+        const y = y0 + 50 + k * 165;
+        if (k % 2 === 0) this.wall(L, y, R - gap, y + 95, 12);
+        else this.wall(R, y, L + gap, y + 95, 12);
+      }
+    }
+
+    sec_spinners(y0, L, R) {
+      const rng = this.rng;
+      const n = rng.pick([2, 3]);
+      for (let i = 0; i < n; i++) {
+        const x = L + ((i + 0.5) / n) * (R - L);
+        this.spinners.push({ x, y: y0 + 270 + (i % 2 ? 60 : -60), len: rng.range(190, 240), a: rng.range(0, 3.14), w: rng.pick([-1, 1]) * rng.range(1.8, 2.8), r: 7 });
+      }
+      for (let i = 0; i < 6; i++) this.pegs.push({ x: rng.range(80, 920), y: y0 + (i < 3 ? rng.range(40, 120) : rng.range(420, 500)), r: 12, flash: 0 });
+    }
+
+    sec_bumpers(y0) {
+      const rng = this.rng;
+      const n = rng.int(5, 7);
+      let tries = 0;
+      while (this.bumpers.filter((b) => b.y > y0).length < n && tries++ < 80) {
+        const b = { x: rng.range(110, 890), y: y0 + rng.range(70, 470), r: rng.range(30, 40), flash: 0 };
+        if (this.bumpers.some((o) => SQ.dist2(o.x, o.y, b.x, b.y) < 150 * 150)) continue;
+        this.bumpers.push(b);
+      }
+    }
+
+    sec_funnel(y0, L, R) {
+      const open = this.rng.range(110, 150);
+      const cx = this.rng.range(380, 620);
+      this.wall(L, y0 + 60, cx - open / 2, y0 + 300, 12);
+      this.wall(R, y0 + 60, cx + open / 2, y0 + 300, 12);
+      for (let r = 0; r < 2; r++)
+        for (let x = 110 + (r % 2) * 60; x < 900; x += 120) this.pegs.push({ x, y: y0 + 390 + r * 80, r: 12, flash: 0 });
+    }
+
+    sec_mix(y0) {
+      const rng = this.rng;
+      for (let i = 0; i < 12; i++) this.pegs.push({ x: rng.range(70, 930), y: y0 + rng.range(40, 500), r: 12, flash: 0 });
+      for (let i = 0; i < 2; i++) this.bumpers.push({ x: rng.range(150, 850), y: y0 + 150 + i * 220, r: 34, flash: 0 });
+      this.spinners.push({ x: 500, y: y0 + 270, len: 200, a: 0, w: rng.sign() * 2.2, r: 7 });
+    }
+
+    // ---------- physics ----------
+    update(dt) {
+      const g = this.g;
+      this.time += dt;
+      for (const sp of this.spinners) sp.a += sp.w * dt;
+      for (const p of this.pegs) p.flash = Math.max(0, p.flash - dt * 4);
+      for (const b of this.bumpers) b.flash = Math.max(0, b.flash - dt * 4);
+      const sub = 3;
+      const h = dt / sub;
+      for (let k = 0; k < sub; k++) {
+        for (const m of this.marbles) this.step(m, h);
+        this.marbleCollisions();
+      }
+      for (const m of this.marbles) {
+        m.flash = Math.max(0, m.flash - dt * 3);
+        m.rot += (m.vx / m.r) * dt * 0.5;
+        m.trail.push(m.x, m.y);
+        if (m.trail.length > 20) m.trail.splice(0, 2);
+        if (m.finished) continue;
+        // nudge anyone who gets stuck on a ledge
+        if (Math.hypot(m.vx, m.vy) < 25) m.slow += dt;
+        else m.slow = 0;
+        if (m.slow > 1) {
+          m.vx += this.rng.sign() * this.rng.range(250, 420);
+          m.vy -= 320;
+          m.slow = 0;
+        }
+        if (m.y > this.finishY) {
+          m.finished = true;
+          this.places.push(m);
+          m.place = this.places.length;
+          g.fx.burst(m.x, m.y, this.teams[m.team].color, 30, 380, 11);
+          if (m.place === 1) {
+            g.audio.ding();
+            this.winner = { team: this.teams[m.team], text: `${this.teams[m.team].name.toUpperCase()} WINS!`, sub: `finished in ${this.time.toFixed(1)}s` };
+            this.winnerEnt = m;
+          } else {
+            g.audio.pickup();
+            g.fx.text(m.x, m.y - 40, ordinal(m.place), '#ffffff', 40);
+          }
+        }
+      }
+
+      const order = this.marbles.slice().sort((a, b) => (a.finished || b.finished ? (a.finished ? (b.finished ? a.place - b.place : -1) : 1) : b.y - a.y));
+      this.order = order;
+      const lead = order[0];
+      if (lead.team !== this.leader && this.leader !== -1 && this.time > 2 && !this.winner && this.time - (this.leadTold || 0) > 2.5) {
+        this.leadTold = this.time;
+        g.fx.text(lead.x, lead.y - 50, 'NEW LEADER', this.teams[lead.team].color, 34);
+        g.audio.whoosh();
+      }
+      this.leader = lead.team;
+      // follow the front runner that is still falling
+      const f = order.find((m) => !m.finished) || lead;
+      g.cam.setDefault(SQ.clamp(f.x, 400, 600), f.y + 110, 1.2);
+
+      if (!this.winner && this.time >= this.duration) {
+        this.winner = { team: this.teams[lead.team], text: `${this.teams[lead.team].name.toUpperCase()} WINS!`, sub: 'time up: furthest down' };
+        this.winnerEnt = lead;
+      }
+    }
+
+    step(m, dt) {
+      const g = this.g;
+      m.vy += GRAV * dt;
+      m.vx *= 1 - 0.15 * dt;
+      const sp = Math.hypot(m.vx, m.vy);
+      if (sp > 820) (m.vx *= 820 / sp), (m.vy *= 820 / sp);
+      m.x += m.vx * dt;
+      m.y += m.vy * dt;
+      if (m.y < m.r) (m.y = m.r), (m.vy = Math.abs(m.vy));
+      for (const s of this.segs) {
+        if (Math.max(s.y1, s.y2) + 40 < m.y - m.r || Math.min(s.y1, s.y2) - 40 > m.y + m.r) continue;
+        this.hitSeg(m, s.x1, s.y1, s.x2, s.y2, s.r, 0, 0, 0, 0.35);
+      }
+      for (const sp2 of this.spinners) {
+        if (Math.abs(sp2.y - m.y) > sp2.len) continue;
+        const ca = Math.cos(sp2.a) * (sp2.len / 2);
+        const sa = Math.sin(sp2.a) * (sp2.len / 2);
+        if (this.hitSeg(m, sp2.x - ca, sp2.y - sa, sp2.x + ca, sp2.y + sa, sp2.r, sp2.w, sp2.x, sp2.y, 0.5)) g.audio.bonk();
+      }
+      for (const p of this.pegs) {
+        if (Math.abs(p.y - m.y) > 40) continue;
+        const vn = this.hitCircle(m, p, 0.5, 0);
+        if (vn > 140) {
+          p.flash = 1;
+          g.audio.melodyHit((p.x - 500) / 600, vn < 400);
+        }
+      }
+      for (const b of this.bumpers) {
+        if (Math.abs(b.y - m.y) > 60) continue;
+        const vn = this.hitCircle(m, b, 0.9, 420);
+        if (vn > 0) {
+          b.flash = 1;
+          m.flash = 0.6;
+          g.audio.pop(4, (b.x - 500) / 600);
+          g.fx.ring(b.x, b.y, this.teams[m.team].color, b.r * 1.3);
+        }
+      }
+    }
+
+    // circle vs segment (optionally spinning around cx, cy at w rad/s)
+    hitSeg(m, x1, y1, x2, y2, rad, w, cx, cy, e) {
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const l2 = dx * dx + dy * dy || 1;
+      const t = SQ.clamp(((m.x - x1) * dx + (m.y - y1) * dy) / l2, 0, 1);
+      const px = x1 + dx * t;
+      const py = y1 + dy * t;
+      let nx = m.x - px;
+      let ny = m.y - py;
+      const d = Math.hypot(nx, ny);
+      const lim = m.r + rad;
+      if (d >= lim || d === 0) return false;
+      nx /= d;
+      ny /= d;
+      m.x = px + nx * lim;
+      m.y = py + ny * lim;
+      // surface velocity of a spinning bar
+      const svx = w ? -w * (py - cy) : 0;
+      const svy = w ? w * (px - cx) : 0;
+      const rvx = m.vx - svx;
+      const rvy = m.vy - svy;
+      const vn = rvx * nx + rvy * ny;
+      if (vn < 0) {
+        m.vx = rvx - (1 + e) * vn * nx + svx;
+        m.vy = rvy - (1 + e) * vn * ny + svy;
+        m.vx *= 0.995;
+      }
+      return -vn > 200;
+    }
+
+    hitCircle(m, c, e, kick) {
+      let nx = m.x - c.x;
+      let ny = m.y - c.y;
+      const d = Math.hypot(nx, ny);
+      const lim = m.r + c.r;
+      if (d >= lim || d === 0) return 0;
+      nx /= d;
+      ny /= d;
+      m.x = c.x + nx * lim;
+      m.y = c.y + ny * lim;
+      const vn = m.vx * nx + m.vy * ny;
+      if (vn < 0) {
+        m.vx -= (1 + e) * vn * nx;
+        m.vy -= (1 + e) * vn * ny;
+      }
+      if (kick) {
+        m.vx += nx * kick;
+        m.vy += ny * kick;
+      }
+      return Math.max(-vn, kick ? 1 : 0);
+    }
+
+    marbleCollisions() {
+      const M = this.marbles;
+      for (let i = 0; i < M.length; i++)
+        for (let j = i + 1; j < M.length; j++) {
+          const a = M[i];
+          const b = M[j];
+          let nx = b.x - a.x;
+          let ny = b.y - a.y;
+          const d = Math.hypot(nx, ny);
+          const lim = a.r + b.r;
+          if (d >= lim || d === 0) continue;
+          nx /= d;
+          ny /= d;
+          const push = (lim - d) / 2;
+          a.x -= nx * push;
+          a.y -= ny * push;
+          b.x += nx * push;
+          b.y += ny * push;
+          const rel = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+          if (rel < 0) {
+            const j2 = -rel * 0.9;
+            a.vx -= j2 * nx;
+            a.vy -= j2 * ny;
+            b.vx += j2 * nx;
+            b.vy += j2 * ny;
+            if (-rel > 250) this.g.audio.bonk();
+          }
+        }
+    }
+
+    intensity() {
+      if (this.winner) return 1;
+      const lead = this.order ? this.order[0] : null;
+      if (lead && lead.y > this.finishY - SEC_H * 1.2) return 1;
+      return this.time < 5 ? 0.5 : 0.7;
+    }
+
+    // ---------- drawing ----------
+    draw(ctx) {
+      const v = this.g.cam.view();
+      const top = v.top - 60;
+      const bot = v.bottom + 60;
+      // background bands, one tint per section
+      const tints = ['#1c2233', '#221c33', '#1c2b2a', '#2b221c', '#1f1c2b', '#2b1c26'];
+      for (let y = Math.floor(top / SEC_H) * SEC_H; y < bot; y += SEC_H) {
+        const idx = Math.max(0, Math.floor((y - this.top) / SEC_H));
+        ctx.fillStyle = y < this.top ? '#1a1d2a' : tints[idx % tints.length];
+        ctx.fillRect(0, y, 1000, SEC_H + 1);
+      }
+      ctx.fillStyle = 'rgba(255,255,255,0.03)';
+      for (let y = Math.floor(top / 100) * 100; y < bot; y += 100) ctx.fillRect(0, y, 1000, 2);
+      // finish band
+      if (this.finishY > top && this.finishY - 60 < bot) {
+        const k = 25;
+        for (let i = 0; i < 1000 / k; i++)
+          for (let j = 0; j < 2; j++) {
+            ctx.fillStyle = (i + j) % 2 ? '#111' : '#fff';
+            ctx.fillRect(i * k, this.finishY - 50 + j * k, k, k);
+          }
+        SQ.outlinedText(ctx, 'FINISH', 500, this.finishY + 80, 64, '#ffd23f', { stroke: 12 });
+      }
+      // walls
+      ctx.lineCap = 'round';
+      for (const s of this.segs) {
+        if (Math.max(s.y1, s.y2) < top || Math.min(s.y1, s.y2) > bot) continue;
+        ctx.strokeStyle = '#0d0f16';
+        ctx.lineWidth = s.r * 2 + 6;
+        ctx.beginPath();
+        ctx.moveTo(s.x1, s.y1);
+        ctx.lineTo(s.x2, s.y2);
+        ctx.stroke();
+        ctx.strokeStyle = '#8f9bb8';
+        ctx.lineWidth = s.r * 2;
+        ctx.stroke();
+      }
+      for (const sp of this.spinners) {
+        if (sp.y < top - sp.len || sp.y > bot + sp.len) continue;
+        const ca = Math.cos(sp.a) * (sp.len / 2);
+        const sa = Math.sin(sp.a) * (sp.len / 2);
+        ctx.strokeStyle = '#0d0f16';
+        ctx.lineWidth = sp.r * 2 + 6;
+        ctx.beginPath();
+        ctx.moveTo(sp.x - ca, sp.y - sa);
+        ctx.lineTo(sp.x + ca, sp.y + sa);
+        ctx.stroke();
+        ctx.strokeStyle = '#ffd23f';
+        ctx.lineWidth = sp.r * 2;
+        ctx.stroke();
+        ctx.fillStyle = '#0d0f16';
+        ctx.beginPath();
+        ctx.arc(sp.x, sp.y, 10, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      for (const p of this.pegs) {
+        if (p.y < top || p.y > bot) continue;
+        ctx.fillStyle = 'rgba(0,0,0,0.35)';
+        ctx.beginPath();
+        ctx.arc(p.x + 2, p.y + 4, p.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = p.flash > 0 ? SQ.mixWhite('#1fd6f0', p.flash) : '#e8ecf5';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * (1 + p.flash * 0.3), 0, Math.PI * 2);
+        ctx.fill();
+      }
+      for (const b of this.bumpers) {
+        if (b.y < top - 50 || b.y > bot + 50) continue;
+        const rr = b.r * (1 + b.flash * 0.25);
+        ctx.fillStyle = '#0d0f16';
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, rr + 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = b.flash > 0 ? '#ffffff' : '#ff4d8d';
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, rr, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ffd6e6';
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, rr * 0.45, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      for (const m of this.marbles) {
+        const t = this.teams[m.team];
+        if (m.trail.length > 4) {
+          ctx.strokeStyle = SQ.rgba(t.color, 0.35);
+          ctx.lineWidth = m.r * 1.2;
+          ctx.beginPath();
+          ctx.moveTo(m.trail[0], m.trail[1]);
+          for (let i = 2; i < m.trail.length; i += 2) ctx.lineTo(m.trail[i], m.trail[i + 1]);
+          ctx.stroke();
+        }
+        const sp = Math.hypot(m.vx, m.vy) || 1;
+        SQ.drawSquare(ctx, m.x, m.y, m.r * 2, t, { angle: m.rot, lookX: m.vx / sp, lookY: m.vy / sp, flash: m.flash, mood: m.finished ? 'happy' : sp > 900 ? 'scared' : 'normal' });
+      }
+    }
+
+    drawHud(ctx, y) {
+      const order = this.order || this.marbles;
+      const n = order.length;
+      const gap = 10;
+      const w = (SQ.W - 120 - (n - 1) * gap) / n;
+      order.forEach((m, i) => {
+        const tm = this.teams[m.team];
+        const x = 60 + i * (w + gap);
+        ctx.fillStyle = tm.color;
+        SQ.roundRect(ctx, x, y, w, 80, 12);
+        ctx.fill();
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = '#0b0b10';
+        ctx.stroke();
+        SQ.outlinedText(ctx, m.finished ? ordinal(m.place) : `#${i + 1}`, x + w / 2, y + 40, Math.min(32, w * 0.35), '#ffffff', { stroke: 7 });
+      });
+      // progress track: where everyone is on the way down
+      const ty = y + 130;
+      ctx.fillStyle = 'rgba(255,255,255,0.12)';
+      ctx.fillRect(60, ty - 4, SQ.W - 120, 8);
+      SQ.drawEmoji(ctx, '🏁', SQ.W - 60, ty - 2, 34);
+      for (const m of this.marbles) {
+        const k = SQ.clamp((m.y - 120) / (this.finishY - 120), 0, 1);
+        const t = this.teams[m.team];
+        ctx.fillStyle = t.color;
+        ctx.strokeStyle = '#0b0b10';
+        ctx.lineWidth = 3;
+        SQ.roundRect(ctx, 60 + k * (SQ.W - 150) - 12, ty - 12, 24, 24, 5);
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+  }
+
+  function ordinal(n) {
+    return ['', '1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'][n] || `${n}th`;
+  }
+
+  SQ.modes.marble = { id: 'marble', name: 'Marble Race', create: (g, rng, opts) => new Marble(g, rng, opts) };
+})();
+
+</script>
+<script>/* js/modes/hill.js */
+// King of the Hill: hold the zone alone to score. Squares shove each other out of it.
+(function () {
+  const SQ = window.SQ;
+
+  class Hill {
+    constructor(g, rng, opts) {
+      opts = opts || {};
+      this.g = g;
+      this.rng = rng;
+      this.teams = opts.teams || SQ.pickTeams(rng, rng.int(4, 6));
+      this.target = opts.quick ? 6 : 8;
+      this.title = 'KING OF THE HILL';
+      this.rules = [
+        [{ t: 'Closest to the ', c: '#ffffff' }, { t: 'center', c: '#ffd23f' }, { t: ' scores', c: '#ffffff' }],
+        [{ t: `First to ${this.target} points wins`, c: '#ffffff' }],
+      ];
+      const n = this.teams.length;
+      this.sq = this.teams.map((t, i) => {
+        const a = (i / n) * Math.PI * 2 + rng.range(0, 0.4);
+        return {
+          team: i,
+          x: 500 + Math.cos(a) * 380,
+          y: 500 + Math.sin(a) * 380,
+          vx: 0,
+          vy: 0,
+          size: 58,
+          score: 0,
+          dashT: rng.range(0.2, 0.9),
+          squash: 0,
+          flash: 0,
+          blink: rng.range(1, 4),
+          crowned: 0,
+        };
+      });
+      this.zone = { x: 500, y: 500, half: 150 };
+      this.nextZone = null;
+      this.moveT = rng.range(11, 14);
+      this.waveT = rng.range(14, 20);
+      this.wave = null;
+      this.king = -1;
+      this.time = 0;
+      this.duration = opts.quick ? 40 : 60;
+      this.winner = null;
+      this.cool = {};
+    }
+
+    inZone(s, z) {
+      z = z || this.zone;
+      return Math.abs(s.x - z.x) < z.half && Math.abs(s.y - z.y) < z.half;
+    }
+
+    update(dt) {
+      const g = this.g;
+      const rng = this.rng;
+      this.time += dt;
+      const Z = this.zone;
+
+      // the zone moves now and then; its next spot shows up a few seconds early
+      this.moveT -= dt;
+      if (this.moveT < 3 && !this.nextZone) {
+        let x;
+        let y;
+        do {
+          x = rng.range(220, 780);
+          y = rng.range(220, 780);
+        } while (Math.hypot(x - Z.x, y - Z.y) < 280);
+        this.nextZone = { x, y, half: Z.half };
+        g.fx.text(x, y, 'ZONE MOVING', '#ffd23f', 42);
+        g.audio.whoosh();
+      }
+      if (this.moveT <= 0 && this.nextZone) {
+        Object.assign(Z, this.nextZone);
+        this.nextZone = null;
+        this.moveT = rng.range(11, 15);
+        g.fx.ring(Z.x, Z.y, '#ffd23f', Z.half * 1.4);
+        g.audio.ding();
+      }
+      // shockwave from the zone pushes everyone out
+      this.waveT -= dt;
+      if (this.waveT <= 0) {
+        this.waveT = rng.range(14, 20);
+        this.wave = { t: 0 };
+        g.fx.banner('SHOCKWAVE!', 'everyone gets blasted out', '#1fd6f0', 1.2);
+        g.audio.boom();
+        g.hitstop(0.06);
+        for (const s of this.sq) {
+          const dx = s.x - Z.x;
+          const dy = s.y - Z.y;
+          const d = Math.hypot(dx, dy) || 1;
+          s.vx += (dx / d) * 1100;
+          s.vy += (dy / d) * 1100;
+          s.squash = 0.3;
+        }
+      }
+      if (this.wave) {
+        this.wave.t += dt;
+        if (this.wave.t > 0.6) this.wave = null;
+      }
+
+      for (const s of this.sq) {
+        s.squash *= Math.exp(-dt * 9);
+        s.flash = Math.max(0, s.flash - dt * 3);
+        s.blink -= dt;
+        if (s.blink < -0.12) s.blink = rng.range(2, 5);
+        s.dashT -= dt;
+        s.stun = (s.stun || 0) - dt;
+        if (s.dashT <= 0 && s.stun <= 0) {
+          // dash toward the zone, or charge a rival who is standing in it
+          const inside = this.inZone(s);
+          const rivals = this.sq.filter((o) => o !== s && this.inZone(o));
+          let tx = Z.x + rng.range(-60, 60);
+          let ty = Z.y + rng.range(-60, 60);
+          if (rivals.length && rng.chance(inside ? 0.8 : 0.5)) {
+            const o = rivals.sort((a, b) => SQ.dist2(a.x, a.y, s.x, s.y) - SQ.dist2(b.x, b.y, s.x, s.y))[0];
+            tx = o.x;
+            ty = o.y;
+            s.charging = 0.5;
+          }
+          const dx = tx - s.x;
+          const dy = ty - s.y;
+          const d = Math.hypot(dx, dy) || 1;
+          const power = inside && !rivals.length ? 250 : rng.range(560, 760);
+          s.vx += (dx / d) * power;
+          s.vy += (dy / d) * power;
+          s.dashT = inside ? rng.range(0.5, 1) : rng.range(0.6, 1.3);
+        }
+        s.charging = (s.charging || 0) - dt;
+        const fr = Math.exp(-dt * 1.8);
+        s.vx *= fr;
+        s.vy *= fr;
+        const sp = Math.hypot(s.vx, s.vy);
+        if (sp > 1300) (s.vx *= 1300 / sp), (s.vy *= 1300 / sp);
+        s.x += s.vx * dt;
+        s.y += s.vy * dt;
+        const h = s.size / 2;
+        if (s.x < h) (s.x = h), (s.vx = Math.abs(s.vx) * 0.8), (s.squash = 0.2), g.audio.melodyHit(-0.8, true);
+        if (s.x > 1000 - h) (s.x = 1000 - h), (s.vx = -Math.abs(s.vx) * 0.8), (s.squash = 0.2), g.audio.melodyHit(0.8, true);
+        if (s.y < h) (s.y = h), (s.vy = Math.abs(s.vy) * 0.8), (s.squash = -0.2), g.audio.melodyHit(0, true);
+        if (s.y > 1000 - h) (s.y = 1000 - h), (s.vy = -Math.abs(s.vy) * 0.8), (s.squash = -0.2), g.audio.melodyHit(0, true);
+      }
+
+      // shoves
+      const S = this.sq;
+      for (let i = 0; i < S.length; i++)
+        for (let j = i + 1; j < S.length; j++) {
+          const a = S[i];
+          const b = S[j];
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const lim = (a.size + b.size) / 2;
+          if (Math.abs(dx) >= lim || Math.abs(dy) >= lim) continue;
+          const d = Math.hypot(dx, dy) || 1;
+          const nx = dx / d;
+          const ny = dy / d;
+          const push = (lim - Math.max(Math.abs(dx), Math.abs(dy))) / 2 + 0.5;
+          a.x -= nx * push;
+          a.y -= ny * push;
+          b.x += nx * push;
+          b.y += ny * push;
+          const rel = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+          if (rel < 0) {
+            const k = -rel * 1.2;
+            a.vx -= k * nx;
+            a.vy -= k * ny;
+            b.vx += k * nx;
+            b.vy += k * ny;
+            a.squash = b.squash = 0.25;
+            const key = i + '-' + j;
+            if (-rel > 300 && (this.cool[key] || 0) < this.time) {
+              this.cool[key] = this.time + 0.25;
+              g.audio.hit(-rel > 700);
+              g.fx.sparks((a.x + b.x) / 2, (a.y + b.y) / 2, 10, '#ffffff');
+              g.cam.shake(-rel > 700 ? 6 : 3);
+              const victim = Math.hypot(a.vx, a.vy) > Math.hypot(b.vx, b.vy) ? a : b;
+              if (-rel > 550) victim.stun = 0.9;
+              if (-rel > 800) {
+                g.hitstop(0.05);
+                g.fx.text(victim.x, victim.y - 50, 'YEET', '#ffd23f', 40);
+                g.fx.maybeSay(victim, 'elim', 0.25);
+              }
+            }
+          }
+        }
+      for (const s of S) {
+        const h = s.size / 2;
+        s.x = SQ.clamp(s.x, h, 1000 - h);
+        s.y = SQ.clamp(s.y, h, 1000 - h);
+      }
+
+      // scoring
+      const inside = S.filter((s) => this.inZone(s));
+      this.contested = inside.length > 1;
+      // whoever is closest to the middle holds the hill; full speed when alone
+      const king = inside.slice().sort((a, b) => SQ.dist2(a.x, a.y, Z.x, Z.y) - SQ.dist2(b.x, b.y, Z.x, Z.y))[0] || null;
+      if (king) king.score += dt * (this.contested ? 0.6 : 1);
+      for (const s of S) s.crowned = Math.max(0, s.crowned - dt * 3);
+      if (king) king.crowned = 1;
+      const kt = king ? king.team : -1;
+      if (kt !== this.king) {
+        if (king && this.time > 1) {
+          g.fx.text(king.x, king.y - 60, 'NEW KING', this.teams[kt].color, 38);
+          g.audio.pickup();
+        }
+        this.king = kt;
+      }
+      // points tick up with a pluck
+      for (const s of S) {
+        const whole = Math.floor(s.score);
+        if (whole > (s.lastWhole || 0)) {
+          s.lastWhole = whole;
+          g.audio.pop(Math.min(9, whole), (s.x - 500) / 600);
+          if (whole === this.target - 2) g.fx.text(s.x, s.y - 60, 'MATCH POINT', '#ff4d5e', 36);
+        }
+      }
+
+      if (!this.winner) {
+        const best = S.slice().sort((a, b) => b.score - a.score)[0];
+        if (best.score >= this.target || this.time >= this.duration) {
+          this.winner = { team: this.teams[best.team], text: `${this.teams[best.team].name.toUpperCase()} WINS!`, sub: `${best.score.toFixed(1)} points on the hill` };
+          this.winnerEnt = best;
+        }
+      }
+    }
+
+    intensity() {
+      const top = Math.max(...this.sq.map((s) => s.score));
+      return top > this.target * 0.7 ? 1 : this.contested ? 0.8 : 0.6;
+    }
+
+    draw(ctx) {
+      ctx.fillStyle = '#20242f';
+      ctx.fillRect(0, 0, 1000, 1000);
+      ctx.fillStyle = '#262b38';
+      for (let r = 0; r < 20; r++) for (let c = 0; c < 20; c++) if ((r + c) % 2) ctx.fillRect(c * 50, r * 50, 50, 50);
+      const Z = this.zone;
+      const kingT = this.king >= 0 ? this.teams[this.king] : null;
+      const col = kingT ? kingT.color : this.contested ? '#ffffff' : '#ffd23f';
+      const pulse = 0.5 + 0.5 * Math.sin(this.time * 5);
+      ctx.fillStyle = SQ.rgba(col, 0.16 + 0.08 * pulse);
+      ctx.fillRect(Z.x - Z.half, Z.y - Z.half, Z.half * 2, Z.half * 2);
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 8;
+      ctx.setLineDash(this.contested ? [24, 16] : []);
+      ctx.lineDashOffset = -this.time * 60;
+      ctx.strokeRect(Z.x - Z.half, Z.y - Z.half, Z.half * 2, Z.half * 2);
+      ctx.setLineDash([]);
+      if (!kingT) SQ.drawEmoji(ctx, '👑', Z.x, Z.y, 70);
+      if (this.contested) SQ.outlinedText(ctx, 'CONTESTED', Z.x, Z.y - Z.half - 30, 34, '#ffffff', { stroke: 7 });
+      if (this.nextZone) {
+        const N = this.nextZone;
+        const blink = Math.floor(this.time * 6) % 2;
+        ctx.strokeStyle = blink ? 'rgba(255,210,63,0.9)' : 'rgba(255,210,63,0.35)';
+        ctx.lineWidth = 5;
+        ctx.setLineDash([16, 12]);
+        ctx.strokeRect(N.x - N.half, N.y - N.half, N.half * 2, N.half * 2);
+        ctx.setLineDash([]);
+        SQ.outlinedText(ctx, String(Math.max(1, Math.ceil(this.moveT))), N.x, N.y, 80, '#ffd23f', { stroke: 12 });
+      }
+      if (this.wave) {
+        const k = this.wave.t / 0.6;
+        ctx.strokeStyle = `rgba(31,214,240,${1 - k})`;
+        ctx.lineWidth = 18 * (1 - k);
+        const r = Z.half + k * 600;
+        ctx.strokeRect(Z.x - r, Z.y - r, r * 2, r * 2);
+      }
+      for (const s of this.sq) {
+        const t = this.teams[s.team];
+        const sp = Math.hypot(s.vx, s.vy) || 1;
+        SQ.drawSquare(ctx, s.x, s.y, s.size, t, {
+          lookX: s.vx / sp,
+          lookY: s.vy / sp,
+          squash: s.squash,
+          blink: s.blink < 0,
+          mood: s.stun > 0 ? 'dead' : s.charging > 0 ? 'angry' : s.crowned > 0 ? 'happy' : 'normal',
+          angle: s.stun > 0 ? Math.sin(this.time * 20) * 0.25 : 0,
+          glow: s.crowned > 0 ? 20 : 0,
+          glowColor: '#ffd23f',
+        });
+        if (s.crowned > 0) SQ.drawEmoji(ctx, '👑', s.x, s.y - s.size / 2 - 16 - Math.abs(Math.sin(this.time * 6)) * 6, 40);
+      }
+    }
+
+    drawHud(ctx, y) {
+      const S = this.sq;
+      const n = S.length;
+      const cols = n > 3 ? 2 : 1;
+      const rows = Math.ceil(n / cols);
+      const colW = (SQ.W - 120 - (cols - 1) * 30) / cols;
+      const rowH = Math.min(60, 230 / rows);
+      S.forEach((s, i) => {
+        const t = this.teams[s.team];
+        const cx = 60 + (i % cols) * (colW + 30);
+        const cy = y + Math.floor(i / cols) * rowH;
+        ctx.fillStyle = t.color;
+        SQ.roundRect(ctx, cx, cy, 34, 34, 7);
+        ctx.fill();
+        const bw = colW - 48 - 60;
+        ctx.fillStyle = 'rgba(255,255,255,0.1)';
+        ctx.fillRect(cx + 48, cy + 8, bw, 18);
+        ctx.fillStyle = t.color;
+        ctx.fillRect(cx + 48, cy + 8, bw * Math.min(1, s.score / this.target), 18);
+        SQ.outlinedText(ctx, String(Math.floor(s.score)), cx + 48 + bw + 32, cy + 18, 28, '#ffffff', { stroke: 6 });
+        if (s.crowned > 0) SQ.drawEmoji(ctx, '👑', cx + 17, cy - 4, 22);
+      });
+    }
+  }
+
+  SQ.modes.hill = { id: 'hill', name: 'King of the Hill', create: (g, rng, opts) => new Hill(g, rng, opts) };
 })();
 
 </script>
@@ -5054,7 +5873,9 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
 // drives the camera and slow motion, and draws the frame that gets recorded.
 (function () {
   const SQ = window.SQ;
-  const MODE_IDS = ['chase', 'territory', 'domain', 'race', 'brawl', 'bounce'];
+  // modes that work as 1v1 matches in a tournament
+  const TOUR_MODES = ['territory', 'domain', 'race', 'brawl', 'bounce', 'marble', 'hill'];
+  const MODE_IDS = ['chase', 'territory', 'domain', 'race', 'brawl', 'bounce', 'marble', 'hill'];
 
   class Recorder {
     get supported() {
@@ -5155,21 +5976,29 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       const seed = SQ.randomSeed();
       this.mode = SQ.modes.chase.create(this, SQ.makeRng(seed));
       this.modeInfo = SQ.modes.chase;
+      this.cam.worldH = SQ.WORLD;
       this.phase = 'idle';
     }
 
-    newMatch(seed) {
+    // o: { tour, mode, teams } when the match is part of a tournament
+    newMatch(seed, o) {
+      o = o || {};
       this.audio.init();
-      this.episode++;
-      this.seed = seed != null ? seed >>> 0 : SQ.randomSeed();
-      const rng = SQ.makeRng(this.seed);
-      let id = this.opts.mode;
-      if (id === 'random') id = MODE_IDS[Math.floor(rng() * MODE_IDS.length)];
+      if (!o.tour) {
+        this.tour = null;
+        this.episode++;
+        this.seed = seed != null ? seed >>> 0 : SQ.randomSeed();
+      }
+      const mseed = o.tour ? seed >>> 0 : this.seed;
+      const rng = SQ.makeRng(mseed);
+      let id = o.mode || this.opts.mode;
+      if (id === 'random' || !SQ.modes[id]) id = MODE_IDS[Math.floor(rng() * MODE_IDS.length)];
       this.modeInfo = SQ.modes[id];
-      this.mode = this.modeInfo.create(this, SQ.makeRng(this.seed ^ 0x9e3779b9));
+      this.mode = this.modeInfo.create(this, SQ.makeRng(mseed ^ 0x9e3779b9), o.teams ? { teams: o.teams, quick: true } : undefined);
       this.fx.clear();
       this.cam.reset();
       this.cam.tracking = !!this.mode.camTracking;
+      this.cam.worldH = this.mode.worldH || SQ.WORLD;
       const start = this.mode.focusStart ? this.mode.focusStart() : { x: rng.range(250, 750), y: rng.range(250, 750) };
       this.cam.focus(start.x, start.y, 2.8, 0);
       this.cam.snap();
@@ -5178,12 +6007,19 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       this.slowT = 0;
       this.acc = 0;
       this.setPhase('intro');
-      this.track = this.audio.pickTrack(this.opts.music);
-      this.audio.intensity = 0.12;
-      this.audio.playTrack(this.track);
+      // a tournament keeps one song going across its matches
+      if (!o.tour || !this.audio.playing) {
+        this.track = this.audio.pickTrack(this.opts.music);
+        this.audio.intensity = 0.12;
+        this.audio.playTrack(this.track);
+        this.trackToast = 4;
+      }
       this.audio.riser(2.6);
       this.audio.whoosh();
-      this.trackToast = 4;
+      if (o.tour) {
+        this.emit('match', { mode: this.modeInfo, seed: this.seed, track: this.track, tour: true });
+        return;
+      }
       this.video = null;
       this.setQuality(this.opts.quality);
       if (this.opts.record && this.recorder.supported) {
@@ -5290,10 +6126,15 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
           const list = SQ.MEMES.winner;
           this.winnerCaption = list[Math.floor(Math.random() * list.length)];
         }
-        if (this.phaseT > 5.4) this.audio.stopMusic(1.2);
-        if (this.phaseT > 6.2) this.finish();
+        if (this.phaseT > 5.4 && !this.tour) this.audio.stopMusic(1.2);
+        if (this.phaseT > (this.tour ? 4 : 6.2)) this.finish();
       }
-      if (P === 'intro' || P === 'countdown') simulate = false;
+      if (P === 'bracket' && this.phaseT > 4.4) {
+        const nx = this.tour.next;
+        this.newMatch(nx.seed, { tour: true, mode: nx.id, teams: nx.pair });
+      }
+      if (P === 'champion' && this.phaseT > 7) this.finishTour();
+      if (P === 'intro' || P === 'countdown' || P === 'bracket' || P === 'champion' || P === 'between') simulate = false;
       if (P !== 'outro') this.memeDone = false;
 
       if (this.hitstopT > 0) {
@@ -5325,7 +6166,98 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       if (this.trackToast > 0) this.trackToast -= realDt;
     }
 
+    // ---------------- tournament ----------------
+    newTournament(seed) {
+      this.audio.init();
+      this.episode++;
+      this.seed = seed != null ? seed >>> 0 : SQ.randomSeed();
+      const rng = SQ.makeRng(this.seed);
+      this.tour = { seed: this.seed, rng, rounds: [rng.shuffle(SQ.TEAMS)], results: [[], [], []], round: 0, match: 0, part: 0, lastMode: null, champion: null, lastResult: null };
+      this.videos = [];
+      this.video = null;
+      this.setQuality(this.opts.quality);
+      this.fx.clear();
+      this.cam.reset();
+      this.cam.worldH = SQ.WORLD;
+      this.track = this.audio.pickTrack(this.opts.music);
+      this.audio.intensity = 0.35;
+      this.audio.playTrack(this.track);
+      this.trackToast = 4;
+      this.emit('match', { tour: true, seed: this.seed, track: this.track });
+      this.enterBracket();
+    }
+
+    roundName(n) {
+      return n === 8 ? 'QUARTERFINAL' : n === 4 ? 'SEMIFINAL' : n === 2 ? 'FINAL' : 'CHAMPION';
+    }
+
+    enterBracket() {
+      const t = this.tour;
+      const list = t.rounds[t.round];
+      const pair = [list[t.match * 2], list[t.match * 2 + 1]];
+      let id;
+      do id = t.rng.pick(TOUR_MODES);
+      while (id === t.lastMode);
+      t.lastMode = id;
+      t.next = { pair, id, seed: t.rng.int(1, 1e9) };
+      t.part++;
+      this.stage = list.length === 2 ? 'FINAL' : `${this.roundName(list.length)} ${t.match + 1}`;
+      this.fx.clear();
+      this.setPhase('bracket');
+      this.audio.whoosh();
+      this.audio.intensity = 0.35;
+      // each match is saved as its own part, which suits a multi-part series of reels
+      if (this.opts.record && this.recorder.supported && !this.recorder.active) {
+        this.recorder.start(this.canvas, this.audio.streamDest && this.audio.streamDest.stream, 30, SQ.RES === 1 ? 9_000_000 : 5_000_000);
+      }
+    }
+
+    async finishTourMatch() {
+      const t = this.tour;
+      const w = this.mode.winner.team;
+      t.results[t.round][t.match] = w;
+      t.lastResult = { r: t.round, i: t.match };
+      t.match++;
+      if (t.match * 2 >= t.rounds[t.round].length) {
+        t.rounds.push(t.results[t.round].slice());
+        t.round++;
+        t.match = 0;
+      }
+      if (t.rounds[t.round].length === 1) {
+        t.champion = t.rounds[t.round][0];
+        this.stage = 'CHAMPION';
+        this.fx.clear();
+        this.setPhase('champion');
+        this.audio.fanfare();
+        this.audio.intensity = 1;
+        this.fx.confettiBurst([t.champion.color, t.champion.light, '#ffd23f', '#ffffff'], 260);
+        return;
+      }
+      this.setPhase('between');
+      await this.savePart();
+      this.enterBracket();
+    }
+
+    async savePart() {
+      if (!this.recorder.active) return;
+      const blob = await this.recorder.stop();
+      if (!blob || !blob.size) return;
+      const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
+      const v = { blob, ext, part: this.tour.part, name: `squares-trinity-cup-${this.tour.seed}-part${this.tour.part}.${ext}` };
+      this.videos.push(v);
+      this.emit('part', v);
+    }
+
+    async finishTour() {
+      this.setPhase('done');
+      this.audio.stopMusic(1.5);
+      await this.savePart();
+      const c = this.tour.champion;
+      this.emit('done', { winner: { team: c, text: `${c.name.toUpperCase()} IS THE CHAMPION` }, video: null, tour: true });
+    }
+
     async finish() {
+      if (this.tour) return this.finishTourMatch();
       this.setPhase('done');
       if (this.recorder.active) {
         const blob = await this.recorder.stop();
@@ -5349,6 +6281,12 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       const m = this.mode;
       ctx.setTransform(SQ.RES, 0, 0, SQ.RES, 0, 0);
       this.drawBackdrop(ctx);
+      if (this.tour && (this.phase === 'bracket' || this.phase === 'champion' || (this.phase === 'done' && this.tour.champion))) {
+        this.drawBracket(ctx);
+        this.fx.drawScreen(ctx);
+        this.drawFooter(ctx);
+        return;
+      }
       this.drawHeader(ctx);
 
       // arena frame with a soft halo
@@ -5401,7 +6339,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     drawHeader(ctx) {
       // The header only changes when the rules change, so outside the intro it is cached.
       if (this.phase === 'intro') return this.drawHeaderLive(ctx);
-      const key = this.phase + '|' + this.episode + '|' + this.mode.title + '|' + JSON.stringify(this.mode.rules);
+      const key = this.phase + '|' + (this.tour ? this.stage : '') + '|' + this.episode + '|' + this.mode.title + '|' + JSON.stringify(this.mode.rules);
       if (!this.headerCache || this.headerCache.key !== key) {
         const c = document.createElement('canvas');
         c.width = Math.round(SQ.W * SQ.RES);
@@ -5423,7 +6361,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillStyle = 'rgba(255,255,255,0.55)';
-      const tag = this.phase === 'idle' ? 'SQUARES TRINITY' : `SQUARES TRINITY  ·  EP ${this.episode}  ·  ${m.title}`;
+      const tag = this.phase === 'idle' ? 'SQUARES TRINITY' : this.tour ? `TRINITY CUP  ·  ${this.stage}  ·  ${m.title}` : `SQUARES TRINITY  ·  EP ${this.episode}  ·  ${m.title}`;
       ctx.fillText(spaced(tag), SQ.W / 2, 66, SQ.W - 120);
       // tri-color strip
       const sw = 60;
@@ -5552,6 +6490,120 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       SQ.outlinedText(ctx, w.text, SQ.W / 2, A.y + 620, 96, w.team.color, { stroke: 16 });
       SQ.outlinedText(ctx, 'Follow for the next episode', SQ.W / 2, A.y + 720, 40, '#ffffff', { stroke: 8, font: SQ.fontBody, weight: 700 });
       ctx.restore();
+    }
+
+    // The cup bracket: quarterfinals, semis, final and the champion, in four columns.
+    drawBracket(ctx) {
+      const t = this.tour;
+      const T = this.phaseT;
+      const W = SQ.W;
+      const champ = this.phase !== 'bracket';
+      ctx.save();
+      if (champ) ctx.globalAlpha = 0.28;
+      SQ.drawEmoji(ctx, '🏆', W / 2, 130, 100);
+      SQ.outlinedText(ctx, 'TRINITY CUP', W / 2, 250, 76, '#ffd23f', { stroke: 14 });
+      const cols = [150, 410, 670, 930];
+      const labels = ['QUARTERS', 'SEMIS', 'FINAL', 'CHAMPION'];
+      const top = 420;
+      const bottom = 1600;
+      const span = (bottom - top) / 8;
+      const yOf = (r, i) => top + span * (i + 0.5) * (1 << r);
+      ctx.font = `700 26px ${SQ.fontBody}`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      labels.forEach((l, r) => ctx.fillText(l.split('').join('\u200A'), cols[r], 360));
+      // connectors
+      ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+      ctx.lineWidth = 4;
+      for (let r = 0; r < 3; r++) {
+        const n = 8 >> r;
+        for (let p = 0; p < n / 2; p++) {
+          const y1 = yOf(r, p * 2);
+          const y2 = yOf(r, p * 2 + 1);
+          const ym = yOf(r + 1, p);
+          const x1 = cols[r] + 105;
+          const xm = (cols[r] + 105 + cols[r + 1] - 105) / 2;
+          const w = t.results[r] && t.results[r][p];
+          if (w) ctx.strokeStyle = SQ.rgba(w.color, 0.8);
+          else ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(xm, y1);
+          ctx.lineTo(xm, y2);
+          ctx.lineTo(x1, y2);
+          ctx.moveTo(xm, ym);
+          ctx.lineTo(cols[r + 1] - 105, ym);
+          ctx.stroke();
+        }
+      }
+      // slots
+      for (let r = 0; r < 4; r++) {
+        const n = 8 >> r;
+        for (let i = 0; i < n; i++) {
+          const team = r === 0 ? t.rounds[0][i] : t.results[r - 1] && t.results[r - 1][i];
+          const x = cols[r];
+          const y = yOf(r, i);
+          const res = t.results[r] && t.results[r][Math.floor(i / 2)];
+          const lost = team && res && res !== team;
+          const isNext = this.phase === 'bracket' && r === t.round && Math.floor(i / 2) === t.match;
+          const fresh = t.lastResult && r === t.lastResult.r + 1 && i === t.lastResult.i && this.phase === 'bracket';
+          const pop = fresh ? SQ.ease.outBack(SQ.clamp((T - 0.3) / 0.5, 0, 1)) : 1;
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.scale(pop, pop);
+          ctx.globalAlpha = (champ ? 0.28 : 1) * (lost ? 0.35 : 1);
+          ctx.fillStyle = '#1b1e2b';
+          SQ.roundRect(ctx, -105, -44, 210, 88, 16);
+          ctx.fill();
+          ctx.lineWidth = isNext ? 6 + 3 * Math.sin(T * 8) : 4;
+          ctx.strokeStyle = isNext ? '#ffd23f' : team ? team.color : 'rgba(255,255,255,0.2)';
+          ctx.stroke();
+          if (team) {
+            SQ.drawSquare(ctx, -62, 0, 50, team, { mood: lost ? 'dead' : res === team || r === 3 ? 'happy' : isNext ? 'angry' : 'normal' });
+            ctx.font = `700 30px ${SQ.fontBody}`;
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(team.name, -26, 2, 124);
+          } else {
+            SQ.outlinedText(ctx, '?', 0, 2, 44, 'rgba(255,255,255,0.35)', { stroke: 0 });
+          }
+          ctx.restore();
+        }
+      }
+      if (this.phase === 'bracket') {
+        const nx = t.next;
+        const [a, b] = nx.pair;
+        const inK = SQ.ease.outBack(SQ.clamp(T / 0.4, 0, 1));
+        ctx.save();
+        ctx.translate(W / 2, 1700);
+        ctx.scale(inK, inK);
+        SQ.outlinedText(ctx, `NEXT UP  ·  ${this.stage}`, 0, -58, 34, '#ffd23f', { stroke: 7 });
+        const size = SQ.fitSize(ctx, [{ t: a.name + ' VS ' + b.name }], W - 120, 72);
+        SQ.richLine(ctx, [{ t: a.name.toUpperCase(), c: a.color }, { t: '  VS  ', c: '#ffffff' }, { t: b.name.toUpperCase(), c: b.color }], 0, 14, size);
+        SQ.outlinedText(ctx, SQ.modes[nx.id].name, 0, 88, 42, '#ffffff', { stroke: 8, font: SQ.fontBody, weight: 700 });
+        ctx.restore();
+        ctx.fillStyle = 'rgba(255,255,255,0.15)';
+        ctx.fillRect(140, 1830, W - 280, 8);
+        ctx.fillStyle = '#ffd23f';
+        ctx.fillRect(140, 1830, (W - 280) * SQ.clamp(T / 4.4, 0, 1), 8);
+      }
+      ctx.restore();
+
+      if (champ && t.champion) {
+        const c = t.champion;
+        const k = SQ.ease.outBack(SQ.clamp(T / 0.6, 0, 1));
+        ctx.save();
+        ctx.translate(W / 2, 900);
+        ctx.scale(k, k);
+        SQ.drawEmoji(ctx, '👑', 0, -250 - Math.abs(Math.sin(this.real * 3)) * 16, 130);
+        SQ.drawSquare(ctx, 0, 0, 320, c, { mood: 'happy', squash: Math.sin(this.real * 6) * 0.04 });
+        if (this.opts.memes > 0) SQ.drawSunglasses(ctx, 0, -12, 300);
+        SQ.outlinedText(ctx, 'CHAMPION', 0, 290, 120, '#ffd23f', { stroke: 20 });
+        SQ.outlinedText(ctx, c.name.toUpperCase(), 0, 420, 96, c.color, { stroke: 16 });
+        SQ.outlinedText(ctx, 'wins the Trinity Cup', 0, 520, 44, '#ffffff', { stroke: 9, font: SQ.fontBody, weight: 700 });
+        ctx.restore();
+      }
     }
 
     drawFooter(ctx) {
@@ -5695,13 +6747,16 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
   function start(seed) {
     const typed = $('seed').value.trim();
     if (seed == null && typed && /^\d+$/.test(typed)) seed = +typed;
-    game.newMatch(seed);
+    if (game.opts.mode === 'tournament') game.newTournament(seed);
+    else game.newMatch(seed);
     keepAwake();
+    $('parts').innerHTML = '';
+    $('parts').hidden = true;
     $('seed').value = '';
     $('seed').placeholder = String(game.seed);
     $('overlay').hidden = true;
     $('save').hidden = true;
-    if (game.recorder.active) status('Recording this match…');
+    if (game.recorder.active) status(game.tour ? 'Recording the tournament. Each match is saved as its own part.' : 'Recording this match…');
     else if (game.opts.record && !game.recorder.supported) status('This browser cannot record video. Try Chrome, Edge or Firefox.', 'bad');
     else status(game.opts.record ? 'The next match will be recorded.' : 'Recording is off.');
   }
@@ -5712,9 +6767,10 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
   game.on('done', ({ winner, video }) => {
     $('overlay-title').textContent = winner ? winner.text : 'Match over';
     $('overlay-text').textContent = 'Ready for another one?';
-    $('overlay-start').textContent = 'Next match';
+    $('overlay-start').textContent = game.tour ? 'New tournament' : 'Next match';
     $('overlay').classList.add('compact');
     $('overlay').hidden = !!game.opts.autoNext;
+    if (game.tour && game.videos.length) status(`Tournament recorded in ${game.videos.length} parts. Save the ones you want.`);
     if (video) {
       const mb = (video.blob.size / 1048576).toFixed(1);
       $('save').hidden = false;
@@ -5731,8 +6787,22 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
   }, 250);
 
   // ----- saving -----
-  $('save').addEventListener('click', async () => {
-    const v = game.video;
+  // one save button per tournament part
+  game.on('part', (v) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn btn-save';
+    b.textContent = `Save part ${v.part}`;
+    b.title = `${(v.blob.size / 1048576).toFixed(1)} MB`;
+    b.addEventListener('click', () => saveVideo(v));
+    $('parts').appendChild(b);
+    $('parts').hidden = false;
+    status(`Part ${v.part} recorded.`);
+  });
+
+  $('save').addEventListener('click', () => saveVideo(game.video));
+
+  async function saveVideo(v) {
     if (!v) return;
     // Inside a Claude artifact, files are offered through the downloads capability.
     if (window.claude && typeof window.claude.use === 'function') {
@@ -5757,7 +6827,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10000);
     status('Video saved to your downloads.');
-  });
+  }
 
   function status(text, tone) {
     const el = $('rec-status');

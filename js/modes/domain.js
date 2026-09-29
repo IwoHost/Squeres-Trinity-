@@ -4,11 +4,12 @@
   const SETTLE = 1.4; // seconds before fresh paint counts as your domain
 
   class Domain {
-    constructor(g, rng) {
+    constructor(g, rng, opts) {
+      opts = opts || {};
       this.g = g;
       this.rng = rng;
-      const n = rng.pick([2, 2, 2, 3, 4]);
-      this.teams = SQ.pickTeams(rng, n);
+      this.teams = opts.teams || SQ.pickTeams(rng, rng.pick([2, 2, 2, 3, 4]));
+      const n = this.teams.length;
       this.N = 20;
       this.cell = 50;
       this.title = n === 2 ? `${this.teams[0].name.toUpperCase()} VS ${this.teams[1].name.toUpperCase()}` : 'DOMAIN BRAWL';
@@ -28,7 +29,7 @@
         [this.N - 5, 1],
         [1, this.N - 5],
       ]);
-      const maxHp = rng.pick([10, 12, 15]);
+      const maxHp = opts.quick ? 8 : rng.pick([10, 12, 15]);
       this.maxHp = maxHp;
       this.sq = this.teams.map((t, ti) => {
         const [cx, cy] = corners[ti];
@@ -357,5 +358,5 @@
     }
   }
 
-  SQ.modes.domain = { id: 'domain', name: 'Domain Duel', create: (g, rng) => new Domain(g, rng) };
+  SQ.modes.domain = { id: 'domain', name: 'Domain Duel', create: (g, rng, opts) => new Domain(g, rng, opts) };
 })();
