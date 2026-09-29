@@ -23,7 +23,7 @@ controls.
 | Domain Duel | Big squares paint the floor. On their own settled paint they cannot be hurt. Segmented health bars and crits. |
 | Square Race | A random maze with breakable brick gates. The camera follows the leaders. |
 | Weapon Brawl | Every square gets its own weapon: sword, axe, hammer, spear, daggers, flail, bow or boomerang. Every hit levels the weapon up (longer blades, bigger heads, more daggers, faster arrows). Sometimes everyone gets the same weapon. Last square standing. |
-| Bounce Brawl | No weapons and no power-ups: every wall bounce makes a square a little bigger (up to about twice its size), and bigger squares hit harder. Last square standing. |
+| Bounce Brawl | No weapons and no power-ups: every wall bounce makes a square 10% bigger (up to 3x its size), and bigger squares hit harder. Last square standing. |
 | Marble Race | Squares tumble down a tall random obstacle course: peg fields, zigzag ramps, spinning bars, pinball bumpers and funnels. The camera follows the leader down. First to the bottom wins. |
 | King of the Hill | Whoever is closest to the centre of the zone scores. Squares charge each other to shove rivals out; hard hits leave them dizzy. The zone moves every few seconds and a shockwave sometimes blasts everyone out. |
 

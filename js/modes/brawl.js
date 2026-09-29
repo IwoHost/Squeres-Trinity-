@@ -217,7 +217,12 @@
         if (s.y > hi - h) (s.y = hi - h), (s.vy = -Math.abs(s.vy)), (s.squash = -0.2), (bounced = true);
         if (bounced) {
           g.audio.melodyHit((s.x - 500) / 600);
-          if (this.variant === 'grow') s.size = Math.min(104, s.size + 2);
+          // Bounce Brawl: every bounce makes the square 10% bigger, up to 3x its starting size
+          if (this.variant === 'grow' && s.size < 162) {
+            s.size = Math.min(162, s.size * 1.1);
+            s.squash = 0.3;
+            if (s.size >= 162) g.fx.text(s.x, s.y - s.size * 0.7, 'MAX SIZE', '#ffd23f', 36);
+          }
           // slight angle change keeps paths interesting
           const a = Math.atan2(s.vy, s.vx) + rng.range(-0.15, 0.15);
           s.vx = Math.cos(a) * sp;
