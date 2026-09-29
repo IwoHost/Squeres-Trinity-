@@ -37,6 +37,52 @@
     sel.value = selected || game.opts.music;
   }
 
+  // ----- custom names -----
+  const names = store.get('names', {});
+  SQ.starred = store.get('stars', []).filter((b) => SQ.TEAMS.some((t) => t.base === b));
+  const applyNames = () => {
+    SQ.TEAMS.forEach((t) => (t.name = (names[t.base] || '').trim() || t.base));
+    game.headerCache = null;
+  };
+  applyNames();
+  SQ.TEAMS.forEach((t) => {
+    const row = document.createElement('div');
+    row.className = 'name-row';
+    const sw = document.createElement('i');
+    sw.style.background = t.color;
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.id = 'name-' + t.base.toLowerCase();
+    inp.maxLength = 10;
+    inp.placeholder = t.base;
+    inp.value = names[t.base] || '';
+    inp.autocomplete = 'off';
+    inp.setAttribute('aria-label', `Name for ${t.base}`);
+    inp.addEventListener('input', () => {
+      names[t.base] = inp.value.replace(/[^\p{L}\p{N} _.-]/gu, '');
+      store.set('names', names);
+      applyNames();
+    });
+    const star = document.createElement('label');
+    star.className = 'star';
+    star.title = `Always include ${t.base}`;
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.id = 'star-' + t.base.toLowerCase();
+    cb.checked = SQ.starred.includes(t.base);
+    cb.setAttribute('aria-label', `Always include ${t.base}`);
+    cb.addEventListener('change', () => {
+      SQ.starred = SQ.starred.filter((b) => b !== t.base);
+      if (cb.checked) SQ.starred.push(t.base);
+      store.set('stars', SQ.starred);
+    });
+    const glyph = document.createElement('span');
+    glyph.textContent = '★';
+    star.append(cb, glyph);
+    row.append(sw, inp, star);
+    $('names').appendChild(row);
+  });
+
   // ----- restore preferences -----
   const prefs = store.get('prefs2', {});
   Object.assign(game.opts, { mode: prefs.mode || 'random', memes: prefs.memes != null ? prefs.memes : 1, speed: prefs.speed || 1, music: prefs.music || 'shuffle', record: prefs.record != null ? prefs.record : true, autoNext: !!prefs.autoNext, quality: prefs.quality || 'auto', voices: prefs.voices !== false, reel: prefs.reel !== false });

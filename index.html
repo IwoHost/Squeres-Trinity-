@@ -145,6 +145,13 @@ body.theater-on .desk { visibility: hidden; }
 .row { display: flex; gap: 10px; flex-wrap: wrap; }
 .parts { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
 .parts .btn { padding: 11px 10px; font-size: 13px; }
+.names { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+.name-row { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+.name-row i { width: 16px; height: 16px; border-radius: 4px; display: block; }
+.name-row input[type="text"] { padding: 7px 8px; }
+.star { position: relative; cursor: pointer; font-size: 18px; line-height: 1; color: var(--muted); }
+.star input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.star input:checked + span { color: var(--gold); }
 .row > .btn { flex: 1 1 auto; }
 
 .group { display: flex; flex-direction: column; gap: 10px; padding-top: 16px; border-top: 1px solid var(--line); }
@@ -273,6 +280,12 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         <label class="btn upload" for="upload">Add your music<input type="file" id="upload" accept="audio/*" multiple></label>
       </div>
       <p class="hint">All built-in tracks are generated live by the game, so they are free to post. Only upload music you have the rights to.</p>
+    </div>
+
+    <div class="group">
+      <span class="label">Names</span>
+      <p class="hint">Rename any color. Tick the star to put that color in every match.</p>
+      <div class="names" id="names"></div>
     </div>
 
     <div class="group">

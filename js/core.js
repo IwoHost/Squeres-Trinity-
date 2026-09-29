@@ -175,11 +175,23 @@
       },
     },
   };
-  SQ.TEAMS.forEach((t) => (t.persona = SQ.PERSONAS[t.name]));
+  SQ.TEAMS.forEach((t) => {
+    t.base = t.name; // the color's own name; t.name can be renamed by the viewer
+    t.persona = SQ.PERSONAS[t.name];
+  });
+  SQ.starred = []; // base names of colors that must be in every match
   SQ.persona = (team) => (team && team.persona) || SQ.PERSONAS.Green;
 
   SQ.pickTeams = function (rng, n) {
-    return rng.shuffle(SQ.TEAMS.map((t, i) => i)).slice(0, n).map((i) => SQ.TEAMS[i]);
+    let idx = rng.shuffle(SQ.TEAMS.map((t, i) => i));
+    // starred colors always get a spot
+    for (const base of SQ.starred) {
+      const s = SQ.TEAMS.findIndex((t) => t.base === base);
+      if (s < 0 || idx.slice(0, n).includes(s)) continue;
+      idx = idx.filter((i) => i !== s);
+      idx.splice(rng.int(0, n - 1), 0, s);
+    }
+    return idx.slice(0, n).map((i) => SQ.TEAMS[i]);
   };
 
   SQ.clamp = (v, a, b) => (v < a ? a : v > b ? b : v);

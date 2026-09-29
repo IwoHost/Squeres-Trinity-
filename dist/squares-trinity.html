@@ -145,6 +145,13 @@ body.theater-on .desk { visibility: hidden; }
 .row { display: flex; gap: 10px; flex-wrap: wrap; }
 .parts { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
 .parts .btn { padding: 11px 10px; font-size: 13px; }
+.names { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+.name-row { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+.name-row i { width: 16px; height: 16px; border-radius: 4px; display: block; }
+.name-row input[type="text"] { padding: 7px 8px; }
+.star { position: relative; cursor: pointer; font-size: 18px; line-height: 1; color: var(--muted); }
+.star input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.star input:checked + span { color: var(--gold); }
 .row > .btn { flex: 1 1 auto; }
 
 .group { display: flex; flex-direction: column; gap: 10px; padding-top: 16px; border-top: 1px solid var(--line); }
@@ -273,6 +280,12 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         <label class="btn upload" for="upload">Add your music<input type="file" id="upload" accept="audio/*" multiple></label>
       </div>
       <p class="hint">All built-in tracks are generated live by the game, so they are free to post. Only upload music you have the rights to.</p>
+    </div>
+
+    <div class="group">
+      <span class="label">Names</span>
+      <p class="hint">Rename any color. Tick the star to put that color in every match.</p>
+      <div class="names" id="names"></div>
     </div>
 
     <div class="group">
@@ -476,11 +489,23 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       },
     },
   };
-  SQ.TEAMS.forEach((t) => (t.persona = SQ.PERSONAS[t.name]));
+  SQ.TEAMS.forEach((t) => {
+    t.base = t.name; // the color's own name; t.name can be renamed by the viewer
+    t.persona = SQ.PERSONAS[t.name];
+  });
+  SQ.starred = []; // base names of colors that must be in every match
   SQ.persona = (team) => (team && team.persona) || SQ.PERSONAS.Green;
 
   SQ.pickTeams = function (rng, n) {
-    return rng.shuffle(SQ.TEAMS.map((t, i) => i)).slice(0, n).map((i) => SQ.TEAMS[i]);
+    let idx = rng.shuffle(SQ.TEAMS.map((t, i) => i));
+    // starred colors always get a spot
+    for (const base of SQ.starred) {
+      const s = SQ.TEAMS.findIndex((t) => t.base === base);
+      if (s < 0 || idx.slice(0, n).includes(s)) continue;
+      idx = idx.filter((i) => i !== s);
+      idx.splice(rng.int(0, n - 1), 0, s);
+    }
+    return idx.slice(0, n).map((i) => SQ.TEAMS[i]);
   };
 
   SQ.clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -7268,6 +7293,52 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     game.audio.library().forEach((t) => add(t.id, `${t.name} · ${t.style}`));
     sel.value = selected || game.opts.music;
   }
+
+  // ----- custom names -----
+  const names = store.get('names', {});
+  SQ.starred = store.get('stars', []).filter((b) => SQ.TEAMS.some((t) => t.base === b));
+  const applyNames = () => {
+    SQ.TEAMS.forEach((t) => (t.name = (names[t.base] || '').trim() || t.base));
+    game.headerCache = null;
+  };
+  applyNames();
+  SQ.TEAMS.forEach((t) => {
+    const row = document.createElement('div');
+    row.className = 'name-row';
+    const sw = document.createElement('i');
+    sw.style.background = t.color;
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.id = 'name-' + t.base.toLowerCase();
+    inp.maxLength = 10;
+    inp.placeholder = t.base;
+    inp.value = names[t.base] || '';
+    inp.autocomplete = 'off';
+    inp.setAttribute('aria-label', `Name for ${t.base}`);
+    inp.addEventListener('input', () => {
+      names[t.base] = inp.value.replace(/[^\p{L}\p{N} _.-]/gu, '');
+      store.set('names', names);
+      applyNames();
+    });
+    const star = document.createElement('label');
+    star.className = 'star';
+    star.title = `Always include ${t.base}`;
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.id = 'star-' + t.base.toLowerCase();
+    cb.checked = SQ.starred.includes(t.base);
+    cb.setAttribute('aria-label', `Always include ${t.base}`);
+    cb.addEventListener('change', () => {
+      SQ.starred = SQ.starred.filter((b) => b !== t.base);
+      if (cb.checked) SQ.starred.push(t.base);
+      store.set('stars', SQ.starred);
+    });
+    const glyph = document.createElement('span');
+    glyph.textContent = '★';
+    star.append(cb, glyph);
+    row.append(sw, inp, star);
+    $('names').appendChild(row);
+  });
 
   // ----- restore preferences -----
   const prefs = store.get('prefs2', {});

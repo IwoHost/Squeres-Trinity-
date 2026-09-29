@@ -81,6 +81,12 @@ They talk at the start, when they hit or get hit, pick up items, take the lead, 
 out, and now and then just chat. Speech bubbles are outlined in the speaker's color. Turn them off
 with "Voice lines". The differences are small multipliers, so every color can still win.
 
+## Custom names
+
+In the Names panel you can rename any color (up to 10 characters), for example to a friend's
+nickname. The name is used everywhere: rules, intro, scoreboard, winner text and the tournament
+bracket. Tick the star next to a color to put it in every match. Personalities stay with the color.
+
 ## Memes
 
 With memes on, squares react with captions ("skill issue", "it's so over", "we're so back",
