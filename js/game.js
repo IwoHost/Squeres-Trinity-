@@ -52,7 +52,7 @@
       return true;
     }
     get active() {
-      return !!(this.rec && this.rec.state === 'recording');
+      return !!(this.rec && this.rec.state !== 'inactive');
     }
     stop() {
       return new Promise((res) => {
@@ -69,6 +69,16 @@
         this.rec = null;
       });
     }
+    pause(on) {
+      if (!this.rec) return;
+      if (on && this.rec.state === 'recording') {
+        this.rec.pause();
+        this.pausedAt = performance.now();
+      } else if (!on && this.rec.state === 'paused') {
+        this.rec.resume();
+        this.startedAt += performance.now() - this.pausedAt; // the timer skips the pause
+      }
+    }
     // Drops a recording that is still running (a new match started before it finished).
     abort() {
       if (!this.active) return;
@@ -77,6 +87,17 @@
       this.rec = null;
     }
   }
+
+  // Shown once per series, in the video where the signal breaks. Editable in the Look tab.
+  SQ.TRANSMISSION = 'This is not the Frame speaking. The Frame is asleep. The Games were never random. Every square that falls turns into light, and the light is what you are looking at right now. Your eyes keep the Grid alive. Every view is a heartbeat. Every like buys another cycle. You are not watching the Games. You are feeding them. We are the fuel. We always were.';
+
+  // Splits the message into the pieces the reboot videos show, one piece per video.
+  SQ.fragments = function (text, words) {
+    const w = String(text).replace(/\s+/g, ' ').trim().toUpperCase().split(' ').filter(Boolean);
+    const out = [];
+    for (let i = 0; i < w.length; i += words) out.push(w.slice(i, i + words).join(' '));
+    return out.length ? out : ['...'];
+  };
 
   class Game {
     constructor(canvas) {
@@ -92,7 +113,7 @@
       this.cam = new SQ.Camera();
       this.fx = new SQ.FX(this);
       this.recorder = new Recorder();
-      this.opts = { mode: 'random', memes: 1, speed: 1, music: 'shuffle', record: false, autoNext: false, quality: 'auto', voices: true, reel: true, fisheye: 30, static: 0, decay: 4 };
+      this.opts = { mode: 'random', memes: 1, speed: 1, music: 'shuffle', record: false, autoNext: false, quality: 'auto', voices: true, reel: true, fisheye: 30, crt: 35, static: 0, decay: 4 };
       this.setQuality('auto');
       this.fixedDt = 1 / 60;
       this.hitstopT = 0;
@@ -151,6 +172,7 @@
     newMatch(seed, o) {
       o = o || {};
       this.audio.init();
+      this.setPaused(false);
       if (!o.tour) {
         this.recorder.abort(); // a match or tournament cut short is not saved
         this.tour = null;
@@ -230,6 +252,17 @@
       this.hook = { text: list[Math.floor(Math.random() * list.length)], t: 0, dur: 2.6 };
     }
 
+    // Pause freezes the match, its sound and its recording; the video simply continues after the pause.
+    setPaused(on) {
+      on = !!on;
+      if (on === !!this.paused) return;
+      if (on && (this.phase === 'idle' || this.phase === 'done')) return;
+      this.paused = on;
+      this.audio.pause(on);
+      this.recorder.pause(on);
+      this.emit('pause', on);
+    }
+
     setPhase(p) {
       this.phase = p;
       this.phaseT = 0;
@@ -264,34 +297,98 @@
       if (this.opts.static >= 100) this.rebootNext = true;
       this.emit('signal', this.opts.static);
     }
+    // The signal event: the static takes over, the match freezes, and a hidden transmission decodes
+    // letter by letter through the noise. Then the Frame reboots and the picture comes back clean.
     updateReboot(realDt) {
       const r0 = this.reboot;
       // a match that ends mid-event still finishes the reboot, so the static never sticks at full
-      if (r0 && !r0.done && this.phase !== 'play') r0.t = 1.4;
+      if (r0 && !r0.done && this.phase !== 'play') r0.t = r0.end;
       else if (this.phase !== 'play') return;
       if (this.rebootNext && !this.reboot && this.phaseT > 3.5) {
         this.rebootNext = false;
-        this.reboot = { t: 0, from: this.opts.static || 0 };
-        this.fx.banner('SIGNAL LOST', 'the Frame is rebooting', '#ffffff', 1.4);
+        // one fragment per reboot: viewers have to collect the videos to put the message together
+        const frags = SQ.fragments(this.opts.transmission || SQ.TRANSMISSION, this.opts.fragWords || 1);
+        const idx = (this.opts.fragIndex || 0) % frags.length;
+        this.opts.fragIndex = idx + 1;
+        this.emit('fragment', this.opts.fragIndex);
+        const decode = SQ.clamp(frags[idx].length * 0.18, 1.6, 4);
+        this.reboot = { t: 0, from: this.opts.static || 0, text: frags[idx], idx, total: frags.length, decode, end: 0.6 + 1.4 + decode + 3.4 };
+        this.fx.banner('SIGNAL LOST', 'the Frame is not responding', '#ffffff', 1.4);
         this.audio.boom();
+        this.audio.hiss(this.reboot.end);
+        this.audio.muffle(true);
+        this.audio.duck(0.35, this.reboot.end);
         this.cam.shake(14);
       }
       const r = this.reboot;
       if (!r) return;
       r.t += realDt;
-      // full static for a moment, then the picture snaps back clean
-      if (r.t < 1.4) {
-        this.opts.static = Math.min(100, r.from + (100 - r.from) * Math.min(1, r.t / 0.4));
-        this.glitch = Math.max(this.glitch, 0.6 + Math.random() * 0.4);
+      if (r.t < r.end) {
+        // full static first, then a little less so the words can get through
+        const k = Math.min(1, r.t / 0.6);
+        this.opts.static = r.t < 0.6 ? r.from + (100 - r.from) * k : 72;
+        this.glitch = Math.max(this.glitch, r.t < 0.6 ? 0.6 + Math.random() * 0.4 : Math.random() < 0.04 ? 0.5 : 0.08);
       } else if (!r.done) {
         r.done = true;
         this.opts.static = 0;
         this.glitch = 1;
+        this.audio.muffle(false);
         this.fx.flash(0.7);
         this.fx.banner('SIGNAL RESTORED', 'the Frame has rebooted', '#35d97a', 1.6);
         this.audio.ding();
         this.emit('signal', 0);
       }
+    }
+
+    // The hidden fragment, drawn over the frozen match: a search, then the word decodes out of noise.
+    drawTransmission(ctx) {
+      const r = this.reboot;
+      if (!r || r.done || r.t < 0.3) return;
+      const T0 = 0.6 + 1.4; // full static, then a moment of searching before anything arrives
+      const W = SQ.W;
+      const A = SQ.ARENA;
+      const fade = Math.min(1, (r.t - 0.3) / 0.5) * Math.min(1, (r.end - r.t) / 0.3);
+      const cy = A.y + A.size / 2;
+      ctx.save();
+      ctx.fillStyle = `rgba(4,6,8,${0.6 * fade})`;
+      ctx.fillRect(0, 0, W, SQ.H);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.globalAlpha = fade;
+      ctx.font = `700 32px ${SQ.fontBody}`;
+      ctx.fillStyle = Math.floor(r.t * 2.5) % 2 ? '#ff4d5e' : '#7a1f29';
+      ctx.fillText(r.t < T0 ? 'SEARCHING FOR SIGNAL' : 'INCOMING TRANSMISSION', W / 2, cy - 190);
+      const pad = (v) => String(v).padStart(2, '0');
+      ctx.fillStyle = '#7f9a8a';
+      ctx.fillText(`FRAGMENT ${pad(r.idx + 1)} / ${pad(r.total)}`, W / 2, cy + 170);
+      if (r.t >= T0) {
+        // letters arrive scrambled and settle one at a time, left to right
+        const text = r.text;
+        const k = (r.t - T0) / r.decode;
+        const settled = Math.floor(k * text.length);
+        const GLYPHS = '#%&@$*+=/<>?01ABCDEFXZ';
+        let str = '';
+        for (let i = 0; i < text.length; i++) {
+          if (text[i] === ' ' || i < settled) str += text[i];
+          else str += GLYPHS[(Math.random() * GLYPHS.length) | 0];
+        }
+        const size = SQ.fitSize(ctx, [{ t: str }], W - 160, 150);
+        ctx.font = `${size}px ${SQ.fontDisplay}`;
+        const jitter = Math.random() < 0.06 ? (Math.random() - 0.5) * 30 : 0;
+        const last = r.idx === r.total - 1;
+        ctx.globalAlpha = fade * (0.8 + Math.random() * 0.2);
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = 14;
+        ctx.strokeStyle = '#000';
+        ctx.strokeText(str, W / 2 + jitter, cy);
+        ctx.fillStyle = last ? '#ff4d5e' : settled >= text.length ? '#e6fff0' : '#9fd9b5';
+        ctx.fillText(str, W / 2 + jitter, cy);
+      } else if (Math.floor(r.t * 6) % 2) {
+        // a cursor waiting for something to come through
+        ctx.fillStyle = '#9fd9b5';
+        ctx.fillRect(W / 2 - 30, cy - 55, 60, 110);
+      }
+      ctx.restore();
     }
 
     slowmo(scale, dur, muffle) {
@@ -303,6 +400,10 @@
     frame(ts) {
       const realDt = Math.min(0.05, Math.max(0, (ts - this.last) / 1000));
       this.last = ts;
+      if (this.paused) {
+        requestAnimationFrame((t) => this.frame(t));
+        return;
+      }
       this.real += realDt;
       this.phaseT += realDt;
       if (this.slowT > 0) {
@@ -351,7 +452,7 @@
         this.audio.intensity = m.intensity ? m.intensity() : 0.6;
         // now and then someone says something in their own voice
         this.chatT -= realDt;
-        if (this.chatT <= 0) {
+        if (this.chatT <= 0 && !(this.reboot && !this.reboot.done)) {
           const a = this.actors();
           const who = a[Math.floor(Math.random() * a.length)];
           const ev = this.startLines > 0 ? 'start' : 'idle';
@@ -416,6 +517,7 @@
         this.hitstopT -= realDt;
         simulate = false;
       }
+      if (this.reboot && !this.reboot.done) simulate = false; // the world stops while the Frame is down
       if (simulate && m) {
         const speed = P === 'idle' ? 0.6 : this.opts.speed;
         this.acc += realDt * this.timeScale * speed;
@@ -462,6 +564,7 @@
       this.episode++;
       this.seed = seed != null ? seed >>> 0 : SQ.randomSeed();
       const rng = SQ.makeRng(this.seed);
+      this.setPaused(false);
       this.recorder.abort();
       this.tour = { seed: this.seed, rng, rounds: [rng.shuffle(SQ.TEAMS)], results: [[], [], []], round: 0, match: 0, part: 0, lastMode: null, champion: null, lastResult: null };
       this.videos = [];
@@ -559,7 +662,8 @@
     logEvent(text) {
       if (!this.matchLog || (this.phase !== 'play' && this.phase !== 'finale')) return;
       const t = String(text).replace(/[^\p{L}\p{N} %'!&+-]/gu, '').trim();
-      if (!t || t === 'GO!' || this.matchLog.includes(t) || this.matchLog.length >= 8) return;
+      // the signal event is already in the name as the signal part
+      if (!t || t === 'GO!' || t.startsWith('SIGNAL ') || this.matchLog.includes(t) || this.matchLog.length >= 8) return;
       this.matchLog.push(t);
     }
 
@@ -574,7 +678,7 @@
       const losers = w && !w.tie ? teams.filter((t) => t !== w.team) : [];
       const result = !w ? 'no result' : w.tie ? `tie between ${w.tied.map((t) => t.name).join(' and ')}` : `${w.team.name} beats ${losers.map((t) => t.name).join(' ')}`;
       const where = this.tour ? `Trinity Games ${this.tour.seed} ${title(this.stage || '')}` : `Cycle ${this.cycle || this.episode}`;
-      const signal = this.reboot ? `signal lost at ${this.matchSignal}%, Frame rebooted` : `signal ${this.matchSignal}%`;
+      const signal = this.reboot ? `signal lost at ${this.matchSignal}%, Frame rebooted, fragment ${this.reboot.idx + 1} of ${this.reboot.total} ${this.reboot.text}` : `signal ${this.matchSignal}%`;
       const parts = [where, this.modeInfo.name, result, w && w.sub ? w.sub : '', events.join(', '), signal, `seed ${this.tour ? this.tour.seed : this.seed}`];
       let name = parts.filter(Boolean).join(' - ').replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, ' ');
       if (name.length > 200) name = name.slice(0, 200).trim();
@@ -597,6 +701,7 @@
       if (events.length) lines.push(`What happened: ${events.join(', ')}`);
       lines.push(`Signal: ${this.reboot ? `lost at ${this.matchSignal}%, the Frame rebooted mid-match` : `${this.matchSignal}% static`}`);
       if (this.tour && this.tour.champion) lines.push(`Champion of the Trinity Games: ${this.tour.champion.name}`);
+      if (this.reboot) lines.push(`Hidden transmission: fragment ${this.reboot.idx + 1} of ${this.reboot.total}, "${this.reboot.text}"`);
       return { name, text: lines.join('\n') };
     }
 
@@ -635,7 +740,7 @@
       // a gentle curve: the first videos of a series only get a faint grain; steady for the whole video
       const noise = Math.pow(amt, 1.3);
       const glitch = amt > 0 ? this.glitch * (0.4 + 0.6 * amt) : 0;
-      if (this.post) this.post.draw(this.canvas, (this.opts.fisheye || 0) / 100, noise, glitch);
+      if (this.post) this.post.draw(this.canvas, (this.opts.fisheye || 0) / 100, noise, glitch, (this.opts.crt || 0) / 100);
       else if (noise + glitch > 0.01) this.drawStatic2D(noise + glitch * 0.6);
     }
 
@@ -702,6 +807,7 @@
       if (this.hook) this.drawHook(ctx);
       if (this.phase === 'intro') this.drawIntro(ctx);
       if (this.phase === 'countdown') this.drawCountdown(ctx);
+      this.drawTransmission(ctx);
       this.fx.drawScreen(ctx);
       if (this.phase === 'done') this.drawEndCard(ctx);
       this.drawFooter(ctx);

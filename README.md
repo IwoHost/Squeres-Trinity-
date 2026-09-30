@@ -121,16 +121,26 @@ With memes on, squares react with captions ("skill issue", "it's so over", "we'r
 pixel "deal with it" sunglasses. Everything is drawn in code, so no copyrighted GIFs are used.
 **Chaos** makes all of it more frequent.
 
-## Screen: fish-eye and static
+## Screen: fish-eye, CRT and static
 
-The Screen panel gives the game square a fish-eye lens with a light blue glass shade (Fish-eye;
-the text around it stays flat) and adds TV static. The static
-belongs to a series, not a single video: with "Per video" set, every finished video adds a
-little more, so a run of posts slowly loses its signal. When it reaches 100%, or when you press
-"Reboot the signal next video", the next video has the signal event: the picture breaks up,
-SIGNAL LOST, the Frame reboots and the static starts over at 0%. Within a video the static stays
-steady. Both effects are in the recorded video. They need
-WebGL; without it the static still shows as grain and the fish-eye is skipped.
+The Look tab gives the game square a fish-eye lens with a light blue glass shade, and a CRT look
+(scanlines, a phosphor grid, glow on bright things, a slight color fringe). The text around the
+square stays flat. Both are in the recorded video. They need WebGL; without it the static still
+shows as grain.
+
+The static belongs to a series, not a single video: with "Per video" set, every finished video adds
+a little more, so a run of posts slowly loses its signal. Within a video it stays steady.
+
+### The signal event and the hidden transmission
+
+When the static reaches 100%, or when you press "Reboot the signal next video", the next video
+has the signal event: SIGNAL LOST, the match freezes, a hiss and hum take over, and after a
+search one fragment of a secret message decodes out of the noise, numbered like
+"FRAGMENT 07 / 66". Then the Frame reboots, the picture comes back clean and the static starts
+over. Every reboot shows the next fragment, so viewers have to collect the videos and put the
+message together, like an ARG. The Look tab shows the full message (you can rewrite it), how many
+words each fragment has, and which fragment the next reboot will show; Back, Skip and Start over
+move through them. The video name and match info say which fragment a video carried.
 
 ## Video names and match info
 
@@ -140,6 +150,15 @@ The cycle is the number of matches played on this device. After each match the V
 also shows "Match info": the same data plus every square's personality and Sector, any rivalry
 that was settled, and whether the Frame rebooted. Copy it into a chat to get lore-style titles
 and descriptions.
+
+## Controls
+
+The top of the control desk always has New match, Pause (also Space or P during a match), Replay,
+Full screen, the speaker volume and the recording status. Pause freezes the match, its sound and
+its recording, so the video just continues afterwards. The speaker volume only changes what you
+hear; videos always get the full sound. The settings are in tabs: Play, Video, Look, Sound and
+World (names, win stats, lore and posters). In full screen on a wide screen, a blurred copy of
+the game fills the sides instead of black bars.
 
 ## Video export
 

@@ -114,7 +114,7 @@ body {
   height: min(100dvh, calc(100vw * 16 / 9));
   max-height: none; max-width: none;
   border-radius: 0;
-  box-shadow: 0 0 0 100vmax #000;
+  box-shadow: 0 0 60px rgba(0,0,0,.6);
 }
 body.theater-on { overflow: hidden; }
 body.theater-on .desk { visibility: hidden; }
@@ -158,6 +158,9 @@ body.theater-on .desk { visibility: hidden; }
 .posters button:hover, .posters button:focus-visible { box-shadow: 0 0 0 2px var(--gold); color: var(--fg); }
 .posters canvas { width: 100%; height: auto; display: block; }
 .posters span { padding: 5px 6px 6px; text-align: left; }
+.label-small { color: var(--muted); font-weight: 600; font-size: 14px; }
+.textbox { box-sizing: border-box; width: 100%; resize: vertical; background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; font: 500 14px/1.45 var(--font-body); }
+.textbox:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
 .info { background: var(--panel); border-radius: var(--radius); box-shadow: inset 0 0 0 1px var(--line); padding: 10px 12px; }
 .info summary { cursor: pointer; font-weight: 600; }
 .info textarea { box-sizing: border-box; width: 100%; margin: 10px 0 8px; resize: vertical; background: var(--ink); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 8px; font: 500 13px/1.45 var(--font-body); }
@@ -210,6 +213,40 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
 .status { font-variant-numeric: tabular-nums; color: var(--fg); font-weight: 600; min-height: 1.4em; margin: 0; }
 .status[data-tone="bad"] { color: #ff8a95; }
 
+/* always-visible controls at the top of the desk */
+.transport { display: flex; flex-direction: column; gap: 10px; padding: 14px; background: var(--panel); border-radius: 14px; box-shadow: inset 0 0 0 1px var(--line); }
+.transport .row > .btn-primary { flex: 2 1 auto; }
+.row-small .btn { padding: 11px 12px; font-size: 13px; }
+.btn:disabled { opacity: .45; cursor: default; transform: none; }
+#pause[aria-pressed="true"] { background: var(--fg); color: var(--ink); box-shadow: none; }
+.listen { display: grid; grid-template-columns: 40px minmax(0, 1fr); align-items: center; gap: 4px 10px; }
+.listen input { accent-color: var(--fg); }
+.listen-note { grid-column: 2; color: var(--muted); font-size: 12px; }
+.icon-btn { appearance: none; border: 0; cursor: pointer; width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; background: var(--panel-2); color: var(--fg); box-shadow: inset 0 0 0 1px var(--line); }
+.icon-btn svg { width: 22px; height: 22px; }
+.icon-btn .cross { display: none; }
+.icon-btn[aria-pressed="true"] .cross { display: inline; }
+.icon-btn[aria-pressed="true"] .wave { display: none; }
+.icon-btn[aria-pressed="true"] { color: #ff8a95; }
+.icon-btn:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+
+/* settings tabs */
+.tabs { display: flex; gap: 4px; padding: 4px; background: var(--panel); border-radius: 12px; box-shadow: inset 0 0 0 1px var(--line); position: sticky; top: 8px; z-index: 5; }
+.tab { flex: 1 1 0; min-width: 0; appearance: none; border: 0; cursor: pointer; background: none; color: var(--muted); font: 700 13px/1 var(--font-body); letter-spacing: .06em; text-transform: uppercase; padding: 11px 4px; border-radius: 9px; }
+.tab:hover { color: var(--fg); }
+.tab[aria-selected="true"] { background: var(--panel-2); color: var(--fg); box-shadow: inset 0 0 0 1px var(--line), 0 2px 0 var(--gold); }
+.tab:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px; }
+.tab-panel { display: flex; flex-direction: column; gap: 18px; }
+.tab-panel > .group:first-child { border-top: 0; padding-top: 0; }
+
+/* pause badge on the stage (not part of the video) */
+.pause-badge { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; background: rgba(8,8,14,.35); }
+.pause-badge span { font: 400 clamp(22px, 7cqw, 40px)/1 var(--font-display); letter-spacing: .06em; padding: 14px 22px; border-radius: 12px; background: rgba(0,0,0,.6); }
+
+/* full screen: a blurred copy of the game fills the sides instead of black bars */
+.fs-backdrop { position: fixed; inset: -60px; width: calc(100% + 120px); height: calc(100% + 120px); z-index: 49; filter: blur(40px) brightness(.5) saturate(1.3); display: none; }
+body.theater-on .fs-backdrop { display: block; }
+
 @media (max-width: 820px) {
   .app { grid-template-columns: minmax(0, 1fr); gap: 20px; padding-block: 12px; }
   .stage { height: auto; width: 100%; max-height: 80vh; max-height: 80dvh; justify-self: center; width: min(100%, calc(80dvh * 9 / 16)); }
@@ -222,6 +259,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
 <!-- head/ -->
 </head>
 <body>
+<canvas class="fs-backdrop" id="fs-backdrop" width="54" height="96" aria-hidden="true"></canvas>
 <div class="app">
   <div class="stage" id="stage">
     <canvas id="screen" width="1080" height="1920" aria-label="Square battle arena"></canvas>
@@ -230,12 +268,14 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       <p id="overlay-text">Random battles, races and brawls between squares.</p>
       <button class="btn btn-primary" id="overlay-start" type="button">Start match</button>
     </div>
+    <div class="pause-badge" id="pause-badge" hidden><span>PAUSED</span></div>
     <div class="rec-badge" id="rec-badge" hidden>REC <span id="rec-time">0:00</span></div>
     <button class="btn fs-toggle" id="fs-toggle" type="button" aria-label="Full screen" title="Full screen">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
     </button>
     <div class="fs-bar" id="fs-bar">
       <button class="btn" id="fs-exit" type="button">Exit full screen</button>
+      <button class="btn" id="fs-pause" type="button">Pause</button>
       <button class="btn btn-primary" id="fs-next" type="button">New match</button>
     </div>
   </div>
@@ -249,37 +289,22 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       </div>
     </div>
 
-    <div class="row">
-      <button class="btn btn-primary" id="start" type="button">New match</button>
-      <button class="btn" id="replay" type="button" title="Play the same match again with the same seed">Replay seed</button>
-      <button class="btn" id="fs-open" type="button">Full screen</button>
-    </div>
-
-    <div class="group">
-      <span class="label">Mode</span>
-      <div class="chips" id="modes" role="radiogroup" aria-label="Mode">
-        <label class="chip"><input type="radio" name="mode" value="random" id="mode-random" checked><span>🎲 Random</span></label>
-        <label class="chip"><input type="radio" name="mode" value="tournament" id="mode-tournament"><span>🏆 Tournament</span></label>
-        <label class="chip"><input type="radio" name="mode" value="chase" id="mode-chase"><span><b style="background:var(--red)"></b>Color Chase</span></label>
-        <label class="chip"><input type="radio" name="mode" value="territory" id="mode-territory"><span><b style="background:#a95cff"></b>Tile Wars</span></label>
-        <label class="chip"><input type="radio" name="mode" value="domain" id="mode-domain"><span><b style="background:#1fd6f0"></b>Domain Duel</span></label>
-        <label class="chip"><input type="radio" name="mode" value="race" id="mode-race"><span><b style="background:var(--gold)"></b>Square Race</span></label>
-        <label class="chip"><input type="radio" name="mode" value="brawl" id="mode-brawl"><span><b style="background:#dfe6ff"></b>Weapon Brawl</span></label>
-        <label class="chip"><input type="radio" name="mode" value="bounce" id="mode-bounce"><span><b style="background:#ff8f33"></b>Bounce Brawl</span></label>
-        <label class="chip"><input type="radio" name="mode" value="marble" id="mode-marble"><span><b style="background:#ff4d8d"></b>Marble Race</span></label>
-        <label class="chip"><input type="radio" name="mode" value="hill" id="mode-hill"><span>👑 King of the Hill</span></label>
+    <div class="transport">
+      <div class="row">
+        <button class="btn btn-primary" id="start" type="button">New match</button>
+        <button class="btn" id="pause" type="button" disabled aria-pressed="false">Pause</button>
       </div>
-    </div>
-
-    <div class="group">
-      <span class="label">Video</span>
-      <label class="toggle"><input type="checkbox" id="record" checked> Record each match with sound</label>
-      <label class="toggle"><input type="checkbox" id="reel" checked> Reel mode: no intro, a hook line, shorter matches</label>
-      <div class="field"><label for="quality">Quality</label><select id="quality">
-        <option value="auto">Auto (720p on phones)</option>
-        <option value="720">720p, smoothest</option>
-        <option value="1080">1080p, sharpest</option>
-      </select></div>
+      <div class="row row-small">
+        <button class="btn" id="replay" type="button" title="Play the same match again with the same seed">Replay seed</button>
+        <button class="btn" id="fs-open" type="button">Full screen</button>
+      </div>
+      <div class="listen">
+        <button class="icon-btn" id="listen-mute" type="button" aria-label="Mute your speakers" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path class="wave" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/><path class="cross" d="M16 9l5 6M21 9l-5 6"/></svg>
+        </button>
+        <input type="range" id="listen" min="0" max="1" step="0.05" value="1" aria-label="Your speaker volume">
+        <span class="listen-note">Your speakers only. Videos keep full sound.</span>
+      </div>
       <p class="status" id="rec-status" aria-live="polite">The next match will be recorded.</p>
       <button class="btn btn-save" id="save" type="button" hidden>Save video</button>
       <div class="parts" id="parts" hidden></div>
@@ -290,93 +315,148 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       </details>
     </div>
 
-    <div class="group">
-      <span class="label">Screen</span>
-      <div class="field"><label for="fisheye">Fish-eye</label><input type="range" id="fisheye" min="0" max="100" step="5" value="30"></div>
-      <div class="field"><label for="static">Static <output id="static-val">0%</output></label><input type="range" id="static" min="0" max="100" step="1" value="0"></div>
-      <div class="field"><label for="decay">Per video</label><select id="decay">
-        <option value="0">Stays the same</option>
-        <option value="2">+2% static (a long series)</option>
-        <option value="4">+4% static</option>
-        <option value="8">+8% static</option>
-        <option value="15">+15% static (a short series)</option>
-      </select></div>
-      <p class="hint">The signal gets worse with every video. At 100% the next video has the signal event: the picture breaks up, the Frame reboots and the static starts over.</p>
-      <div class="row">
-        <button class="btn" id="reboot" type="button">Reboot the signal next video</button>
+    <div class="tabs" role="tablist" aria-label="Settings">
+      <button class="tab" role="tab" id="tabbtn-play" aria-controls="tab-play" aria-selected="true" type="button">Play</button>
+      <button class="tab" role="tab" id="tabbtn-video" aria-controls="tab-video" aria-selected="false" type="button" tabindex="-1">Video</button>
+      <button class="tab" role="tab" id="tabbtn-look" aria-controls="tab-look" aria-selected="false" type="button" tabindex="-1">Look</button>
+      <button class="tab" role="tab" id="tabbtn-sound" aria-controls="tab-sound" aria-selected="false" type="button" tabindex="-1">Sound</button>
+      <button class="tab" role="tab" id="tabbtn-world" aria-controls="tab-world" aria-selected="false" type="button" tabindex="-1">World</button>
+    </div>
+
+    <section class="tab-panel" id="tab-play" role="tabpanel" aria-labelledby="tabbtn-play">
+      <div class="group">
+        <span class="label">Mode</span>
+        <div class="chips" id="modes" role="radiogroup" aria-label="Mode">
+          <label class="chip"><input type="radio" name="mode" value="random" id="mode-random" checked><span>🎲 Random</span></label>
+          <label class="chip"><input type="radio" name="mode" value="tournament" id="mode-tournament"><span>🏆 Tournament</span></label>
+          <label class="chip"><input type="radio" name="mode" value="chase" id="mode-chase"><span><b style="background:var(--red)"></b>Color Chase</span></label>
+          <label class="chip"><input type="radio" name="mode" value="territory" id="mode-territory"><span><b style="background:#a95cff"></b>Tile Wars</span></label>
+          <label class="chip"><input type="radio" name="mode" value="domain" id="mode-domain"><span><b style="background:#1fd6f0"></b>Domain Duel</span></label>
+          <label class="chip"><input type="radio" name="mode" value="race" id="mode-race"><span><b style="background:var(--gold)"></b>Square Race</span></label>
+          <label class="chip"><input type="radio" name="mode" value="brawl" id="mode-brawl"><span><b style="background:#dfe6ff"></b>Weapon Brawl</span></label>
+          <label class="chip"><input type="radio" name="mode" value="bounce" id="mode-bounce"><span><b style="background:#ff8f33"></b>Bounce Brawl</span></label>
+          <label class="chip"><input type="radio" name="mode" value="marble" id="mode-marble"><span><b style="background:#ff4d8d"></b>Marble Race</span></label>
+          <label class="chip"><input type="radio" name="mode" value="hill" id="mode-hill"><span>👑 King of the Hill</span></label>
+        </div>
       </div>
-    </div>
-
-    <div class="group">
-      <span class="label">Clip farm</span>
-      <p class="hint">Plays matches back to back and saves every match as its own video file. Keep this tab open and visible while it runs; a minimised tab pauses the game.</p>
-      <div class="row">
-        <button class="btn" id="farm-folder" type="button">Choose folder</button>
+      <div class="group">
+        <span class="label">Match</span>
+        <div class="chips" role="radiogroup" aria-label="Speed">
+          <label class="chip"><input type="radio" name="speed" value="1" id="speed-1" checked><span>1×</span></label>
+          <label class="chip"><input type="radio" name="speed" value="1.5" id="speed-15"><span>1.5×</span></label>
+          <label class="chip"><input type="radio" name="speed" value="2" id="speed-2"><span>2×</span></label>
+        </div>
+        <div class="field"><label for="seed">Seed</label><input type="text" id="seed" inputmode="numeric" placeholder="random" autocomplete="off"></div>
+        <label class="toggle"><input type="checkbox" id="auto"> Start the next match automatically</label>
       </div>
-      <div class="field"><label for="farm-max">Stop after</label><input type="text" id="farm-max" inputmode="numeric" value="30" autocomplete="off"></div>
-      <div class="row">
-        <button class="btn btn-primary" id="farm-start" type="button">Start clip farm</button>
+      <div class="group">
+        <span class="label">Memes and voices</span>
+        <div class="chips" role="radiogroup" aria-label="Memes">
+          <label class="chip"><input type="radio" name="memes" value="0" id="memes-off"><span>Off</span></label>
+          <label class="chip"><input type="radio" name="memes" value="1" id="memes-on" checked><span>On</span></label>
+          <label class="chip"><input type="radio" name="memes" value="2" id="memes-chaos"><span>💀 Chaos</span></label>
+        </div>
+        <label class="toggle"><input type="checkbox" id="voices" checked> Voice lines (every color has its own personality)</label>
       </div>
-      <p class="status" id="farm-status" aria-live="polite">Clips go to your Downloads folder.</p>
-    </div>
+    </section>
 
-    <div class="group">
-      <span class="label">Music and sound</span>
-      <div class="field"><label for="music">Track</label><select id="music"></select></div>
-      <div class="field"><label for="music-vol">Music</label><input type="range" id="music-vol" min="0" max="1" step="0.05" value="0.45"></div>
-      <div class="field"><label for="sfx-vol">Effects</label><input type="range" id="sfx-vol" min="0" max="1" step="0.05" value="0.9"></div>
-      <div class="row">
-        <label class="btn upload" for="upload">Add your music<input type="file" id="upload" accept="audio/*" multiple></label>
+    <section class="tab-panel" id="tab-video" role="tabpanel" aria-labelledby="tabbtn-video" hidden>
+      <div class="group">
+        <span class="label">Recording</span>
+        <label class="toggle"><input type="checkbox" id="record" checked> Record each match with sound</label>
+        <label class="toggle"><input type="checkbox" id="reel" checked> Reel mode: no intro, a hook line, shorter matches</label>
+        <div class="field"><label for="quality">Quality</label><select id="quality">
+          <option value="auto">Auto (720p on phones)</option>
+          <option value="720">720p, smoothest</option>
+          <option value="1080">1080p, sharpest</option>
+        </select></div>
       </div>
-      <p class="hint">All built-in tracks are generated live by the game, so they are free to post. Only upload music you have the rights to.</p>
-    </div>
-
-    <div class="group">
-      <span class="label">Win stats</span>
-      <div class="field"><label for="stats-mode">Mode</label><select id="stats-mode"></select></div>
-      <div class="stats-wrap"><table class="stats" id="stats-table" aria-label="Wins per color"></table></div>
-      <div class="row"><button class="btn" id="stats-reset" type="button">Reset stats</button></div>
-      <p class="hint" id="stats-note">Counted on this device only.</p>
-    </div>
-
-    <div class="group">
-      <span class="label">Names</span>
-      <p class="hint">Rename any color. Tick the star to put that color in every match.</p>
-      <div class="names" id="names"></div>
-    </div>
-
-    <div class="group">
-      <span class="label">Memes and voices</span>
-      <div class="chips" role="radiogroup" aria-label="Memes">
-        <label class="chip"><input type="radio" name="memes" value="0" id="memes-off"><span>Off</span></label>
-        <label class="chip"><input type="radio" name="memes" value="1" id="memes-on" checked><span>On</span></label>
-        <label class="chip"><input type="radio" name="memes" value="2" id="memes-chaos"><span>💀 Chaos</span></label>
+      <div class="group">
+        <span class="label">Clip farm</span>
+        <p class="hint">Plays matches back to back and saves every match as its own video file. Keep this tab open and visible while it runs; a minimised tab pauses the game.</p>
+        <div class="row">
+          <button class="btn" id="farm-folder" type="button">Choose folder</button>
+        </div>
+        <div class="field"><label for="farm-max">Stop after</label><input type="text" id="farm-max" inputmode="numeric" value="30" autocomplete="off"></div>
+        <div class="row">
+          <button class="btn btn-primary" id="farm-start" type="button">Start clip farm</button>
+        </div>
+        <p class="status" id="farm-status" aria-live="polite">Clips go to your Downloads folder.</p>
       </div>
-      <label class="toggle"><input type="checkbox" id="voices" checked> Voice lines (every color has its own personality)</label>
-    </div>
+    </section>
 
-    <div class="group">
-      <span class="label">Lore</span>
-      <div class="lore" id="lore"></div>
-    </div>
-
-    <div class="group">
-      <span class="label">Posters</span>
-      <p class="hint">Propaganda from the Grid, starring DoucheCube. Tap a poster to save it as a 1080×1350 PNG (the feed size on Instagram and Facebook).</p>
-      <div class="field"><label for="poster-handle">Handle on posters</label><input type="text" id="poster-handle" placeholder="@squeretrinity" autocomplete="off" maxlength="30"></div>
-      <div class="posters" id="posters"></div>
-    </div>
-
-    <div class="group">
-      <span class="label">Match</span>
-      <div class="chips" role="radiogroup" aria-label="Speed">
-        <label class="chip"><input type="radio" name="speed" value="1" id="speed-1" checked><span>1×</span></label>
-        <label class="chip"><input type="radio" name="speed" value="1.5" id="speed-15"><span>1.5×</span></label>
-        <label class="chip"><input type="radio" name="speed" value="2" id="speed-2"><span>2×</span></label>
+    <section class="tab-panel" id="tab-look" role="tabpanel" aria-labelledby="tabbtn-look" hidden>
+      <div class="group">
+        <span class="label">Screen</span>
+        <div class="field"><label for="fisheye">Fish-eye</label><input type="range" id="fisheye" min="0" max="100" step="5" value="30"></div>
+        <div class="field"><label for="crt">CRT</label><input type="range" id="crt" min="0" max="100" step="5" value="35"></div>
+        <div class="field"><label for="static">Static <output id="static-val">0%</output></label><input type="range" id="static" min="0" max="100" step="1" value="0"></div>
+        <div class="field"><label for="decay">Per video</label><select id="decay">
+          <option value="0">Stays the same</option>
+          <option value="2">+2% static (a long series)</option>
+          <option value="4">+4% static</option>
+          <option value="8">+8% static</option>
+          <option value="15">+15% static (a short series)</option>
+        </select></div>
+        <p class="hint">The signal gets worse with every video. At 100% the next video has the signal event: the picture breaks up, the Frame reboots and the static starts over.</p>
+        <div class="row">
+          <button class="btn" id="reboot" type="button">Reboot the signal next video</button>
+        </div>
+        <label class="label-small" for="transmission">Hidden transmission</label>
+        <textarea class="textbox" id="transmission" rows="6" spellcheck="false"></textarea>
+        <p class="hint">The secret message, split into fragments. Each reboot video shows only the next fragment, numbered, while the match is frozen, so viewers have to collect the videos and put it together. Clear the box to get the original message back.</p>
+        <div class="field"><label for="frag-words">Fragment</label><select id="frag-words">
+          <option value="1">1 word per reboot</option>
+          <option value="2">2 words per reboot</option>
+          <option value="3">3 words per reboot</option>
+        </select></div>
+        <p class="status" id="frag-next" aria-live="polite"></p>
+        <div class="row row-small">
+          <button class="btn" id="frag-prev" type="button" aria-label="Previous fragment">Back</button>
+          <button class="btn" id="frag-fwd" type="button" aria-label="Next fragment">Skip</button>
+          <button class="btn" id="frag-reset" type="button">Start over</button>
+        </div>
       </div>
-      <div class="field"><label for="seed">Seed</label><input type="text" id="seed" inputmode="numeric" placeholder="random" autocomplete="off"></div>
-      <label class="toggle"><input type="checkbox" id="auto"> Start the next match automatically</label>
-    </div>
+    </section>
+
+    <section class="tab-panel" id="tab-sound" role="tabpanel" aria-labelledby="tabbtn-sound" hidden>
+      <div class="group">
+        <span class="label">Music and sound</span>
+        <div class="field"><label for="music">Track</label><select id="music"></select></div>
+        <div class="field"><label for="music-vol">Music</label><input type="range" id="music-vol" min="0" max="1" step="0.05" value="0.45"></div>
+        <div class="field"><label for="sfx-vol">Effects</label><input type="range" id="sfx-vol" min="0" max="1" step="0.05" value="0.9"></div>
+        <div class="row">
+          <label class="btn upload" for="upload">Add your music<input type="file" id="upload" accept="audio/*" multiple></label>
+        </div>
+        <p class="hint">Music and effects volumes change the sound in your videos too. To only make it quieter for yourself, use the speaker slider at the top.</p>
+        <p class="hint">All built-in tracks are generated live by the game, so they are free to post. Only upload music you have the rights to.</p>
+      </div>
+    </section>
+
+    <section class="tab-panel" id="tab-world" role="tabpanel" aria-labelledby="tabbtn-world" hidden>
+      <div class="group">
+        <span class="label">Names</span>
+        <p class="hint">Rename any color. Tick the star to put that color in every match.</p>
+        <div class="names" id="names"></div>
+      </div>
+      <div class="group">
+        <span class="label">Win stats</span>
+        <div class="field"><label for="stats-mode">Mode</label><select id="stats-mode"></select></div>
+        <div class="stats-wrap"><table class="stats" id="stats-table" aria-label="Wins per color"></table></div>
+        <div class="row"><button class="btn" id="stats-reset" type="button">Reset stats</button></div>
+        <p class="hint" id="stats-note">Counted on this device only.</p>
+      </div>
+      <div class="group">
+        <span class="label">Lore</span>
+        <div class="lore" id="lore"></div>
+      </div>
+      <div class="group">
+        <span class="label">Posters</span>
+        <p class="hint">Propaganda from the Grid, starring DoucheCube. Tap a poster to save it as a 1080×1350 PNG (the feed size on Instagram and Facebook).</p>
+        <div class="field"><label for="poster-handle">Handle on posters</label><input type="text" id="poster-handle" placeholder="@squeretrinity" autocomplete="off" maxlength="30"></div>
+        <div class="posters" id="posters"></div>
+      </div>
+    </section>
   </aside>
 </div>
 

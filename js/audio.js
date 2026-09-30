@@ -114,11 +114,12 @@
       this.intensity = 0.4;
       this.uploads = []; // { name, buffer }
       this.lastSfx = {};
+      this.listenVol = 1; // your speakers only; recordings always get the full mix
     }
 
     init() {
       if (this.ctx) {
-        if (this.ctx.state === 'suspended') this.ctx.resume();
+        if (this.ctx.state === 'suspended' && !this.wantPaused) this.ctx.resume();
         return;
       }
       const AC = window.AudioContext || window.webkitAudioContext;
@@ -133,7 +134,11 @@
       comp.attack.value = 0.004;
       comp.release.value = 0.2;
       this.master.connect(comp);
-      comp.connect(ctx.destination);
+      // what you hear goes through its own volume knob; the recording taps the mix before it
+      this.monitor = ctx.createGain();
+      this.monitor.gain.value = this.listenVol;
+      comp.connect(this.monitor);
+      this.monitor.connect(ctx.destination);
       if (ctx.createMediaStreamDestination) {
         this.streamDest = ctx.createMediaStreamDestination();
         comp.connect(this.streamDest);
@@ -183,6 +188,25 @@
       return this.ctx ? this.ctx.currentTime : 0;
     }
 
+    setListenVolume(v) {
+      this.listenVol = v;
+      if (this.monitor) this.monitor.gain.setTargetAtTime(v, this.ctx.currentTime, 0.02);
+    }
+    // Freezes all sound, music included, while the game is paused.
+    pause(on) {
+      if (!this.ctx) return;
+      this.wantPaused = on;
+      // one change at a time, and check again after each one, so a fast pause-unpause-pause ends paused
+      if (this.pausing) return;
+      this.pausing = true;
+      const settle = () => {
+        const ctx = this.ctx;
+        if (this.wantPaused && ctx.state === 'running') ctx.suspend().then(settle, settle);
+        else if (!this.wantPaused && ctx.state === 'suspended') ctx.resume().then(settle, settle);
+        else this.pausing = false;
+      };
+      settle();
+    }
     setMusicVolume(v) {
       this.musicVol = v;
       if (this.musicBus) this.musicBus.gain.setTargetAtTime(v, this.now, 0.05);
@@ -276,6 +300,26 @@
         setTimeout(() => g.disconnect(), ((fade || 0.3) + 0.5) * 1000);
         this.musicGain = null;
       }
+    }
+
+    // A dead-channel hiss with a low hum under it, for when the signal is lost.
+    hiss(dur) {
+      if (!this.ctx) return;
+      const t = this.now;
+      this.noiseHit(t, dur, { filter: 'highpass', freq: 2200, gain: 0.11, attack: 0.4 });
+      this.noiseHit(t, dur, { filter: 'bandpass', freq: 700, q: 0.7, gain: 0.05, attack: 0.6 });
+      const o = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      o.type = 'sawtooth';
+      o.frequency.value = 55;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.035, t + 0.8);
+      g.gain.setValueAtTime(0.035, t + dur - 0.6);
+      g.gain.linearRampToValueAtTime(0.0001, t + dur);
+      o.connect(g);
+      g.connect(this.sfxBus);
+      o.start(t);
+      o.stop(t + dur + 0.1);
     }
 
     // Muffles the music, e.g. during slow motion.

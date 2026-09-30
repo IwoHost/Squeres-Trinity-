@@ -251,7 +251,7 @@
 
   // ----- restore preferences -----
   const prefs = store.get('prefs2', {});
-  Object.assign(game.opts, { mode: prefs.mode || 'random', memes: prefs.memes != null ? prefs.memes : 1, speed: prefs.speed || 1, music: prefs.music || 'shuffle', record: prefs.record != null ? prefs.record : true, autoNext: !!prefs.autoNext, quality: prefs.quality || 'auto', voices: prefs.voices !== false, reel: prefs.reel !== false, fisheye: prefs.fisheye != null ? prefs.fisheye : 30, static: prefs.static || 0, decay: prefs.decay != null ? prefs.decay : 4 });
+  Object.assign(game.opts, { mode: prefs.mode || 'random', memes: prefs.memes != null ? prefs.memes : 1, speed: prefs.speed || 1, music: prefs.music || 'shuffle', record: prefs.record != null ? prefs.record : true, autoNext: !!prefs.autoNext, quality: prefs.quality || 'auto', voices: prefs.voices !== false, reel: prefs.reel !== false, fisheye: prefs.fisheye != null ? prefs.fisheye : 30, crt: prefs.crt != null ? prefs.crt : 35, static: prefs.static || 0, decay: prefs.decay != null ? prefs.decay : 4, transmission: typeof prefs.transmission === 'string' ? prefs.transmission : '', fragWords: prefs.fragWords || 1, fragIndex: prefs.fragIndex || 0 });
   if (game.opts.music.startsWith('up')) game.opts.music = 'shuffle';
   fillMusic();
   const setRadio = (name, value) => {
@@ -297,6 +297,8 @@
     $('reboot').textContent = game.rebootNext ? 'Reboot set for the next video' : 'Reboot the signal next video';
   };
   $('fisheye').value = game.opts.fisheye;
+  $('crt').value = game.opts.crt;
+  $('crt').addEventListener('input', (e) => ((game.opts.crt = +e.target.value), save()));
   $('decay').value = String(game.opts.decay);
   if ($('decay').value === '') $('decay').value = '4';
   showSignal(game.opts.static);
@@ -306,6 +308,45 @@
     game.rebootNext = game.opts.static >= 100;
     showSignal(game.opts.static);
     save();
+  });
+  // the hidden message: you always see exactly what the reboot video will show
+  $('transmission').value = game.opts.transmission || SQ.TRANSMISSION;
+  // which fragment the next reboot video will show, so you always know where the story is
+  const showFragment = () => {
+    const frags = SQ.fragments(game.opts.transmission || SQ.TRANSMISSION, game.opts.fragWords || 1);
+    const i = (game.opts.fragIndex || 0) % frags.length;
+    const done = (game.opts.fragIndex || 0) >= frags.length;
+    $('frag-next').textContent = `${done ? 'All shown, starting over. ' : ''}Next reboot: fragment ${i + 1} of ${frags.length}, "${frags[i]}"`;
+  };
+  const moveFragment = (d) => {
+    const n = SQ.fragments(game.opts.transmission || SQ.TRANSMISSION, game.opts.fragWords || 1).length;
+    game.opts.fragIndex = d === 0 ? 0 : ((((game.opts.fragIndex || 0) % n) + d + n) % n);
+    save();
+    showFragment();
+  };
+  $('frag-words').value = String(game.opts.fragWords || 1);
+  $('frag-words').addEventListener('change', (e) => {
+    game.opts.fragWords = +e.target.value;
+    game.opts.fragIndex = 0; // a new split starts the message from the beginning
+    save();
+    showFragment();
+  });
+  $('frag-prev').addEventListener('click', () => moveFragment(-1));
+  $('frag-fwd').addEventListener('click', () => moveFragment(1));
+  $('frag-reset').addEventListener('click', () => moveFragment(0));
+  game.on('fragment', () => {
+    save();
+    showFragment();
+  });
+  $('transmission').addEventListener('input', (e) => {
+    const t = e.target.value.trim();
+    game.opts.transmission = t && t !== SQ.TRANSMISSION ? t : '';
+    save();
+    showFragment();
+  });
+  showFragment();
+  $('transmission').addEventListener('blur', (e) => {
+    if (!e.target.value.trim()) e.target.value = SQ.TRANSMISSION;
   });
   $('decay').addEventListener('change', (e) => ((game.opts.decay = +e.target.value), save()));
   $('reboot').addEventListener('click', () => {
@@ -492,8 +533,76 @@
   setInterval(() => {
     const on = game.recorder.active;
     $('rec-badge').hidden = !on;
-    if (on) $('rec-time').textContent = SQ.fmtTime((performance.now() - game.recorder.startedAt) / 1000 - 0.5);
+    // the timer stands still while the game is paused, like the recording itself
+    if (on && !game.paused) $('rec-time').textContent = SQ.fmtTime((performance.now() - game.recorder.startedAt) / 1000 - 0.5);
   }, 250);
+
+  // ----- pause -----
+  const togglePause = () => game.setPaused(!game.paused);
+  $('pause').addEventListener('click', togglePause);
+  $('fs-pause').addEventListener('click', () => {
+    togglePause();
+    showBar();
+  });
+  const pausable = () => game.phase !== 'idle' && game.phase !== 'done';
+  const syncPause = () => {
+    const p = !!game.paused;
+    $('pause').disabled = !pausable() && !p;
+    $('pause').textContent = p ? 'Resume' : 'Pause';
+    $('pause').setAttribute('aria-pressed', String(p));
+    $('fs-pause').textContent = p ? 'Resume' : 'Pause';
+    $('pause-badge').hidden = !p;
+  };
+  game.on('pause', syncPause);
+  game.on('phase', syncPause);
+  syncPause();
+
+  // ----- your speakers (the recording is not affected) -----
+  const listenPrefs = store.get('listen', { vol: 1, muted: false });
+  let listenVol = typeof listenPrefs.vol === 'number' ? listenPrefs.vol : 1;
+  let listenMuted = !!listenPrefs.muted;
+  const applyListen = () => {
+    game.audio.setListenVolume(listenMuted ? 0 : listenVol);
+    $('listen').value = listenVol;
+    $('listen-mute').setAttribute('aria-pressed', String(listenMuted));
+    $('listen-mute').setAttribute('aria-label', listenMuted ? 'Unmute your speakers' : 'Mute your speakers');
+    store.set('listen', { vol: listenVol, muted: listenMuted });
+  };
+  $('listen').addEventListener('input', (e) => {
+    listenVol = +e.target.value;
+    listenMuted = listenVol === 0;
+    applyListen();
+  });
+  $('listen-mute').addEventListener('click', () => {
+    listenMuted = !listenMuted;
+    if (!listenMuted && listenVol === 0) listenVol = 0.5;
+    applyListen();
+  });
+  applyListen();
+
+  // ----- settings tabs -----
+  const tabs = [...document.querySelectorAll('.tab')];
+  const showTab = (id, focus) => {
+    tabs.forEach((t) => {
+      const on = t.id === 'tabbtn-' + id;
+      t.setAttribute('aria-selected', String(on));
+      t.tabIndex = on ? 0 : -1;
+      $('tab-' + t.id.slice(7)).hidden = !on;
+      if (on && focus) t.focus();
+    });
+    store.set('tab', id);
+  };
+  tabs.forEach((t, i) => {
+    t.addEventListener('click', () => showTab(t.id.slice(7)));
+    t.addEventListener('keydown', (e) => {
+      const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+      if (!d) return;
+      e.preventDefault();
+      showTab(tabs[(i + d + tabs.length) % tabs.length].id.slice(7), true);
+    });
+  });
+  const savedTab = store.get('tab', 'play');
+  showTab(tabs.some((t) => t.id === 'tabbtn-' + savedTab) ? savedTab : 'play');
 
   // ----- saving -----
   // one save button per tournament part
@@ -577,6 +686,30 @@
     }
     keepAwake();
     showBar();
+    drawBackdrop();
+  }
+  // The sides of the screen show a blurred copy of the game instead of black bars.
+  // A tiny copy is enough: the browser blurs it anyway, which keeps it cheap.
+  const backdrop = $('fs-backdrop');
+  const bctx = backdrop.getContext('2d');
+  let backdropOn = false;
+  function drawBackdrop() {
+    if (backdropOn) return;
+    backdropOn = true;
+    let n = 0;
+    const step = () => {
+      if (!document.body.classList.contains('theater-on')) {
+        backdropOn = false;
+        return;
+      }
+      if (n++ % 3 === 0) {
+        try {
+          bctx.drawImage(game.view, 0, 0, backdrop.width, backdrop.height);
+        } catch (e) {}
+      }
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
   }
   function exitFull() {
     stage.classList.remove('theater');
@@ -630,9 +763,16 @@
 
   // keyboard: space or enter starts a match when nothing is focused
   document.addEventListener('keydown', (e) => {
-    // only between matches, so a stray key press never throws away a match that is being recorded
+    if (document.activeElement !== document.body) return;
+    // during a match Space and P pause; a new match only starts between matches,
+    // so a stray key press never throws away a match that is being recorded
     const between = game.phase === 'idle' || game.phase === 'done';
-    if ((e.key === ' ' || e.key === 'Enter') && document.activeElement === document.body && between) {
+    if ((e.key === ' ' || e.key === 'p' || e.key === 'P') && !between) {
+      e.preventDefault();
+      togglePause();
+      return;
+    }
+    if ((e.key === ' ' || e.key === 'Enter') && between) {
       e.preventDefault();
       start();
     }
