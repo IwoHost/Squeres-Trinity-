@@ -117,9 +117,28 @@ decides who advances.
 ## Memes
 
 With memes on, squares react with captions ("skill issue", "it's so over", "we're so back",
-"6 7", "aura +1000"…), streaks turn a square into 🗿 with a vine-boom, and the winner gets
+"6 7", "aura +1000"…), a 5-kill streak makes a square glow with a vine-boom, and the winner gets
 pixel "deal with it" sunglasses. Everything is drawn in code, so no copyrighted GIFs are used.
 **Chaos** makes all of it more frequent.
+
+## Screen: fish-eye and static
+
+The Screen panel bends the picture like an old TV (Fish-eye) and adds TV static. The static
+belongs to a series, not a single video: with "Per video" set, every finished video adds a
+little more, so a run of posts slowly loses its signal. When it reaches 100%, or when you press
+"Reboot the signal next video", the next video has the signal event: the picture breaks up,
+SIGNAL LOST, the Frame reboots and the static starts over at 0%. Big moments make the picture
+glitch harder the worse the signal is. Both effects are in the recorded video. They need
+WebGL; without it the static still shows as grain and the fish-eye is skipped.
+
+## Video names and match info
+
+Every video is named after what happened in it, so it is easy to write titles later, for example:
+`Cycle 12 - Marble Race - Pink beats Blue Cyan Purple - finished in 12.5s - Photo Finish - signal 36% - seed 2030.mp4`.
+The cycle is the number of matches played on this device. After each match the Video panel
+also shows "Match info": the same data plus every square's personality and Sector, any rivalry
+that was settled, and whether the Frame rebooted. Copy it into a chat to get lore-style titles
+and descriptions.
 
 ## Video export
 
@@ -149,6 +168,7 @@ open and visible: browsers pause games in minimised or hidden tabs.
 - `js/core.js`: random numbers, teams and the square renderer (faces, moods, sunglasses)
 - `js/audio.js`: music generator and sound effects
 - `js/fx.js`: camera, particles, speech bubbles, banners, confetti
+- `js/post.js`: the WebGL screen pass (fish-eye, static, glitches)
 - `js/modes/*.js`: one file per mode
 - `js/game.js`: match director (intro → countdown → play → finale → outro) and recorder
 - `js/posters.js`: the propaganda posters and the poster-style DoucheCube

@@ -98,6 +98,7 @@
   statsSel.addEventListener('change', renderStats);
   game.on('result', (r) => {
     stats.total++;
+    game.cycle = stats.total; // every match ever played on this device is one cycle of the Games
     const byColor = (stats.modes[r.mode] = stats.modes[r.mode] || {});
     for (const c of r.teams) {
       const row = (byColor[c] = byColor[c] || { p: 0, w: 0, t: 0 });
@@ -250,7 +251,7 @@
 
   // ----- restore preferences -----
   const prefs = store.get('prefs2', {});
-  Object.assign(game.opts, { mode: prefs.mode || 'random', memes: prefs.memes != null ? prefs.memes : 1, speed: prefs.speed || 1, music: prefs.music || 'shuffle', record: prefs.record != null ? prefs.record : true, autoNext: !!prefs.autoNext, quality: prefs.quality || 'auto', voices: prefs.voices !== false, reel: prefs.reel !== false });
+  Object.assign(game.opts, { mode: prefs.mode || 'random', memes: prefs.memes != null ? prefs.memes : 1, speed: prefs.speed || 1, music: prefs.music || 'shuffle', record: prefs.record != null ? prefs.record : true, autoNext: !!prefs.autoNext, quality: prefs.quality || 'auto', voices: prefs.voices !== false, reel: prefs.reel !== false, fisheye: prefs.fisheye != null ? prefs.fisheye : 30, static: prefs.static || 0, decay: prefs.decay != null ? prefs.decay : 4 });
   if (game.opts.music.startsWith('up')) game.opts.music = 'shuffle';
   fillMusic();
   const setRadio = (name, value) => {
@@ -289,6 +290,34 @@
       game.trackToast = 3;
     }
   });
+  // ----- screen effects -----
+  const showSignal = (v) => {
+    $('static').value = Math.round(v);
+    $('static-val').textContent = `${Math.round(v)}%`;
+    $('reboot').textContent = game.rebootNext ? 'Reboot set for the next video' : 'Reboot the signal next video';
+  };
+  $('fisheye').value = game.opts.fisheye;
+  $('decay').value = String(game.opts.decay);
+  if ($('decay').value === '') $('decay').value = '4';
+  showSignal(game.opts.static);
+  $('fisheye').addEventListener('input', (e) => ((game.opts.fisheye = +e.target.value), save()));
+  $('static').addEventListener('input', (e) => {
+    game.opts.static = +e.target.value;
+    game.rebootNext = game.opts.static >= 100;
+    showSignal(game.opts.static);
+    save();
+  });
+  $('decay').addEventListener('change', (e) => ((game.opts.decay = +e.target.value), save()));
+  $('reboot').addEventListener('click', () => {
+    game.rebootNext = !game.rebootNext;
+    showSignal(game.opts.static);
+  });
+  game.on('signal', (v) => {
+    showSignal(v);
+    save();
+  });
+  if (game.opts.static >= 100) game.rebootNext = true;
+
   $('music-vol').addEventListener('input', (e) => (game.audio.setMusicVolume(+e.target.value), save()));
   $('sfx-vol').addEventListener('input', (e) => (game.audio.setSfxVolume(+e.target.value), save()));
   $('record').addEventListener('change', (e) => {
@@ -322,6 +351,25 @@
     e.target.value = '';
   });
 
+  // ----- match info, for writing titles and descriptions -----
+  function showInfo(text) {
+    $('info-text').value = text;
+    $('info').hidden = !text;
+  }
+  $('info-copy').addEventListener('click', async () => {
+    const el = $('info-text');
+    try {
+      await navigator.clipboard.writeText(el.value);
+      $('info-copy').textContent = 'Copied';
+    } catch (e) {
+      // some viewers block the clipboard; selecting the text lets you copy it by hand
+      el.focus();
+      el.select();
+      $('info-copy').textContent = 'Selected, copy it by hand';
+    }
+    setTimeout(() => ($('info-copy').textContent = 'Copy match info'), 1600);
+  });
+
   // ----- matches -----
   function start(seed) {
     const typed = $('seed').value.trim();
@@ -331,6 +379,7 @@
     keepAwake();
     $('parts').innerHTML = '';
     $('parts').hidden = true;
+    showInfo('');
     $('seed').value = '';
     $('seed').placeholder = String(game.seed);
     $('overlay').hidden = true;
@@ -430,6 +479,7 @@
       }, 2500);
     }
     if (game.tour && game.videos.length) status(`Tournament recorded in ${game.videos.length} parts. Save the ones you want.`);
+    showInfo(video && video.info ? `File: ${video.name}\n${video.info}` : game.mode && game.mode.winner ? game.matchInfo().text : '');
     if (video) {
       const mb = (video.blob.size / 1048576).toFixed(1);
       $('save').hidden = false;
@@ -462,6 +512,7 @@
     b.textContent = `Save part ${v.part}`;
     b.title = `${(v.blob.size / 1048576).toFixed(1)} MB`;
     b.addEventListener('click', () => saveVideo(v));
+    showInfo(`${$('info-text').value ? $('info-text').value + '\n\n' : ''}File: ${v.name}\n${v.info}`);
     $('parts').appendChild(b);
     $('parts').hidden = false;
     status(`Part ${v.part} recorded.`);

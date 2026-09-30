@@ -67,7 +67,7 @@
             flash: 0,
             squash: 0,
             blink: rng.range(1, 5),
-            sigma: false,
+            streak: false,
           });
         }
       }
@@ -334,10 +334,10 @@
       this.comboT = 0.9;
       g.audio.pop(this.combo - 1, (prey.x - 500) / 600);
       if (this.combo === 10 || this.combo === 25 || this.combo === 50 || this.combo === 100) g.fx.text(prey.x, prey.y - 40, `x${this.combo} COMBO`, '#ffe066', 38);
-      if (hunter.kills === 5 && !hunter.sigma && g.opts.memes > 0) {
-        // every streaker gets the 🗿 face; only the occasional one gets the full moment
-        hunter.sigma = true;
-        if (g.fx.memeMoment('SIGMA 🗿', hunter.x, hunter.y)) {
+      if (hunter.kills === 5 && !hunter.streak && g.opts.memes > 0) {
+        // every streaker glows; only the occasional one gets the full moment
+        hunter.streak = true;
+        if (g.fx.memeMoment('5 IN A ROW', hunter.x, hunter.y)) {
           g.fx.say(hunter, SQ.MEMES.streak[(Math.random() * SQ.MEMES.streak.length) | 0]);
           g.highlight(hunter.x, hunter.y, 1.3, 0.9, 0.5);
         }
@@ -446,8 +446,7 @@
           pop: e.pop,
           squash: e.squash,
           shield: e.shield,
-          face: e.sigma && this.g.opts.memes > 0 ? 'moai' : null,
-          glow: e.boost > 0 ? 18 : 0,
+          glow: e.boost > 0 ? 18 : e.streak && this.g.opts.memes > 0 ? 10 : 0,
           outline: e.frozen > 0 ? '#dff8ff' : null,
         });
       }

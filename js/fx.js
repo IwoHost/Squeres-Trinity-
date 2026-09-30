@@ -91,7 +91,7 @@
   const MEMES = {
     elim: ['💀', 'L', 'skill issue', 'bro fell off', 'emotional damage', 'caught in 4K', 'ratio', 'cooked 🍳', 'NPC behavior', 'bye bye 👋', 'not like this 😭', 'unlucky'],
     hunter: ['ez', 'mine now', 'gg', 'no cap', 'who let bro cook', 'yoink', 'sheesh', 'chat is this real'],
-    streak: ['SIGMA', 'AURA +1000', 'HIM', 'UNSTOPPABLE', 'built different', 'goated'],
+    streak: ['AURA +1000', 'HIM', 'UNSTOPPABLE', 'built different', 'goated'],
     lonely: ["it's so over", 'send help', 'alone 🥲', 'plot armor pls'],
     comeback: ["WE'RE SO BACK", 'COMEBACK ARC', 'main character energy'],
     winner: ['GG EZ', 'DEAL WITH IT', 'AURA MAXXED', 'W', 'THE GOAT 🐐', 'FLAWLESS'],
@@ -201,6 +201,7 @@
     // Once a match is decided (quiet), only banners marked force still show, so late events can't cover the win.
     banner(text, sub, color, dur, opts) {
       if (this.quiet && !(opts && opts.force)) return;
+      if (this.g && this.g.logEvent && !(opts && opts.force)) this.g.logEvent(text);
       this.banners.push({ text, sub, color: color || '#fff', life: 0, max: dur || 1.6, opts: opts || {} });
     }
     // A full-screen meme moment: vine boom, zoom punch, red vignette, big caption.
@@ -215,6 +216,7 @@
       this.g.cam.shake(10);
       this.vignette = 1;
       this.bigMeme = { caption, life: 0, max: 1.3 };
+      if (this.g.logEvent) this.g.logEvent(caption);
       return true;
     }
     flash(a, color) {

@@ -158,6 +158,9 @@ body.theater-on .desk { visibility: hidden; }
 .posters button:hover, .posters button:focus-visible { box-shadow: 0 0 0 2px var(--gold); color: var(--fg); }
 .posters canvas { width: 100%; height: auto; display: block; }
 .posters span { padding: 5px 6px 6px; text-align: left; }
+.info { background: var(--panel); border-radius: var(--radius); box-shadow: inset 0 0 0 1px var(--line); padding: 10px 12px; }
+.info summary { cursor: pointer; font-weight: 600; }
+.info textarea { box-sizing: border-box; width: 100%; margin: 10px 0 8px; resize: vertical; background: var(--ink); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 8px; font: 500 13px/1.45 var(--font-body); }
 .lore { display: flex; flex-direction: column; gap: 8px; }
 .lore p { margin: 0; color: var(--muted); max-width: 65ch; }
 .lore details { background: var(--panel); border-radius: var(--radius); box-shadow: inset 0 0 0 1px var(--line); }
@@ -280,6 +283,28 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       <p class="status" id="rec-status" aria-live="polite">The next match will be recorded.</p>
       <button class="btn btn-save" id="save" type="button" hidden>Save video</button>
       <div class="parts" id="parts" hidden></div>
+      <details class="info" id="info" hidden>
+        <summary>Match info for titles and descriptions</summary>
+        <textarea id="info-text" readonly rows="7" aria-label="Match info"></textarea>
+        <button class="btn" id="info-copy" type="button">Copy match info</button>
+      </details>
+    </div>
+
+    <div class="group">
+      <span class="label">Screen</span>
+      <div class="field"><label for="fisheye">Fish-eye</label><input type="range" id="fisheye" min="0" max="100" step="5" value="30"></div>
+      <div class="field"><label for="static">Static <output id="static-val">0%</output></label><input type="range" id="static" min="0" max="100" step="1" value="0"></div>
+      <div class="field"><label for="decay">Per video</label><select id="decay">
+        <option value="0">Stays the same</option>
+        <option value="2">+2% static (a long series)</option>
+        <option value="4">+4% static</option>
+        <option value="8">+8% static</option>
+        <option value="15">+15% static (a short series)</option>
+      </select></div>
+      <p class="hint">The signal gets worse with every video. At 100% the next video has the signal event: the picture breaks up, the Frame reboots and the static starts over.</p>
+      <div class="row">
+        <button class="btn" id="reboot" type="button">Reboot the signal next video</button>
+      </div>
     </div>
 
     <div class="group">
@@ -1925,7 +1950,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
   const MEMES = {
     elim: ['💀', 'L', 'skill issue', 'bro fell off', 'emotional damage', 'caught in 4K', 'ratio', 'cooked 🍳', 'NPC behavior', 'bye bye 👋', 'not like this 😭', 'unlucky'],
     hunter: ['ez', 'mine now', 'gg', 'no cap', 'who let bro cook', 'yoink', 'sheesh', 'chat is this real'],
-    streak: ['SIGMA', 'AURA +1000', 'HIM', 'UNSTOPPABLE', 'built different', 'goated'],
+    streak: ['AURA +1000', 'HIM', 'UNSTOPPABLE', 'built different', 'goated'],
     lonely: ["it's so over", 'send help', 'alone 🥲', 'plot armor pls'],
     comeback: ["WE'RE SO BACK", 'COMEBACK ARC', 'main character energy'],
     winner: ['GG EZ', 'DEAL WITH IT', 'AURA MAXXED', 'W', 'THE GOAT 🐐', 'FLAWLESS'],
@@ -2035,6 +2060,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     // Once a match is decided (quiet), only banners marked force still show, so late events can't cover the win.
     banner(text, sub, color, dur, opts) {
       if (this.quiet && !(opts && opts.force)) return;
+      if (this.g && this.g.logEvent && !(opts && opts.force)) this.g.logEvent(text);
       this.banners.push({ text, sub, color: color || '#fff', life: 0, max: dur || 1.6, opts: opts || {} });
     }
     // A full-screen meme moment: vine boom, zoom punch, red vignette, big caption.
@@ -2049,6 +2075,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       this.g.cam.shake(10);
       this.vignette = 1;
       this.bigMeme = { caption, life: 0, max: 1.3 };
+      if (this.g.logEvent) this.g.logEvent(caption);
       return true;
     }
     flash(a, color) {
@@ -2246,6 +2273,143 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
 })();
 
 </script>
+<script>/* js/post.js */
+// Screen effects over the finished frame: a slight fish-eye bulge and TV static.
+// The game draws into an offscreen 2D canvas; this pass copies it to the visible (and recorded) canvas with WebGL.
+(function () {
+  const SQ = window.SQ;
+
+  const VERT = `
+attribute vec2 p;
+varying vec2 uv;
+void main() {
+  uv = vec2(p.x * 0.5 + 0.5, 0.5 - p.y * 0.5);
+  gl_Position = vec4(p, 0.0, 1.0);
+}`;
+
+  const FRAG = `
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+uniform sampler2D tex;
+uniform float fish;    // 0..1 bulge strength
+uniform float noise;   // 0..1 how much static is on screen right now
+uniform float glitch;  // 0..1 burst when something big happens
+uniform float seed;    // changes every frame so the static moves
+uniform vec2 res;
+varying vec2 uv;
+
+// kept to small numbers so it also works on phones with low-precision GPUs
+float rand(vec2 c) {
+  c = mod(c, 289.0);
+  return fract(sin(dot(c, vec2(12.9898, 78.233))) * 43758.5453);
+}
+
+// old-TV curvature: every edge keeps its middle, lines bow outward and the corners round off
+vec2 bulge(vec2 u) {
+  vec2 c = u * 2.0 - 1.0;
+  c *= 1.0 + (c.yx * c.yx) * fish * 0.2;
+  return c * 0.5 + 0.5;
+}
+
+void main() {
+  vec2 u = bulge(uv);
+  float row = floor(uv.y * res.y / 3.0);
+  // torn rows: a few bands slide sideways, more with static, a lot during a glitch
+  float band = floor(uv.y * 48.0 + seed * 7.0);
+  float tear = step(1.0 - (noise * 0.08 + glitch * 0.35), rand(vec2(band, seed)));
+  u.x += tear * (rand(vec2(band, seed + 1.0)) - 0.5) * (0.015 + noise * 0.03 + glitch * 0.12);
+  // a slow rolling bar, like a badly tuned signal
+  float roll = fract(uv.y * 0.9 - seed * 0.013);
+  float bar = smoothstep(0.0, 0.08, roll) * smoothstep(0.2, 0.08, roll);
+  u.x += bar * noise * 0.006;
+  // colors split apart during a glitch
+  float split = glitch * 0.012 + noise * 0.0025;
+  vec3 col;
+  col.r = texture2D(tex, u + vec2(split, 0.0)).r;
+  col.g = texture2D(tex, u).g;
+  col.b = texture2D(tex, u - vec2(split, 0.0)).b;
+  // static: grain over everything, stronger bright specks
+  float n = rand(vec2(floor(uv.x * res.x / 2.0), row) + seed);
+  float amount = noise * 0.5 + glitch * 0.35;
+  col = mix(col, vec3(n), amount * (0.55 + 0.45 * n));
+  col += bar * noise * 0.08;
+  // faint scanlines and a vignette that grows with the bulge
+  col *= 1.0 - 0.06 * noise * step(0.5, fract(uv.y * res.y / 4.0));
+  vec2 v = uv * 2.0 - 1.0;
+  col *= 1.0 - fish * 0.28 * dot(v, v) * 0.5;
+  // outside the curved screen is black
+  if (u.x < 0.0 || u.x > 1.0 || u.y < 0.0 || u.y > 1.0) col = vec3(0.0);
+  gl_FragColor = vec4(col, 1.0);
+}`;
+
+  class PostFX {
+    // view: the visible canvas. Returns an object whose .ok says whether WebGL is available.
+    constructor(view) {
+      this.view = view;
+      this.ok = false;
+      let gl = null;
+      try {
+        gl = view.getContext('webgl', { alpha: false, antialias: false, depth: false, preserveDrawingBuffer: true });
+      } catch (e) {}
+      if (!gl) return;
+      const sh = (type, src) => {
+        const s = gl.createShader(type);
+        gl.shaderSource(s, src);
+        gl.compileShader(s);
+        return gl.getShaderParameter(s, gl.COMPILE_STATUS) ? s : null;
+      };
+      const vs = sh(gl.VERTEX_SHADER, VERT);
+      const fs = sh(gl.FRAGMENT_SHADER, FRAG);
+      if (!vs || !fs) return;
+      const prog = gl.createProgram();
+      gl.attachShader(prog, vs);
+      gl.attachShader(prog, fs);
+      gl.linkProgram(prog);
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return;
+      gl.useProgram(prog);
+      const buf = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+      const loc = gl.getAttribLocation(prog, 'p');
+      gl.enableVertexAttribArray(loc);
+      gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+      const tex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      this.gl = gl;
+      this.u = {};
+      for (const k of ['fish', 'noise', 'glitch', 'seed', 'res']) this.u[k] = gl.getUniformLocation(prog, k);
+      this.ok = true;
+    }
+
+    // Copies the scene to the screen with the effects applied.
+    draw(scene, fish, noise, glitch) {
+      const gl = this.gl;
+      if (this.view.width !== scene.width || this.view.height !== scene.height) {
+        this.view.width = scene.width;
+        this.view.height = scene.height;
+      }
+      gl.viewport(0, 0, scene.width, scene.height);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, scene);
+      gl.uniform1f(this.u.fish, fish);
+      gl.uniform1f(this.u.noise, noise);
+      gl.uniform1f(this.u.glitch, glitch);
+      gl.uniform1f(this.u.seed, (Math.random() * 97) | 0);
+      gl.uniform2f(this.u.res, scene.width, scene.height);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    }
+  }
+
+  SQ.PostFX = PostFX;
+})();
+
+</script>
 <script>/* js/modes/chase.js */
 // Color Chase: each color hunts the next one in the cycle. Tagging converts the square.
 (function () {
@@ -2316,7 +2480,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
             flash: 0,
             squash: 0,
             blink: rng.range(1, 5),
-            sigma: false,
+            streak: false,
           });
         }
       }
@@ -2583,10 +2747,10 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       this.comboT = 0.9;
       g.audio.pop(this.combo - 1, (prey.x - 500) / 600);
       if (this.combo === 10 || this.combo === 25 || this.combo === 50 || this.combo === 100) g.fx.text(prey.x, prey.y - 40, `x${this.combo} COMBO`, '#ffe066', 38);
-      if (hunter.kills === 5 && !hunter.sigma && g.opts.memes > 0) {
-        // every streaker gets the 🗿 face; only the occasional one gets the full moment
-        hunter.sigma = true;
-        if (g.fx.memeMoment('SIGMA 🗿', hunter.x, hunter.y)) {
+      if (hunter.kills === 5 && !hunter.streak && g.opts.memes > 0) {
+        // every streaker glows; only the occasional one gets the full moment
+        hunter.streak = true;
+        if (g.fx.memeMoment('5 IN A ROW', hunter.x, hunter.y)) {
           g.fx.say(hunter, SQ.MEMES.streak[(Math.random() * SQ.MEMES.streak.length) | 0]);
           g.highlight(hunter.x, hunter.y, 1.3, 0.9, 0.5);
         }
@@ -2695,8 +2859,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
           pop: e.pop,
           squash: e.squash,
           shield: e.shield,
-          face: e.sigma && this.g.opts.memes > 0 ? 'moai' : null,
-          glow: e.boost > 0 ? 18 : 0,
+          glow: e.boost > 0 ? 18 : e.streak && this.g.opts.memes > 0 ? 10 : 0,
           outline: e.frozen > 0 ? '#dff8ff' : null,
         });
       }
@@ -7591,13 +7754,19 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
 
   class Game {
     constructor(canvas) {
-      this.canvas = canvas;
-      this.ctx = canvas.getContext('2d', { alpha: false });
+      // the game draws offscreen; the screen pass copies it to the visible canvas with fish-eye and static
+      this.view = canvas;
+      this.post = new SQ.PostFX(canvas);
+      if (!this.post.ok) this.post = null;
+      this.canvas = this.post ? document.createElement('canvas') : canvas;
+      this.ctx = this.canvas.getContext('2d', { alpha: false });
+      this.glitch = 0;
+      this.reboot = null; // the signal event, when the static has run its course
       this.audio = new SQ.AudioEngine();
       this.cam = new SQ.Camera();
       this.fx = new SQ.FX(this);
       this.recorder = new Recorder();
-      this.opts = { mode: 'random', memes: 1, speed: 1, music: 'shuffle', record: false, autoNext: false, quality: 'auto', voices: true, reel: true };
+      this.opts = { mode: 'random', memes: 1, speed: 1, music: 'shuffle', record: false, autoNext: false, quality: 'auto', voices: true, reel: true, fisheye: 30, static: 0, decay: 4 };
       this.setQuality('auto');
       this.fixedDt = 1 / 60;
       this.hitstopT = 0;
@@ -7662,6 +7831,9 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         this.episode++;
         this.seed = seed != null ? seed >>> 0 : SQ.randomSeed();
       }
+      this.reboot = null;
+      this.matchLog = [];
+      this.matchSignal = Math.round(this.opts.static || 0);
       const mseed = o.tour ? seed >>> 0 : this.seed;
       const rng = SQ.makeRng(mseed);
       let id = o.mode || this.opts.mode;
@@ -7702,7 +7874,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       this.video = null;
       this.setQuality(this.opts.quality);
       if (this.opts.record && this.recorder.supported) {
-        this.recorder.start(this.canvas, this.audio.streamDest && this.audio.streamDest.stream, 30, SQ.RES === 1 ? 9_000_000 : 5_000_000);
+        this.recorder.start(this.view, this.audio.streamDest && this.audio.streamDest.stream, 30, SQ.RES === 1 ? 9_000_000 : 5_000_000);
       }
       this.emit('match', { mode: this.modeInfo, seed: this.seed, track: this.track });
     }
@@ -7741,6 +7913,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     // Director hook used by modes: zoom to a moment, optionally in slow motion.
     highlight(x, y, z, dur, slow) {
       if (this.phase !== 'play') return;
+      this.burst(1);
       // crowded modes keep the full arena in view; zooming would crop squares at the edges
       if (this.mode && this.mode.wideShot) return;
       if (this.real - this.lastHighlight < 6) return;
@@ -7753,9 +7926,55 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       if (this.phase !== 'play') return;
       if (this.real - (this.lastQuickZoom || -10) < 2.2 || this.cam.hold > 0) return;
       this.lastQuickZoom = this.real;
+      this.burst(0.8);
       this.cam.focus(x, y, z, dur, 7);
       this.cam.punch(0.06);
       this.audio.whoosh();
+    }
+
+    // Big moments make the signal flicker; the more static the series has, the harder it glitches.
+    burst(power) {
+      const amt = (this.opts.static || 0) / 100;
+      if (amt <= 0) return;
+      this.glitch = Math.max(this.glitch, Math.min(1, (0.15 + amt * 0.6) * power));
+    }
+
+    // The static grows a little with every video of a series. At 100% (or when asked) the next video
+    // has the signal event: the picture breaks up, the Frame reboots and the static starts over.
+    advanceSignal() {
+      if (!this.opts.decay) return;
+      this.opts.static = Math.min(100, (this.opts.static || 0) + this.opts.decay);
+      if (this.opts.static >= 100) this.rebootNext = true;
+      this.emit('signal', this.opts.static);
+    }
+    updateReboot(realDt) {
+      const r0 = this.reboot;
+      // a match that ends mid-event still finishes the reboot, so the static never sticks at full
+      if (r0 && !r0.done && this.phase !== 'play') r0.t = 1.4;
+      else if (this.phase !== 'play') return;
+      if (this.rebootNext && !this.reboot && this.phaseT > 3.5) {
+        this.rebootNext = false;
+        this.reboot = { t: 0, from: this.opts.static || 0 };
+        this.fx.banner('SIGNAL LOST', 'the Frame is rebooting', '#ffffff', 1.4);
+        this.audio.boom();
+        this.cam.shake(14);
+      }
+      const r = this.reboot;
+      if (!r) return;
+      r.t += realDt;
+      // full static for a moment, then the picture snaps back clean
+      if (r.t < 1.4) {
+        this.opts.static = Math.min(100, r.from + (100 - r.from) * Math.min(1, r.t / 0.4));
+        this.glitch = Math.max(this.glitch, 0.6 + Math.random() * 0.4);
+      } else if (!r.done) {
+        r.done = true;
+        this.opts.static = 0;
+        this.glitch = 1;
+        this.fx.flash(0.7);
+        this.fx.banner('SIGNAL RESTORED', 'the Frame has rebooted', '#35d97a', 1.6);
+        this.audio.ding();
+        this.emit('signal', 0);
+      }
     }
 
     slowmo(scale, dur, muffle) {
@@ -7825,6 +8044,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         if (m.winner) {
           this.setPhase('finale');
           this.fx.quiet = true;
+          this.burst(1.3);
           this.slowmo(0.25, 1.5, true);
           const w = m.winnerEnt;
           this.cam.tracking = false;
@@ -7901,6 +8121,8 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         this.cam.tz = this.cam.defaultView.z;
       }
       if (P === 'idle' && m.winner) this.makeIdle();
+      this.updateReboot(realDt);
+      this.glitch = Math.max(0, this.glitch - realDt * 2.4);
       this.cam.update(realDt);
       this.fx.update(realDt * this.timeScale, realDt);
       if (this.trackToast > 0) this.trackToast -= realDt;
@@ -7963,12 +8185,13 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       this.audio.intensity = 0.35;
       // each match is saved as its own part, which suits a multi-part series of reels
       if (this.opts.record && this.recorder.supported && !this.recorder.active) {
-        this.recorder.start(this.canvas, this.audio.streamDest && this.audio.streamDest.stream, 30, SQ.RES === 1 ? 9_000_000 : 5_000_000);
+        this.recorder.start(this.view, this.audio.streamDest && this.audio.streamDest.stream, 30, SQ.RES === 1 ? 9_000_000 : 5_000_000);
       }
     }
 
     async finishTourMatch() {
       const t = this.tour;
+      if (!this.reboot) this.advanceSignal();
       const res = this.mode.winner;
       this.emitResult();
       // a knockout needs someone to advance: a tie is settled by a coin flip
@@ -8002,7 +8225,8 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       const blob = await this.recorder.stop();
       if (!blob || !blob.size) return;
       const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
-      const v = { blob, ext, part: this.tour.part, name: `squares-trinity-cup-${this.tour.seed}-part${this.tour.part}.${ext}` };
+      const info = this.matchInfo();
+      const v = { blob, ext, part: this.tour.part, name: `${info.name}.${ext}`, info: info.text };
       this.videos.push(v);
       this.emit('part', v);
     }
@@ -8013,6 +8237,51 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       await this.savePart();
       const c = this.tour.champion;
       this.emit('done', { winner: { team: c, text: `${c.name.toUpperCase()} IS THE CHAMPION` }, video: null, tour: true });
+    }
+
+    // Remembers what happened in a match (event banners, meme moments) for the video name.
+    logEvent(text) {
+      if (!this.matchLog || (this.phase !== 'play' && this.phase !== 'finale')) return;
+      const t = String(text).replace(/[^\p{L}\p{N} %'!&+-]/gu, '').trim();
+      if (!t || t === 'GO!' || this.matchLog.includes(t) || this.matchLog.length >= 8) return;
+      this.matchLog.push(t);
+    }
+
+    // Everything worth knowing about the match that just ended: a file name packed with it,
+    // and a longer text with the lore, for writing titles and descriptions.
+    matchInfo() {
+      const m = this.mode;
+      const w = m.winner;
+      const teams = m.teams || [];
+      const title = (s) => s.toLowerCase().replace(/(^|[\s-])\p{L}/gu, (c) => c.toUpperCase());
+      const events = (this.matchLog || []).map(title);
+      const losers = w && !w.tie ? teams.filter((t) => t !== w.team) : [];
+      const result = !w ? 'no result' : w.tie ? `tie between ${w.tied.map((t) => t.name).join(' and ')}` : `${w.team.name} beats ${losers.map((t) => t.name).join(' ')}`;
+      const where = this.tour ? `Trinity Games ${this.tour.seed} ${title(this.stage || '')}` : `Cycle ${this.cycle || this.episode}`;
+      const signal = this.reboot ? `signal lost at ${this.matchSignal}%, Frame rebooted` : `signal ${this.matchSignal}%`;
+      const parts = [where, this.modeInfo.name, result, w && w.sub ? w.sub : '', events.join(', '), signal, `seed ${this.tour ? this.tour.seed : this.seed}`];
+      let name = parts.filter(Boolean).join(' - ').replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, ' ');
+      if (name.length > 200) name = name.slice(0, 200).trim();
+      // the long version, with where each square is from
+      const who = (t) => {
+        const L = SQ.LORE[t.base];
+        const P = SQ.persona(t);
+        return `${t.name} (${P.title}${L ? `, ${L.sector}` : ''})`;
+      };
+      const lines = [
+        `${where}: ${this.modeInfo.name}`,
+        `Contestants: ${teams.map(who).join(', ')}`,
+        `Result: ${result}${w && w.sub ? ` (${w.sub})` : ''}`,
+      ];
+      if (w && !w.tie) {
+        const L = SQ.LORE[w.team.base];
+        const rival = L && teams.find((t) => t.base === L.rival);
+        if (rival) lines.push(`Rivalry: ${w.team.name} beat its rival ${rival.name}, who ${L.rivalWhy}`);
+      }
+      if (events.length) lines.push(`What happened: ${events.join(', ')}`);
+      lines.push(`Signal: ${this.reboot ? `lost at ${this.matchSignal}%, the Frame rebooted mid-match` : `${this.matchSignal}% static`}`);
+      if (this.tour && this.tour.champion) lines.push(`Champion of the Trinity Games: ${this.tour.champion.name}`);
+      return { name, text: lines.join('\n') };
     }
 
     // Tells the page who played and who won, for the win stats.
@@ -8029,13 +8298,14 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
 
     async finish() {
       if (this.tour) return this.finishTourMatch();
+      if (!this.reboot) this.advanceSignal(); // the video that rebooted starts the next series clean
       this.emitResult();
       this.setPhase('done');
       if (this.recorder.active) {
         const blob = await this.recorder.stop();
         if (blob && blob.size) {
           const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
-          this.video = { blob, ext, name: `squares-trinity-${this.modeInfo.id}-${this.seed}.${ext}` };
+          this.video = { blob, ext, name: `${this.matchInfo().name}.${ext}`, info: this.matchInfo().text };
         }
       }
       // the page starts the next match itself when auto-next is on, so its buttons stay in step
@@ -8044,6 +8314,41 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
 
     // ---------------- rendering ----------------
     render() {
+      this.renderScene();
+      const amt = (this.opts.static || 0) / 100;
+      // a gentle curve: the first videos of a series only get a faint grain
+      const noise = Math.pow(amt, 1.3) * (0.9 + Math.random() * 0.2);
+      const glitch = amt > 0 ? this.glitch * (0.4 + 0.6 * amt) : 0;
+      if (this.post) this.post.draw(this.canvas, (this.opts.fisheye || 0) / 100, noise, glitch);
+      else if (noise + glitch > 0.01) this.drawStatic2D(noise + glitch * 0.6);
+    }
+
+    // Without WebGL there is no fish-eye, but static still works as a grain layer.
+    drawStatic2D(a) {
+      if (!this.grainTile) {
+        const c = document.createElement('canvas');
+        c.width = c.height = 256;
+        const g = c.getContext('2d');
+        const img = g.createImageData(256, 256);
+        for (let i = 0; i < img.data.length; i += 4) {
+          const v = (Math.random() * 255) | 0;
+          img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+          img.data[i + 3] = 255;
+        }
+        g.putImageData(img, 0, 0);
+        this.grainTile = c;
+      }
+      const ctx = this.ctx;
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalAlpha = Math.min(0.6, a * 0.55);
+      const ox = (Math.random() * 256) | 0;
+      const oy = (Math.random() * 256) | 0;
+      for (let y = -oy; y < this.canvas.height; y += 256) for (let x = -ox; x < this.canvas.width; x += 256) ctx.drawImage(this.grainTile, x, y);
+      ctx.restore();
+    }
+
+    renderScene() {
       const ctx = this.ctx;
       const A = SQ.ARENA;
       const m = this.mode;
@@ -8554,6 +8859,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
   statsSel.addEventListener('change', renderStats);
   game.on('result', (r) => {
     stats.total++;
+    game.cycle = stats.total; // every match ever played on this device is one cycle of the Games
     const byColor = (stats.modes[r.mode] = stats.modes[r.mode] || {});
     for (const c of r.teams) {
       const row = (byColor[c] = byColor[c] || { p: 0, w: 0, t: 0 });
@@ -8706,7 +9012,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
 
   // ----- restore preferences -----
   const prefs = store.get('prefs2', {});
-  Object.assign(game.opts, { mode: prefs.mode || 'random', memes: prefs.memes != null ? prefs.memes : 1, speed: prefs.speed || 1, music: prefs.music || 'shuffle', record: prefs.record != null ? prefs.record : true, autoNext: !!prefs.autoNext, quality: prefs.quality || 'auto', voices: prefs.voices !== false, reel: prefs.reel !== false });
+  Object.assign(game.opts, { mode: prefs.mode || 'random', memes: prefs.memes != null ? prefs.memes : 1, speed: prefs.speed || 1, music: prefs.music || 'shuffle', record: prefs.record != null ? prefs.record : true, autoNext: !!prefs.autoNext, quality: prefs.quality || 'auto', voices: prefs.voices !== false, reel: prefs.reel !== false, fisheye: prefs.fisheye != null ? prefs.fisheye : 30, static: prefs.static || 0, decay: prefs.decay != null ? prefs.decay : 4 });
   if (game.opts.music.startsWith('up')) game.opts.music = 'shuffle';
   fillMusic();
   const setRadio = (name, value) => {
@@ -8745,6 +9051,34 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       game.trackToast = 3;
     }
   });
+  // ----- screen effects -----
+  const showSignal = (v) => {
+    $('static').value = Math.round(v);
+    $('static-val').textContent = `${Math.round(v)}%`;
+    $('reboot').textContent = game.rebootNext ? 'Reboot set for the next video' : 'Reboot the signal next video';
+  };
+  $('fisheye').value = game.opts.fisheye;
+  $('decay').value = String(game.opts.decay);
+  if ($('decay').value === '') $('decay').value = '4';
+  showSignal(game.opts.static);
+  $('fisheye').addEventListener('input', (e) => ((game.opts.fisheye = +e.target.value), save()));
+  $('static').addEventListener('input', (e) => {
+    game.opts.static = +e.target.value;
+    game.rebootNext = game.opts.static >= 100;
+    showSignal(game.opts.static);
+    save();
+  });
+  $('decay').addEventListener('change', (e) => ((game.opts.decay = +e.target.value), save()));
+  $('reboot').addEventListener('click', () => {
+    game.rebootNext = !game.rebootNext;
+    showSignal(game.opts.static);
+  });
+  game.on('signal', (v) => {
+    showSignal(v);
+    save();
+  });
+  if (game.opts.static >= 100) game.rebootNext = true;
+
   $('music-vol').addEventListener('input', (e) => (game.audio.setMusicVolume(+e.target.value), save()));
   $('sfx-vol').addEventListener('input', (e) => (game.audio.setSfxVolume(+e.target.value), save()));
   $('record').addEventListener('change', (e) => {
@@ -8778,6 +9112,25 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     e.target.value = '';
   });
 
+  // ----- match info, for writing titles and descriptions -----
+  function showInfo(text) {
+    $('info-text').value = text;
+    $('info').hidden = !text;
+  }
+  $('info-copy').addEventListener('click', async () => {
+    const el = $('info-text');
+    try {
+      await navigator.clipboard.writeText(el.value);
+      $('info-copy').textContent = 'Copied';
+    } catch (e) {
+      // some viewers block the clipboard; selecting the text lets you copy it by hand
+      el.focus();
+      el.select();
+      $('info-copy').textContent = 'Selected, copy it by hand';
+    }
+    setTimeout(() => ($('info-copy').textContent = 'Copy match info'), 1600);
+  });
+
   // ----- matches -----
   function start(seed) {
     const typed = $('seed').value.trim();
@@ -8787,6 +9140,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     keepAwake();
     $('parts').innerHTML = '';
     $('parts').hidden = true;
+    showInfo('');
     $('seed').value = '';
     $('seed').placeholder = String(game.seed);
     $('overlay').hidden = true;
@@ -8886,6 +9240,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       }, 2500);
     }
     if (game.tour && game.videos.length) status(`Tournament recorded in ${game.videos.length} parts. Save the ones you want.`);
+    showInfo(video && video.info ? `File: ${video.name}\n${video.info}` : game.mode && game.mode.winner ? game.matchInfo().text : '');
     if (video) {
       const mb = (video.blob.size / 1048576).toFixed(1);
       $('save').hidden = false;
@@ -8918,6 +9273,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     b.textContent = `Save part ${v.part}`;
     b.title = `${(v.blob.size / 1048576).toFixed(1)} MB`;
     b.addEventListener('click', () => saveVideo(v));
+    showInfo(`${$('info-text').value ? $('info-text').value + '\n\n' : ''}File: ${v.name}\n${v.info}`);
     $('parts').appendChild(b);
     $('parts').hidden = false;
     status(`Part ${v.part} recorded.`);

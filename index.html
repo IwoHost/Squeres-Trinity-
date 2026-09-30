@@ -158,6 +158,9 @@ body.theater-on .desk { visibility: hidden; }
 .posters button:hover, .posters button:focus-visible { box-shadow: 0 0 0 2px var(--gold); color: var(--fg); }
 .posters canvas { width: 100%; height: auto; display: block; }
 .posters span { padding: 5px 6px 6px; text-align: left; }
+.info { background: var(--panel); border-radius: var(--radius); box-shadow: inset 0 0 0 1px var(--line); padding: 10px 12px; }
+.info summary { cursor: pointer; font-weight: 600; }
+.info textarea { box-sizing: border-box; width: 100%; margin: 10px 0 8px; resize: vertical; background: var(--ink); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 8px; font: 500 13px/1.45 var(--font-body); }
 .lore { display: flex; flex-direction: column; gap: 8px; }
 .lore p { margin: 0; color: var(--muted); max-width: 65ch; }
 .lore details { background: var(--panel); border-radius: var(--radius); box-shadow: inset 0 0 0 1px var(--line); }
@@ -280,6 +283,28 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       <p class="status" id="rec-status" aria-live="polite">The next match will be recorded.</p>
       <button class="btn btn-save" id="save" type="button" hidden>Save video</button>
       <div class="parts" id="parts" hidden></div>
+      <details class="info" id="info" hidden>
+        <summary>Match info for titles and descriptions</summary>
+        <textarea id="info-text" readonly rows="7" aria-label="Match info"></textarea>
+        <button class="btn" id="info-copy" type="button">Copy match info</button>
+      </details>
+    </div>
+
+    <div class="group">
+      <span class="label">Screen</span>
+      <div class="field"><label for="fisheye">Fish-eye</label><input type="range" id="fisheye" min="0" max="100" step="5" value="30"></div>
+      <div class="field"><label for="static">Static <output id="static-val">0%</output></label><input type="range" id="static" min="0" max="100" step="1" value="0"></div>
+      <div class="field"><label for="decay">Per video</label><select id="decay">
+        <option value="0">Stays the same</option>
+        <option value="2">+2% static (a long series)</option>
+        <option value="4">+4% static</option>
+        <option value="8">+8% static</option>
+        <option value="15">+15% static (a short series)</option>
+      </select></div>
+      <p class="hint">The signal gets worse with every video. At 100% the next video has the signal event: the picture breaks up, the Frame reboots and the static starts over.</p>
+      <div class="row">
+        <button class="btn" id="reboot" type="button">Reboot the signal next video</button>
+      </div>
     </div>
 
     <div class="group">
@@ -358,6 +383,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
 <script src="js/core.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/fx.js"></script>
+<script src="js/post.js"></script>
 <script src="js/modes/chase.js"></script>
 <script src="js/modes/territory.js"></script>
 <script src="js/modes/domain.js"></script>

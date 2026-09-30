@@ -80,13 +80,19 @@
 
   class Game {
     constructor(canvas) {
-      this.canvas = canvas;
-      this.ctx = canvas.getContext('2d', { alpha: false });
+      // the game draws offscreen; the screen pass copies it to the visible canvas with fish-eye and static
+      this.view = canvas;
+      this.post = new SQ.PostFX(canvas);
+      if (!this.post.ok) this.post = null;
+      this.canvas = this.post ? document.createElement('canvas') : canvas;
+      this.ctx = this.canvas.getContext('2d', { alpha: false });
+      this.glitch = 0;
+      this.reboot = null; // the signal event, when the static has run its course
       this.audio = new SQ.AudioEngine();
       this.cam = new SQ.Camera();
       this.fx = new SQ.FX(this);
       this.recorder = new Recorder();
-      this.opts = { mode: 'random', memes: 1, speed: 1, music: 'shuffle', record: false, autoNext: false, quality: 'auto', voices: true, reel: true };
+      this.opts = { mode: 'random', memes: 1, speed: 1, music: 'shuffle', record: false, autoNext: false, quality: 'auto', voices: true, reel: true, fisheye: 30, static: 0, decay: 4 };
       this.setQuality('auto');
       this.fixedDt = 1 / 60;
       this.hitstopT = 0;
@@ -151,6 +157,9 @@
         this.episode++;
         this.seed = seed != null ? seed >>> 0 : SQ.randomSeed();
       }
+      this.reboot = null;
+      this.matchLog = [];
+      this.matchSignal = Math.round(this.opts.static || 0);
       const mseed = o.tour ? seed >>> 0 : this.seed;
       const rng = SQ.makeRng(mseed);
       let id = o.mode || this.opts.mode;
@@ -191,7 +200,7 @@
       this.video = null;
       this.setQuality(this.opts.quality);
       if (this.opts.record && this.recorder.supported) {
-        this.recorder.start(this.canvas, this.audio.streamDest && this.audio.streamDest.stream, 30, SQ.RES === 1 ? 9_000_000 : 5_000_000);
+        this.recorder.start(this.view, this.audio.streamDest && this.audio.streamDest.stream, 30, SQ.RES === 1 ? 9_000_000 : 5_000_000);
       }
       this.emit('match', { mode: this.modeInfo, seed: this.seed, track: this.track });
     }
@@ -230,6 +239,7 @@
     // Director hook used by modes: zoom to a moment, optionally in slow motion.
     highlight(x, y, z, dur, slow) {
       if (this.phase !== 'play') return;
+      this.burst(1);
       // crowded modes keep the full arena in view; zooming would crop squares at the edges
       if (this.mode && this.mode.wideShot) return;
       if (this.real - this.lastHighlight < 6) return;
@@ -242,9 +252,55 @@
       if (this.phase !== 'play') return;
       if (this.real - (this.lastQuickZoom || -10) < 2.2 || this.cam.hold > 0) return;
       this.lastQuickZoom = this.real;
+      this.burst(0.8);
       this.cam.focus(x, y, z, dur, 7);
       this.cam.punch(0.06);
       this.audio.whoosh();
+    }
+
+    // Big moments make the signal flicker; the more static the series has, the harder it glitches.
+    burst(power) {
+      const amt = (this.opts.static || 0) / 100;
+      if (amt <= 0) return;
+      this.glitch = Math.max(this.glitch, Math.min(1, (0.15 + amt * 0.6) * power));
+    }
+
+    // The static grows a little with every video of a series. At 100% (or when asked) the next video
+    // has the signal event: the picture breaks up, the Frame reboots and the static starts over.
+    advanceSignal() {
+      if (!this.opts.decay) return;
+      this.opts.static = Math.min(100, (this.opts.static || 0) + this.opts.decay);
+      if (this.opts.static >= 100) this.rebootNext = true;
+      this.emit('signal', this.opts.static);
+    }
+    updateReboot(realDt) {
+      const r0 = this.reboot;
+      // a match that ends mid-event still finishes the reboot, so the static never sticks at full
+      if (r0 && !r0.done && this.phase !== 'play') r0.t = 1.4;
+      else if (this.phase !== 'play') return;
+      if (this.rebootNext && !this.reboot && this.phaseT > 3.5) {
+        this.rebootNext = false;
+        this.reboot = { t: 0, from: this.opts.static || 0 };
+        this.fx.banner('SIGNAL LOST', 'the Frame is rebooting', '#ffffff', 1.4);
+        this.audio.boom();
+        this.cam.shake(14);
+      }
+      const r = this.reboot;
+      if (!r) return;
+      r.t += realDt;
+      // full static for a moment, then the picture snaps back clean
+      if (r.t < 1.4) {
+        this.opts.static = Math.min(100, r.from + (100 - r.from) * Math.min(1, r.t / 0.4));
+        this.glitch = Math.max(this.glitch, 0.6 + Math.random() * 0.4);
+      } else if (!r.done) {
+        r.done = true;
+        this.opts.static = 0;
+        this.glitch = 1;
+        this.fx.flash(0.7);
+        this.fx.banner('SIGNAL RESTORED', 'the Frame has rebooted', '#35d97a', 1.6);
+        this.audio.ding();
+        this.emit('signal', 0);
+      }
     }
 
     slowmo(scale, dur, muffle) {
@@ -314,6 +370,7 @@
         if (m.winner) {
           this.setPhase('finale');
           this.fx.quiet = true;
+          this.burst(1.3);
           this.slowmo(0.25, 1.5, true);
           const w = m.winnerEnt;
           this.cam.tracking = false;
@@ -390,6 +447,8 @@
         this.cam.tz = this.cam.defaultView.z;
       }
       if (P === 'idle' && m.winner) this.makeIdle();
+      this.updateReboot(realDt);
+      this.glitch = Math.max(0, this.glitch - realDt * 2.4);
       this.cam.update(realDt);
       this.fx.update(realDt * this.timeScale, realDt);
       if (this.trackToast > 0) this.trackToast -= realDt;
@@ -452,12 +511,13 @@
       this.audio.intensity = 0.35;
       // each match is saved as its own part, which suits a multi-part series of reels
       if (this.opts.record && this.recorder.supported && !this.recorder.active) {
-        this.recorder.start(this.canvas, this.audio.streamDest && this.audio.streamDest.stream, 30, SQ.RES === 1 ? 9_000_000 : 5_000_000);
+        this.recorder.start(this.view, this.audio.streamDest && this.audio.streamDest.stream, 30, SQ.RES === 1 ? 9_000_000 : 5_000_000);
       }
     }
 
     async finishTourMatch() {
       const t = this.tour;
+      if (!this.reboot) this.advanceSignal();
       const res = this.mode.winner;
       this.emitResult();
       // a knockout needs someone to advance: a tie is settled by a coin flip
@@ -491,7 +551,8 @@
       const blob = await this.recorder.stop();
       if (!blob || !blob.size) return;
       const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
-      const v = { blob, ext, part: this.tour.part, name: `squares-trinity-cup-${this.tour.seed}-part${this.tour.part}.${ext}` };
+      const info = this.matchInfo();
+      const v = { blob, ext, part: this.tour.part, name: `${info.name}.${ext}`, info: info.text };
       this.videos.push(v);
       this.emit('part', v);
     }
@@ -502,6 +563,51 @@
       await this.savePart();
       const c = this.tour.champion;
       this.emit('done', { winner: { team: c, text: `${c.name.toUpperCase()} IS THE CHAMPION` }, video: null, tour: true });
+    }
+
+    // Remembers what happened in a match (event banners, meme moments) for the video name.
+    logEvent(text) {
+      if (!this.matchLog || (this.phase !== 'play' && this.phase !== 'finale')) return;
+      const t = String(text).replace(/[^\p{L}\p{N} %'!&+-]/gu, '').trim();
+      if (!t || t === 'GO!' || this.matchLog.includes(t) || this.matchLog.length >= 8) return;
+      this.matchLog.push(t);
+    }
+
+    // Everything worth knowing about the match that just ended: a file name packed with it,
+    // and a longer text with the lore, for writing titles and descriptions.
+    matchInfo() {
+      const m = this.mode;
+      const w = m.winner;
+      const teams = m.teams || [];
+      const title = (s) => s.toLowerCase().replace(/(^|[\s-])\p{L}/gu, (c) => c.toUpperCase());
+      const events = (this.matchLog || []).map(title);
+      const losers = w && !w.tie ? teams.filter((t) => t !== w.team) : [];
+      const result = !w ? 'no result' : w.tie ? `tie between ${w.tied.map((t) => t.name).join(' and ')}` : `${w.team.name} beats ${losers.map((t) => t.name).join(' ')}`;
+      const where = this.tour ? `Trinity Games ${this.tour.seed} ${title(this.stage || '')}` : `Cycle ${this.cycle || this.episode}`;
+      const signal = this.reboot ? `signal lost at ${this.matchSignal}%, Frame rebooted` : `signal ${this.matchSignal}%`;
+      const parts = [where, this.modeInfo.name, result, w && w.sub ? w.sub : '', events.join(', '), signal, `seed ${this.tour ? this.tour.seed : this.seed}`];
+      let name = parts.filter(Boolean).join(' - ').replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, ' ');
+      if (name.length > 200) name = name.slice(0, 200).trim();
+      // the long version, with where each square is from
+      const who = (t) => {
+        const L = SQ.LORE[t.base];
+        const P = SQ.persona(t);
+        return `${t.name} (${P.title}${L ? `, ${L.sector}` : ''})`;
+      };
+      const lines = [
+        `${where}: ${this.modeInfo.name}`,
+        `Contestants: ${teams.map(who).join(', ')}`,
+        `Result: ${result}${w && w.sub ? ` (${w.sub})` : ''}`,
+      ];
+      if (w && !w.tie) {
+        const L = SQ.LORE[w.team.base];
+        const rival = L && teams.find((t) => t.base === L.rival);
+        if (rival) lines.push(`Rivalry: ${w.team.name} beat its rival ${rival.name}, who ${L.rivalWhy}`);
+      }
+      if (events.length) lines.push(`What happened: ${events.join(', ')}`);
+      lines.push(`Signal: ${this.reboot ? `lost at ${this.matchSignal}%, the Frame rebooted mid-match` : `${this.matchSignal}% static`}`);
+      if (this.tour && this.tour.champion) lines.push(`Champion of the Trinity Games: ${this.tour.champion.name}`);
+      return { name, text: lines.join('\n') };
     }
 
     // Tells the page who played and who won, for the win stats.
@@ -518,13 +624,14 @@
 
     async finish() {
       if (this.tour) return this.finishTourMatch();
+      if (!this.reboot) this.advanceSignal(); // the video that rebooted starts the next series clean
       this.emitResult();
       this.setPhase('done');
       if (this.recorder.active) {
         const blob = await this.recorder.stop();
         if (blob && blob.size) {
           const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
-          this.video = { blob, ext, name: `squares-trinity-${this.modeInfo.id}-${this.seed}.${ext}` };
+          this.video = { blob, ext, name: `${this.matchInfo().name}.${ext}`, info: this.matchInfo().text };
         }
       }
       // the page starts the next match itself when auto-next is on, so its buttons stay in step
@@ -533,6 +640,41 @@
 
     // ---------------- rendering ----------------
     render() {
+      this.renderScene();
+      const amt = (this.opts.static || 0) / 100;
+      // a gentle curve: the first videos of a series only get a faint grain
+      const noise = Math.pow(amt, 1.3) * (0.9 + Math.random() * 0.2);
+      const glitch = amt > 0 ? this.glitch * (0.4 + 0.6 * amt) : 0;
+      if (this.post) this.post.draw(this.canvas, (this.opts.fisheye || 0) / 100, noise, glitch);
+      else if (noise + glitch > 0.01) this.drawStatic2D(noise + glitch * 0.6);
+    }
+
+    // Without WebGL there is no fish-eye, but static still works as a grain layer.
+    drawStatic2D(a) {
+      if (!this.grainTile) {
+        const c = document.createElement('canvas');
+        c.width = c.height = 256;
+        const g = c.getContext('2d');
+        const img = g.createImageData(256, 256);
+        for (let i = 0; i < img.data.length; i += 4) {
+          const v = (Math.random() * 255) | 0;
+          img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+          img.data[i + 3] = 255;
+        }
+        g.putImageData(img, 0, 0);
+        this.grainTile = c;
+      }
+      const ctx = this.ctx;
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalAlpha = Math.min(0.6, a * 0.55);
+      const ox = (Math.random() * 256) | 0;
+      const oy = (Math.random() * 256) | 0;
+      for (let y = -oy; y < this.canvas.height; y += 256) for (let x = -ox; x < this.canvas.width; x += 256) ctx.drawImage(this.grainTile, x, y);
+      ctx.restore();
+    }
+
+    renderScene() {
       const ctx = this.ctx;
       const A = SQ.ARENA;
       const m = this.mode;
