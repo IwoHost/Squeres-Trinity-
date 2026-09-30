@@ -264,8 +264,8 @@
       if (this.contested) SQ.outlinedText(ctx, 'CONTESTED', Z.x, Z.y - Z.half - 30, 34, '#ffffff', { stroke: 7 });
       if (this.nextZone) {
         const N = this.nextZone;
-        const blink = Math.floor(this.time * 6) % 2;
-        ctx.strokeStyle = blink ? 'rgba(255,210,63,0.9)' : 'rgba(255,210,63,0.35)';
+        // a smooth, slow pulse rather than a hard blink
+        ctx.strokeStyle = `rgba(255,210,63,${0.6 + 0.3 * Math.sin(this.time * 6)})`;
         ctx.lineWidth = 5;
         ctx.setLineDash([16, 12]);
         ctx.strokeRect(N.x - N.half, N.y - N.half, N.half * 2, N.half * 2);

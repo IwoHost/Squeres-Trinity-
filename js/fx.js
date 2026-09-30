@@ -219,8 +219,13 @@
       if (this.g.logEvent) this.g.logEvent(caption);
       return true;
     }
+    // Screen flashes are kept gentle and rare for people who are sensitive to flashing:
+    // never brighter than 35%, and at most about two a second.
     flash(a, color) {
-      this.flashA = Math.max(this.flashA, a);
+      const now = this.g ? this.g.real : 0;
+      if (now - (this.lastFlash || -9) < 0.45) return;
+      this.lastFlash = now;
+      this.flashA = Math.max(this.flashA, Math.min(0.35, a));
       this.flashColor = color || '#fff';
     }
     confettiBurst(colors, n) {

@@ -581,14 +581,15 @@
           ctx.stroke();
           continue;
         }
-        const blink = p.warn && Math.floor(this.time * 10) % 2;
+        // a warned plate fades between green and red, slowly, instead of strobing
+        const warmth = p.warn ? 0.5 + 0.5 * Math.sin(this.time * 9) : 0;
         ctx.strokeStyle = '#0d0f16';
         ctx.lineWidth = p.r * 2 + 6;
         ctx.beginPath();
         ctx.moveTo(p.x1, p.y1);
         ctx.lineTo(p.x2, p.y2);
         ctx.stroke();
-        ctx.strokeStyle = blink ? '#ff4d5e' : '#35d97a';
+        ctx.strokeStyle = warmth > 0 ? `rgb(${Math.round(53 + 202 * warmth)},${Math.round(217 - 140 * warmth)},${Math.round(122 - 28 * warmth)})` : '#35d97a';
         ctx.lineWidth = p.r * 2;
         ctx.stroke();
       }

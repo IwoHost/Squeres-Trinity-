@@ -151,6 +151,15 @@ also shows "Match info": the same data plus every square's personality and Secto
 that was settled, and whether the Frame rebooted. Copy it into a chat to get lore-style titles
 and descriptions.
 
+### Flashing and flicker
+
+Everything is kept gentle for people who are sensitive to flashing light. Screen flashes are never
+brighter than 35% and come at most about twice a second. The static is fine mid-grey grain that
+doesn't pulse the picture. Torn rows move about three times a second, not every frame. Warning
+lights and blinking text fade slowly instead of strobing. A frame-by-frame brightness check of the
+signal event, heavy static and matches full of knockouts stays under the common limit of three
+flashes per second.
+
 ## Controls
 
 The top of the control desk always has New match, Pause (also Space or P during a match), Replay,

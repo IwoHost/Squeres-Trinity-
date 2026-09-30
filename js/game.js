@@ -327,13 +327,14 @@
         // full static first, then a little less so the words can get through
         const k = Math.min(1, r.t / 0.6);
         this.opts.static = r.t < 0.6 ? r.from + (100 - r.from) * k : 72;
-        this.glitch = Math.max(this.glitch, r.t < 0.6 ? 0.6 + Math.random() * 0.4 : Math.random() < 0.04 ? 0.5 : 0.08);
+        // steady, not random spikes: the picture breaks up but never strobes
+        this.glitch = Math.max(this.glitch, r.t < 0.6 ? 0.7 : 0.1);
       } else if (!r.done) {
         r.done = true;
         this.opts.static = 0;
-        this.glitch = 1;
+        this.glitch = 0.6;
         this.audio.muffle(false);
-        this.fx.flash(0.7);
+        this.fx.flash(0.35);
         this.fx.banner('SIGNAL RESTORED', 'the Frame has rebooted', '#35d97a', 1.6);
         this.audio.ding();
         this.emit('signal', 0);
@@ -356,9 +357,12 @@
       ctx.textBaseline = 'middle';
       ctx.globalAlpha = fade;
       ctx.font = `700 32px ${SQ.fontBody}`;
-      ctx.fillStyle = Math.floor(r.t * 2.5) % 2 ? '#ff4d5e' : '#7a1f29';
+      // a slow pulse instead of a blink
+      ctx.globalAlpha = fade * (0.65 + 0.35 * Math.sin(r.t * 3));
+      ctx.fillStyle = '#ff4d5e';
       ctx.fillText(r.t < T0 ? 'SEARCHING FOR SIGNAL' : 'INCOMING TRANSMISSION', W / 2, cy - 190);
       const pad = (v) => String(v).padStart(2, '0');
+      ctx.globalAlpha = fade;
       ctx.fillStyle = '#7f9a8a';
       ctx.fillText(`FRAGMENT ${pad(r.idx + 1)} / ${pad(r.total)}`, W / 2, cy + 170);
       if (r.t >= T0) {
@@ -370,20 +374,20 @@
         let str = '';
         for (let i = 0; i < text.length; i++) {
           if (text[i] === ' ' || i < settled) str += text[i];
-          else str += GLYPHS[(Math.random() * GLYPHS.length) | 0];
+          else str += GLYPHS[(Math.abs(Math.sin((i + 1) * 12.9898 + Math.floor(r.t * 8) * 78.233)) * 43758.5453 * GLYPHS.length | 0) % GLYPHS.length];
         }
         const size = SQ.fitSize(ctx, [{ t: str }], W - 160, 150);
         ctx.font = `${size}px ${SQ.fontDisplay}`;
-        const jitter = Math.random() < 0.06 ? (Math.random() - 0.5) * 30 : 0;
+        const jitter = 0;
         const last = r.idx === r.total - 1;
-        ctx.globalAlpha = fade * (0.8 + Math.random() * 0.2);
+        ctx.globalAlpha = fade;
         ctx.lineJoin = 'round';
         ctx.lineWidth = 14;
         ctx.strokeStyle = '#000';
         ctx.strokeText(str, W / 2 + jitter, cy);
         ctx.fillStyle = last ? '#ff4d5e' : settled >= text.length ? '#e6fff0' : '#9fd9b5';
         ctx.fillText(str, W / 2 + jitter, cy);
-      } else if (Math.floor(r.t * 6) % 2) {
+      } else if (Math.floor(r.t * 3) % 2) {
         // a cursor waiting for something to come through
         ctx.fillStyle = '#9fd9b5';
         ctx.fillRect(W / 2 - 30, cy - 55, 60, 110);

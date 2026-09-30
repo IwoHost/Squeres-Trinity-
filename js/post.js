@@ -22,7 +22,9 @@ uniform float fish;    // 0..1 bulge strength
 uniform float crt;     // 0..1 old tube look on the game square: scanlines, phosphor grid, glow
 uniform float noise;   // 0..1 how much static is on screen right now
 uniform float glitch;  // 0..1 burst when something big happens
-uniform float seed;    // changes every frame so the static moves
+uniform float seed;    // changes every frame, only for the fine grain (tiny dots average out, so nothing flashes)
+uniform float slow;    // changes about 3 times a second: anything big, like torn rows, moves no faster than that
+uniform float time;    // seconds, for the slow rolling bar
 uniform vec2 res;
 uniform vec4 box;      // the game square, as x0, y0, x1, y1 in 0..1 screen units
 varying vec2 uv;
@@ -49,11 +51,11 @@ void main() {
   vec2 tube = u; // where this pixel sits on the curved tube, before any tearing
   float row = floor(uv.y * res.y / 3.0);
   // torn rows: a few bands slide sideways, more with static, a lot during a glitch
-  float band = floor(uv.y * 48.0 + seed * 7.0);
-  float tear = step(1.0 - (noise * 0.08 + glitch * 0.35), rand(vec2(band, seed)));
-  u.x += tear * (rand(vec2(band, seed + 1.0)) - 0.5) * (0.015 + noise * 0.03 + glitch * 0.12);
+  float band = floor(uv.y * 48.0 + slow * 7.0);
+  float tear = step(1.0 - (noise * 0.08 + glitch * 0.35), rand(vec2(band, slow)));
+  u.x += tear * (rand(vec2(band, slow + 1.0)) - 0.5) * (0.015 + noise * 0.03 + glitch * 0.12);
   // a slow rolling bar, like a badly tuned signal
-  float roll = fract(uv.y * 0.9 - seed * 0.013);
+  float roll = fract(uv.y * 0.9 - time * 0.12);
   float bar = smoothstep(0.0, 0.08, roll) * smoothstep(0.2, 0.08, roll);
   u.x += bar * noise * 0.006;
   // colors split apart during a glitch
@@ -81,10 +83,10 @@ void main() {
     vec3 mask = m < 1.0 ? vec3(1.0, 0.82, 0.82) : m < 2.0 ? vec3(0.82, 1.0, 0.82) : vec3(0.82, 0.82, 1.0);
     col *= mix(vec3(1.0), mask, crt * 0.3); // kept soft so it doesn't shimmer when the video is scaled down
     col *= 1.0 - crt * 0.25 * max(0.0, r2 - 0.35); // the tube is dimmer in its corners
-    col *= 1.0 + (rand(vec2(seed, 3.0)) - 0.5) * 0.03 * crt; // a faint flicker
   }
   // static: grain over everything, stronger bright specks
-  float n = rand(vec2(floor(uv.x * res.x / 2.0), row) + seed);
+  // mid-grey dots, not black and white, so heavy static is soft on the eyes
+  float n = 0.3 + 0.4 * rand(vec2(floor(uv.x * res.x / 2.0), row) + seed);
   float amount = noise * 0.5 + glitch * 0.35;
   col = mix(col, vec3(n), amount * (0.55 + 0.45 * n));
   col += bar * noise * 0.08;
@@ -141,7 +143,7 @@ void main() {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       this.gl = gl;
       this.u = {};
-      for (const k of ['fish', 'crt', 'noise', 'glitch', 'seed', 'res', 'box']) this.u[k] = gl.getUniformLocation(prog, k);
+      for (const k of ['fish', 'crt', 'noise', 'glitch', 'seed', 'slow', 'time', 'res', 'box']) this.u[k] = gl.getUniformLocation(prog, k);
       this.ok = true;
     }
 
@@ -159,6 +161,9 @@ void main() {
       gl.uniform1f(this.u.noise, noise);
       gl.uniform1f(this.u.glitch, glitch);
       gl.uniform1f(this.u.seed, (Math.random() * 97) | 0);
+      const now = performance.now() / 1000;
+      gl.uniform1f(this.u.slow, Math.floor(now * 3) % 97);
+      gl.uniform1f(this.u.time, now % 1000);
       gl.uniform2f(this.u.res, scene.width, scene.height);
       const A = SQ.ARENA;
       gl.uniform4f(this.u.box, A.x / SQ.W, A.y / SQ.H, (A.x + A.size) / SQ.W, (A.y + A.size) / SQ.H);
