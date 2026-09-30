@@ -123,12 +123,13 @@ pixel "deal with it" sunglasses. Everything is drawn in code, so no copyrighted 
 
 ## Screen: fish-eye and static
 
-The Screen panel bends the picture like an old TV (Fish-eye) and adds TV static. The static
+The Screen panel gives the game square a fish-eye lens with a light blue glass shade (Fish-eye;
+the text around it stays flat) and adds TV static. The static
 belongs to a series, not a single video: with "Per video" set, every finished video adds a
 little more, so a run of posts slowly loses its signal. When it reaches 100%, or when you press
 "Reboot the signal next video", the next video has the signal event: the picture breaks up,
-SIGNAL LOST, the Frame reboots and the static starts over at 0%. Big moments make the picture
-glitch harder the worse the signal is. Both effects are in the recorded video. They need
+SIGNAL LOST, the Frame reboots and the static starts over at 0%. Within a video the static stays
+steady. Both effects are in the recorded video. They need
 WebGL; without it the static still shows as grain and the fish-eye is skipped.
 
 ## Video names and match info

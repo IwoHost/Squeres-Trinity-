@@ -1,4 +1,4 @@
-// Screen effects over the finished frame: a slight fish-eye bulge and TV static.
+// Screen effects over the finished frame: a fish-eye bulge and blue glass shading on the game square, and TV static.
 // The game draws into an offscreen 2D canvas; this pass copies it to the visible (and recorded) canvas with WebGL.
 (function () {
   const SQ = window.SQ;
@@ -23,6 +23,7 @@ uniform float noise;   // 0..1 how much static is on screen right now
 uniform float glitch;  // 0..1 burst when something big happens
 uniform float seed;    // changes every frame so the static moves
 uniform vec2 res;
+uniform vec4 box;      // the game square, as x0, y0, x1, y1 in 0..1 screen units
 varying vec2 uv;
 
 // kept to small numbers so it also works on phones with low-precision GPUs
@@ -31,15 +32,19 @@ float rand(vec2 c) {
   return fract(sin(dot(c, vec2(12.9898, 78.233))) * 43758.5453);
 }
 
-// old-TV curvature: every edge keeps its middle, lines bow outward and the corners round off
-vec2 bulge(vec2 u) {
-  vec2 c = u * 2.0 - 1.0;
-  c *= 1.0 + (c.yx * c.yx) * fish * 0.2;
-  return c * 0.5 + 0.5;
-}
-
 void main() {
-  vec2 u = bulge(uv);
+  vec2 u = uv;
+  // fish-eye only inside the game square
+  vec2 size = box.zw - box.xy;
+  vec2 l = (uv - box.xy) / size;
+  float inBox = step(0.0, l.x) * step(l.x, 1.0) * step(0.0, l.y) * step(l.y, 1.0);
+  vec2 c = l - 0.5;
+  float r2 = dot(c, c) / 0.5; // 0 in the middle, 1 in the corners
+  if (inBox > 0.5) {
+    // the corners stay pinned, so the square is always filled with the game; the middle swells
+    vec2 s = c * (1.0 - fish * 0.25 * (1.0 - r2));
+    u = box.xy + (s + 0.5) * size;
+  }
   float row = floor(uv.y * res.y / 3.0);
   // torn rows: a few bands slide sideways, more with static, a lot during a glitch
   float band = floor(uv.y * 48.0 + seed * 7.0);
@@ -60,12 +65,17 @@ void main() {
   float amount = noise * 0.5 + glitch * 0.35;
   col = mix(col, vec3(n), amount * (0.55 + 0.45 * n));
   col += bar * noise * 0.08;
-  // faint scanlines and a vignette that grows with the bulge
+  // faint scanlines
   col *= 1.0 - 0.06 * noise * step(0.5, fract(uv.y * res.y / 4.0));
-  vec2 v = uv * 2.0 - 1.0;
-  col *= 1.0 - fish * 0.28 * dot(v, v) * 0.5;
-  // outside the curved screen is black
-  if (u.x < 0.0 || u.x > 1.0 || u.y < 0.0 || u.y > 1.0) col = vec3(0.0);
+  // the game square gets a glass look: a cool blue shade toward its edges and a soft sheen
+  if (inBox > 0.5) {
+    vec2 d = min(l, 1.0 - l);
+    float edge = 1.0 - smoothstep(0.0, 0.2, min(d.x, d.y));
+    float shade = fish * (0.3 * edge + 0.3 * max(0.0, r2 - 0.25));
+    col = mix(col, col * vec3(0.55, 0.68, 1.0) + vec3(0.0, 0.015, 0.06), clamp(shade, 0.0, 0.8));
+    float sheen = smoothstep(0.6, 0.0, length((l - vec2(0.2, 0.12)) * vec2(1.0, 1.6)));
+    col += vec3(0.04, 0.07, 0.13) * sheen * fish;
+  }
   gl_FragColor = vec4(col, 1.0);
 }`;
 
@@ -108,7 +118,7 @@ void main() {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       this.gl = gl;
       this.u = {};
-      for (const k of ['fish', 'noise', 'glitch', 'seed', 'res']) this.u[k] = gl.getUniformLocation(prog, k);
+      for (const k of ['fish', 'noise', 'glitch', 'seed', 'res', 'box']) this.u[k] = gl.getUniformLocation(prog, k);
       this.ok = true;
     }
 
@@ -126,6 +136,8 @@ void main() {
       gl.uniform1f(this.u.glitch, glitch);
       gl.uniform1f(this.u.seed, (Math.random() * 97) | 0);
       gl.uniform2f(this.u.res, scene.width, scene.height);
+      const A = SQ.ARENA;
+      gl.uniform4f(this.u.box, A.x / SQ.W, A.y / SQ.H, (A.x + A.size) / SQ.W, (A.y + A.size) / SQ.H);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     }
   }

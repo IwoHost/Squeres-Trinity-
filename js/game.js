@@ -239,7 +239,6 @@
     // Director hook used by modes: zoom to a moment, optionally in slow motion.
     highlight(x, y, z, dur, slow) {
       if (this.phase !== 'play') return;
-      this.burst(1);
       // crowded modes keep the full arena in view; zooming would crop squares at the edges
       if (this.mode && this.mode.wideShot) return;
       if (this.real - this.lastHighlight < 6) return;
@@ -252,17 +251,9 @@
       if (this.phase !== 'play') return;
       if (this.real - (this.lastQuickZoom || -10) < 2.2 || this.cam.hold > 0) return;
       this.lastQuickZoom = this.real;
-      this.burst(0.8);
       this.cam.focus(x, y, z, dur, 7);
       this.cam.punch(0.06);
       this.audio.whoosh();
-    }
-
-    // Big moments make the signal flicker; the more static the series has, the harder it glitches.
-    burst(power) {
-      const amt = (this.opts.static || 0) / 100;
-      if (amt <= 0) return;
-      this.glitch = Math.max(this.glitch, Math.min(1, (0.15 + amt * 0.6) * power));
     }
 
     // The static grows a little with every video of a series. At 100% (or when asked) the next video
@@ -370,7 +361,6 @@
         if (m.winner) {
           this.setPhase('finale');
           this.fx.quiet = true;
-          this.burst(1.3);
           this.slowmo(0.25, 1.5, true);
           const w = m.winnerEnt;
           this.cam.tracking = false;
@@ -642,8 +632,8 @@
     render() {
       this.renderScene();
       const amt = (this.opts.static || 0) / 100;
-      // a gentle curve: the first videos of a series only get a faint grain
-      const noise = Math.pow(amt, 1.3) * (0.9 + Math.random() * 0.2);
+      // a gentle curve: the first videos of a series only get a faint grain; steady for the whole video
+      const noise = Math.pow(amt, 1.3);
       const glitch = amt > 0 ? this.glitch * (0.4 + 0.6 * amt) : 0;
       if (this.post) this.post.draw(this.canvas, (this.opts.fisheye || 0) / 100, noise, glitch);
       else if (noise + glitch > 0.01) this.drawStatic2D(noise + glitch * 0.6);
