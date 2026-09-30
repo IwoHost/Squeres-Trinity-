@@ -77,7 +77,7 @@
       }
       // shockwave from the zone pushes everyone out
       this.waveT -= dt;
-      if (this.waveT <= 0) {
+      if (this.waveT <= 0 && !this.winner) {
         this.waveT = rng.range(14, 20);
         this.wave = { t: 0 };
         g.fx.banner('SHOCKWAVE!', 'everyone gets blasted out', '#1fd6f0', 1.2);

@@ -26,20 +26,28 @@
       const list = ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
       return list.find((m) => MediaRecorder.isTypeSupported(m)) || '';
     }
+    // Each recording keeps its own chunks and video track, so a new one can never mix with the last.
     start(canvas, audioStream, fps, bitrate) {
       if (!this.supported) return false;
-      const tracks = canvas.captureStream(fps || 30).getVideoTracks();
+      this.abort();
+      const video = canvas.captureStream(fps || 30).getVideoTracks();
+      const tracks = video.slice();
       if (audioStream) tracks.push(...audioStream.getAudioTracks());
       const stream = new MediaStream(tracks);
       this.mime = this.pickMime();
-      this.chunks = [];
+      let rec;
       try {
-        this.rec = new MediaRecorder(stream, { mimeType: this.mime || undefined, videoBitsPerSecond: bitrate || 6_000_000, audioBitsPerSecond: 192_000 });
+        rec = new MediaRecorder(stream, { mimeType: this.mime || undefined, videoBitsPerSecond: bitrate || 6_000_000, audioBitsPerSecond: 192_000 });
       } catch (e) {
-        this.rec = new MediaRecorder(stream);
+        rec = new MediaRecorder(stream);
       }
-      this.rec.ondataavailable = (e) => e.data && e.data.size && this.chunks.push(e.data);
-      this.rec.start(500);
+      const chunks = [];
+      rec.ondataavailable = (e) => e.data && e.data.size && chunks.push(e.data);
+      // the canvas track is ours to end; the audio track belongs to the shared sound output
+      rec.onstop = () => video.forEach((t) => t.stop());
+      rec.start(500);
+      this.rec = rec;
+      this.chunks = chunks;
       this.startedAt = performance.now();
       return true;
     }
@@ -49,12 +57,24 @@
     stop() {
       return new Promise((res) => {
         if (!this.active) return res(null);
-        this.rec.onstop = () => {
-          const type = (this.rec.mimeType || this.mime || 'video/webm').split(';')[0];
-          res(new Blob(this.chunks, { type }));
+        const rec = this.rec;
+        const chunks = this.chunks;
+        const end = rec.onstop;
+        rec.onstop = () => {
+          end();
+          const type = (rec.mimeType || this.mime || 'video/webm').split(';')[0];
+          res(new Blob(chunks, { type }));
         };
-        this.rec.stop();
+        rec.stop();
+        this.rec = null;
       });
+    }
+    // Drops a recording that is still running (a new match started before it finished).
+    abort() {
+      if (!this.active) return;
+      this.rec.ondataavailable = null;
+      this.rec.stop();
+      this.rec = null;
     }
   }
 
@@ -126,6 +146,7 @@
       o = o || {};
       this.audio.init();
       if (!o.tour) {
+        this.recorder.abort(); // a match or tournament cut short is not saved
         this.tour = null;
         this.episode++;
         this.seed = seed != null ? seed >>> 0 : SQ.randomSeed();
@@ -292,6 +313,7 @@
         }
         if (m.winner) {
           this.setPhase('finale');
+          this.fx.quiet = true;
           this.slowmo(0.25, 1.5, true);
           const w = m.winnerEnt;
           this.cam.tracking = false;
@@ -303,7 +325,7 @@
       if (P === 'finale' && this.phaseT > 1.5) {
         this.setPhase('outro');
         const w = m.winner;
-        this.fx.banner(w.text, w.sub, w.team.color, 5.2, { y: SQ.ARENA.y + SQ.ARENA.size * 0.78, size: 96 });
+        this.fx.banner(w.text, w.sub, w.team.color, 5.2, { y: SQ.ARENA.y + SQ.ARENA.size * 0.78, size: 96, force: true });
         this.fx.confettiBurst([w.team.color, w.team.light, '#ffffff', '#ffd23f'], 220);
         this.audio.fanfare();
         this.audio.intensity = 1;
@@ -323,8 +345,13 @@
           const list = SQ.MEMES.winner;
           this.winnerCaption = list[Math.floor(Math.random() * list.length)];
         }
-        if (this.phaseT > 5.4 && !this.tour) this.audio.stopMusic(1.2);
-        if (this.phaseT > (this.tour ? 4 : this.opts.reel ? 3.6 : 6.2)) this.finish();
+        const finishAt = this.tour ? 4 : this.opts.reel ? 3.6 : 6.2;
+        // the music fades out just before the end, so a saved clip never stops mid-song
+        if (this.phaseT > finishAt - 0.8 && !this.tour && !this.musicFaded) {
+          this.musicFaded = true;
+          this.audio.stopMusic(1.2);
+        }
+        if (this.phaseT > finishAt) this.finish();
       }
       if (P === 'bracket' && this.phaseT > 4.4) {
         const nx = this.tour.next;
@@ -333,6 +360,7 @@
       if (P === 'champion' && this.phaseT > 7) this.finishTour();
       if (P === 'intro' || P === 'countdown' || P === 'bracket' || P === 'champion' || P === 'between') simulate = false;
       if (P !== 'outro') {
+        this.musicFaded = false;
         this.memeDone = false;
         this.winLine = false;
       }
@@ -385,6 +413,7 @@
       this.episode++;
       this.seed = seed != null ? seed >>> 0 : SQ.randomSeed();
       const rng = SQ.makeRng(this.seed);
+      this.recorder.abort();
       this.tour = { seed: this.seed, rng, rounds: [rng.shuffle(SQ.TEAMS)], results: [[], [], []], round: 0, match: 0, part: 0, lastMode: null, champion: null, lastResult: null };
       this.videos = [];
       this.video = null;
@@ -498,12 +527,8 @@
           this.video = { blob, ext, name: `squares-trinity-${this.modeInfo.id}-${this.seed}.${ext}` };
         }
       }
+      // the page starts the next match itself when auto-next is on, so its buttons stay in step
       this.emit('done', { winner: this.mode.winner, video: this.video });
-      if (this.opts.autoNext) {
-        setTimeout(() => {
-          if (this.phase === 'done' && this.opts.autoNext) this.newMatch();
-        }, 2500);
-      }
     }
 
     // ---------------- rendering ----------------
@@ -668,11 +693,19 @@
         const x = SQ.W / 2 - total / 2 + size / 2 + i * (size + gap);
         const y = A.y + A.size * 0.6 - Math.abs(Math.sin(t * 5 + i)) * 16;
         SQ.drawSquare(ctx, x, y, size * SQ.ease.outBack(kk), tm, { mood: i % 2 ? 'angry' : 'normal', lookX: Math.sin(t * 2 + i), squash: Math.sin(t * 10 + i) * 0.06 });
-        SQ.outlinedText(ctx, tm.name, x, y + size * 0.85, Math.min(36, size * 0.36), tm.color, { stroke: 7 });
+        // each label is shrunk to its own slot so long names like DOUCHECUBE never run into a neighbour
+        const slot = size + gap - 6;
+        const nameSize = SQ.fitSize(ctx, [{ t: tm.name }], slot, Math.min(36, size * 0.36));
+        SQ.outlinedText(ctx, tm.name, x, y + size * 0.85, nameSize, tm.color, { stroke: 7 });
         const P = SQ.persona(tm);
         const L = SQ.LORE[tm.base];
         const home = L && teams.length <= 4 ? ` · ${L.sector.replace(/^(Sector|the) /, '')}` : '';
-        SQ.outlinedText(ctx, P.title + home, x, y + size * 0.85 + Math.min(36, size * 0.36) * 0.95, Math.min(24, size * 0.24), '#ffffff', { stroke: 5, font: SQ.fontBody, weight: 700 });
+        const sub = P.title + home;
+        let subSize = Math.min(24, size * 0.24);
+        ctx.font = `700 ${subSize}px ${SQ.fontBody}`;
+        const sw = ctx.measureText(sub).width;
+        if (sw > slot) subSize = Math.floor((subSize * slot) / sw);
+        SQ.outlinedText(ctx, sub, x, y + size * 0.85 + Math.min(36, size * 0.36) * 0.95, subSize, '#ffffff', { stroke: 5, font: SQ.fontBody, weight: 700 });
       });
       ctx.restore();
       if (t > 1.2) {
@@ -727,7 +760,15 @@
       const gy = w.y - size * 0.04 - (1 - SQ.ease.outCubic(k)) * 320;
       SQ.drawSunglasses(ctx, w.x, gy, size * 0.95);
       if (this.winnerCaption) {
-        SQ.outlinedText(ctx, this.winnerCaption, w.x, w.y + size * 0.5 + 30, Math.max(22, size * 0.5), '#ffffff', { stroke: 7 });
+        const cs = Math.max(22, size * 0.5);
+        ctx.font = `${cs}px ${SQ.fontDisplay}`;
+        const half = ctx.measureText(this.winnerCaption).width / 2 + 12;
+        // keep it inside the arena; near the top the speech bubble flips below the square, so go under that
+        const cx = SQ.clamp(w.x, half, SQ.WORLD - half);
+        const worldH = this.mode.worldH || SQ.WORLD;
+        const bubbleBelow = w.y - size / 2 - 40 < 28; // same test as the bubble in fx.js
+        const cy = Math.min(w.y + size * 0.5 + (bubbleBelow ? 100 : 30), worldH - cs * 0.6);
+        SQ.outlinedText(ctx, this.winnerCaption, cx, cy, cs, '#ffffff', { stroke: 7 });
       }
     }
 

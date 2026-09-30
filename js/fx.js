@@ -105,6 +105,7 @@
       this.clear();
     }
     clear() {
+      this.quiet = false;
       this.parts = [];
       this.texts = [];
       this.bubbles = [];
@@ -197,7 +198,9 @@
       const list = MEMES[kind];
       return this.say(ent, list[(Math.random() * list.length) | 0]);
     }
+    // Once a match is decided (quiet), only banners marked force still show, so late events can't cover the win.
     banner(text, sub, color, dur, opts) {
+      if (this.quiet && !(opts && opts.force)) return;
       this.banners.push({ text, sub, color: color || '#fff', life: 0, max: dur || 1.6, opts: opts || {} });
     }
     // A full-screen meme moment: vine boom, zoom punch, red vignette, big caption.
@@ -315,7 +318,8 @@
         const h = size + 18;
         let bx = SQ.clamp(e.x, w / 2 + 6, SQ.WORLD - w / 2 - 6);
         let by = e.y - (e.size || 30) / 2 - h / 2 - 16;
-        if (by < h / 2 + 4) by = e.y + (e.size || 30) / 2 + h / 2 + 16;
+        const below = by < h / 2 + 4;
+        if (below) by = e.y + (e.size || 30) / 2 + h / 2 + 16;
         ctx.translate(bx, by);
         ctx.scale(pop, pop);
         ctx.fillStyle = '#ffffff';
@@ -324,10 +328,12 @@
         SQ.roundRect(ctx, -w / 2, -h / 2, w, h, 14);
         ctx.fill();
         ctx.stroke();
+        // the tail points at the speaker, up when the bubble had to flip below it
+        const ty = below ? -1 : 1;
         ctx.beginPath();
-        ctx.moveTo(-8, h / 2 - 2);
-        ctx.lineTo(0, h / 2 + 12);
-        ctx.lineTo(8, h / 2 - 2);
+        ctx.moveTo(-8, ty * (h / 2 - 2));
+        ctx.lineTo(0, ty * (h / 2 + 12));
+        ctx.lineTo(8, ty * (h / 2 - 2));
         ctx.fill();
         ctx.fillStyle = '#0b0b10';
         ctx.textAlign = 'center';

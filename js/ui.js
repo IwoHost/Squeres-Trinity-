@@ -39,7 +39,9 @@
 
   // ----- win stats, kept in this browser -----
   const MODE_NAMES = { chase: 'Color Chase', territory: 'Tile Wars', domain: 'Domain Duel', race: 'Square Race', brawl: 'Weapon Brawl', bounce: 'Bounce Brawl', marble: 'Marble Race', hill: 'King of the Hill' };
-  let stats = store.get('stats', { total: 0, modes: {} });
+  let stats = store.get('stats', null);
+  // anything odd in storage (an old version, a hand edit) starts the stats fresh instead of breaking the page
+  if (!stats || typeof stats !== 'object' || !stats.modes || typeof stats.modes !== 'object') stats = { total: 0, modes: {} };
   const statsSel = $('stats-mode');
   const fillStatsModes = () => {
     statsSel.innerHTML = '';
@@ -125,8 +127,11 @@
   });
 
   // ----- custom names -----
-  const names = store.get('names', {});
-  SQ.starred = store.get('stars', []).filter((b) => SQ.TEAMS.some((t) => t.base === b));
+  const storedNames = store.get('names', {});
+  const names = storedNames && typeof storedNames === 'object' ? storedNames : {};
+  const storedStars = store.get('stars', []);
+  SQ.starred = (Array.isArray(storedStars) ? storedStars : []).filter((b) => SQ.TEAMS.some((t) => t.base === b));
+  let posterTimer = null;
   const applyNames = () => {
     SQ.TEAMS.forEach((t) => (t.name = (names[t.base] || '').trim() || t.canon));
     game.headerCache = null;
@@ -146,12 +151,16 @@
     inp.autocomplete = 'off';
     inp.setAttribute('aria-label', `Name for ${t.base}`);
     inp.addEventListener('input', () => {
-      names[t.base] = inp.value.replace(/[^\p{L}\p{N} _.-]/gu, '');
+      const clean = inp.value.replace(/[^\p{L}\p{N} _.-]/gu, '');
+      if (clean !== inp.value) inp.value = clean; // show what will actually be used
+      names[t.base] = clean;
       store.set('names', names);
       applyNames();
       renderStats();
       renderLore();
-      renderPosters();
+      // redrawing all the posters on every key press is slow on phones, so wait for a pause in typing
+      clearTimeout(posterTimer);
+      posterTimer = setTimeout(renderPosters, 350);
     });
     const star = document.createElement('label');
     star.className = 'star';
@@ -396,8 +405,10 @@
   }
 
   game.on('done', async ({ winner, video }) => {
-    if (farm.on) {
-      if (video && !(await farmSave(video))) return;
+    // the last tournament part may still be on its way to the folder
+    if (farm.pending) await farm.pending;
+    // if saving fails the farm stops, and the match ends like a normal one so the clip can still be saved
+    if (farm.on && (!video || (await farmSave(video)))) {
       game.video = null;
       $('save').hidden = true;
       if (farm.saved >= farm.max) return stopFarm(`Done: saved ${farm.saved} clips.`);
@@ -407,9 +418,17 @@
     }
     $('overlay-title').textContent = winner ? winner.text : 'Match over';
     $('overlay-text').textContent = 'Ready for another one?';
-    $('overlay-start').textContent = game.tour ? 'New tournament' : 'Next match';
+    $('overlay-start').textContent = game.opts.mode === 'tournament' ? 'New tournament' : 'Next match';
     $('overlay').classList.add('compact');
-    $('overlay').hidden = !!game.opts.autoNext;
+    const auto = game.opts.autoNext && !game.tour;
+    $('overlay').hidden = auto;
+    if (auto) {
+      setTimeout(() => {
+        if (game.phase !== 'done') return;
+        if (game.opts.autoNext) start();
+        else $('overlay').hidden = false; // auto-next was switched off while waiting
+      }, 2500);
+    }
     if (game.tour && game.videos.length) status(`Tournament recorded in ${game.videos.length} parts. Save the ones you want.`);
     if (video) {
       const mb = (video.blob.size / 1048576).toFixed(1);
@@ -430,7 +449,11 @@
   // one save button per tournament part
   game.on('part', async (v) => {
     if (farm.on) {
-      if (await farmSave(v)) farmStatus(`Saved ${farm.saved} clip${farm.saved === 1 ? '' : 's'}. Recording the next one…`);
+      farm.pending = farmSave(v).then((ok) => {
+        if (ok) farmStatus(`Saved ${farm.saved} clip${farm.saved === 1 ? '' : 's'}. Recording the next one…`);
+      });
+      await farm.pending;
+      farm.pending = null;
       return;
     }
     const b = document.createElement('button');
@@ -556,7 +579,9 @@
 
   // keyboard: space or enter starts a match when nothing is focused
   document.addEventListener('keydown', (e) => {
-    if ((e.key === ' ' || e.key === 'Enter') && document.activeElement === document.body) {
+    // only between matches, so a stray key press never throws away a match that is being recorded
+    const between = game.phase === 'idle' || game.phase === 'done';
+    if ((e.key === ' ' || e.key === 'Enter') && document.activeElement === document.body && between) {
       e.preventDefault();
       start();
     }

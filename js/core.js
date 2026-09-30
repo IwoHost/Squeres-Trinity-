@@ -260,15 +260,13 @@
   };
 
   SQ.pickTeams = function (rng, n) {
-    let idx = rng.shuffle(SQ.TEAMS.map((t, i) => i));
-    // starred colors always get a spot
-    for (const base of SQ.starred) {
-      const s = SQ.TEAMS.findIndex((t) => t.base === base);
-      if (s < 0 || idx.slice(0, n).includes(s)) continue;
-      idx = idx.filter((i) => i !== s);
-      idx.splice(rng.int(0, n - 1), 0, s);
-    }
-    return idx.slice(0, n).map((i) => SQ.TEAMS[i]);
+    const idx = rng.shuffle(SQ.TEAMS.map((t, i) => i));
+    // starred colors always get a spot (as many as fit), the rest are random
+    const star = SQ.starred.map((base) => SQ.TEAMS.findIndex((t) => t.base === base)).filter((s) => s >= 0);
+    if (!star.length) return idx.slice(0, n).map((i) => SQ.TEAMS[i]);
+    const keep = idx.filter((i) => star.includes(i)).slice(0, n);
+    const rest = idx.filter((i) => !keep.includes(i));
+    return rng.shuffle(keep.concat(rest).slice(0, n)).map((i) => SQ.TEAMS[i]);
   };
 
   SQ.clamp = (v, a, b) => (v < a ? a : v > b ? b : v);

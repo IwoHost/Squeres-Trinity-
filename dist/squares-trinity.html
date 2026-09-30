@@ -618,15 +618,13 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
   };
 
   SQ.pickTeams = function (rng, n) {
-    let idx = rng.shuffle(SQ.TEAMS.map((t, i) => i));
-    // starred colors always get a spot
-    for (const base of SQ.starred) {
-      const s = SQ.TEAMS.findIndex((t) => t.base === base);
-      if (s < 0 || idx.slice(0, n).includes(s)) continue;
-      idx = idx.filter((i) => i !== s);
-      idx.splice(rng.int(0, n - 1), 0, s);
-    }
-    return idx.slice(0, n).map((i) => SQ.TEAMS[i]);
+    const idx = rng.shuffle(SQ.TEAMS.map((t, i) => i));
+    // starred colors always get a spot (as many as fit), the rest are random
+    const star = SQ.starred.map((base) => SQ.TEAMS.findIndex((t) => t.base === base)).filter((s) => s >= 0);
+    if (!star.length) return idx.slice(0, n).map((i) => SQ.TEAMS[i]);
+    const keep = idx.filter((i) => star.includes(i)).slice(0, n);
+    const rest = idx.filter((i) => !keep.includes(i));
+    return rng.shuffle(keep.concat(rest).slice(0, n)).map((i) => SQ.TEAMS[i]);
   };
 
   SQ.clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -1941,6 +1939,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       this.clear();
     }
     clear() {
+      this.quiet = false;
       this.parts = [];
       this.texts = [];
       this.bubbles = [];
@@ -2033,7 +2032,9 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       const list = MEMES[kind];
       return this.say(ent, list[(Math.random() * list.length) | 0]);
     }
+    // Once a match is decided (quiet), only banners marked force still show, so late events can't cover the win.
     banner(text, sub, color, dur, opts) {
+      if (this.quiet && !(opts && opts.force)) return;
       this.banners.push({ text, sub, color: color || '#fff', life: 0, max: dur || 1.6, opts: opts || {} });
     }
     // A full-screen meme moment: vine boom, zoom punch, red vignette, big caption.
@@ -2151,7 +2152,8 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         const h = size + 18;
         let bx = SQ.clamp(e.x, w / 2 + 6, SQ.WORLD - w / 2 - 6);
         let by = e.y - (e.size || 30) / 2 - h / 2 - 16;
-        if (by < h / 2 + 4) by = e.y + (e.size || 30) / 2 + h / 2 + 16;
+        const below = by < h / 2 + 4;
+        if (below) by = e.y + (e.size || 30) / 2 + h / 2 + 16;
         ctx.translate(bx, by);
         ctx.scale(pop, pop);
         ctx.fillStyle = '#ffffff';
@@ -2160,10 +2162,12 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         SQ.roundRect(ctx, -w / 2, -h / 2, w, h, 14);
         ctx.fill();
         ctx.stroke();
+        // the tail points at the speaker, up when the bubble had to flip below it
+        const ty = below ? -1 : 1;
         ctx.beginPath();
-        ctx.moveTo(-8, h / 2 - 2);
-        ctx.lineTo(0, h / 2 + 12);
-        ctx.lineTo(8, h / 2 - 2);
+        ctx.moveTo(-8, ty * (h / 2 - 2));
+        ctx.lineTo(0, ty * (h / 2 + 12));
+        ctx.lineTo(8, ty * (h / 2 - 2));
         ctx.fill();
         ctx.fillStyle = '#0b0b10';
         ctx.textAlign = 'center';
@@ -6287,7 +6291,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       }
       // shockwave from the zone pushes everyone out
       this.waveT -= dt;
-      if (this.waveT <= 0) {
+      if (this.waveT <= 0 && !this.winner) {
         this.waveT = rng.range(14, 20);
         this.wave = { t: 0 };
         g.fx.banner('SHOCKWAVE!', 'everyone gets blasted out', '#1fd6f0', 1.2);
@@ -7533,20 +7537,28 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       const list = ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
       return list.find((m) => MediaRecorder.isTypeSupported(m)) || '';
     }
+    // Each recording keeps its own chunks and video track, so a new one can never mix with the last.
     start(canvas, audioStream, fps, bitrate) {
       if (!this.supported) return false;
-      const tracks = canvas.captureStream(fps || 30).getVideoTracks();
+      this.abort();
+      const video = canvas.captureStream(fps || 30).getVideoTracks();
+      const tracks = video.slice();
       if (audioStream) tracks.push(...audioStream.getAudioTracks());
       const stream = new MediaStream(tracks);
       this.mime = this.pickMime();
-      this.chunks = [];
+      let rec;
       try {
-        this.rec = new MediaRecorder(stream, { mimeType: this.mime || undefined, videoBitsPerSecond: bitrate || 6_000_000, audioBitsPerSecond: 192_000 });
+        rec = new MediaRecorder(stream, { mimeType: this.mime || undefined, videoBitsPerSecond: bitrate || 6_000_000, audioBitsPerSecond: 192_000 });
       } catch (e) {
-        this.rec = new MediaRecorder(stream);
+        rec = new MediaRecorder(stream);
       }
-      this.rec.ondataavailable = (e) => e.data && e.data.size && this.chunks.push(e.data);
-      this.rec.start(500);
+      const chunks = [];
+      rec.ondataavailable = (e) => e.data && e.data.size && chunks.push(e.data);
+      // the canvas track is ours to end; the audio track belongs to the shared sound output
+      rec.onstop = () => video.forEach((t) => t.stop());
+      rec.start(500);
+      this.rec = rec;
+      this.chunks = chunks;
       this.startedAt = performance.now();
       return true;
     }
@@ -7556,12 +7568,24 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     stop() {
       return new Promise((res) => {
         if (!this.active) return res(null);
-        this.rec.onstop = () => {
-          const type = (this.rec.mimeType || this.mime || 'video/webm').split(';')[0];
-          res(new Blob(this.chunks, { type }));
+        const rec = this.rec;
+        const chunks = this.chunks;
+        const end = rec.onstop;
+        rec.onstop = () => {
+          end();
+          const type = (rec.mimeType || this.mime || 'video/webm').split(';')[0];
+          res(new Blob(chunks, { type }));
         };
-        this.rec.stop();
+        rec.stop();
+        this.rec = null;
       });
+    }
+    // Drops a recording that is still running (a new match started before it finished).
+    abort() {
+      if (!this.active) return;
+      this.rec.ondataavailable = null;
+      this.rec.stop();
+      this.rec = null;
     }
   }
 
@@ -7633,6 +7657,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       o = o || {};
       this.audio.init();
       if (!o.tour) {
+        this.recorder.abort(); // a match or tournament cut short is not saved
         this.tour = null;
         this.episode++;
         this.seed = seed != null ? seed >>> 0 : SQ.randomSeed();
@@ -7799,6 +7824,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         }
         if (m.winner) {
           this.setPhase('finale');
+          this.fx.quiet = true;
           this.slowmo(0.25, 1.5, true);
           const w = m.winnerEnt;
           this.cam.tracking = false;
@@ -7810,7 +7836,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       if (P === 'finale' && this.phaseT > 1.5) {
         this.setPhase('outro');
         const w = m.winner;
-        this.fx.banner(w.text, w.sub, w.team.color, 5.2, { y: SQ.ARENA.y + SQ.ARENA.size * 0.78, size: 96 });
+        this.fx.banner(w.text, w.sub, w.team.color, 5.2, { y: SQ.ARENA.y + SQ.ARENA.size * 0.78, size: 96, force: true });
         this.fx.confettiBurst([w.team.color, w.team.light, '#ffffff', '#ffd23f'], 220);
         this.audio.fanfare();
         this.audio.intensity = 1;
@@ -7830,8 +7856,13 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
           const list = SQ.MEMES.winner;
           this.winnerCaption = list[Math.floor(Math.random() * list.length)];
         }
-        if (this.phaseT > 5.4 && !this.tour) this.audio.stopMusic(1.2);
-        if (this.phaseT > (this.tour ? 4 : this.opts.reel ? 3.6 : 6.2)) this.finish();
+        const finishAt = this.tour ? 4 : this.opts.reel ? 3.6 : 6.2;
+        // the music fades out just before the end, so a saved clip never stops mid-song
+        if (this.phaseT > finishAt - 0.8 && !this.tour && !this.musicFaded) {
+          this.musicFaded = true;
+          this.audio.stopMusic(1.2);
+        }
+        if (this.phaseT > finishAt) this.finish();
       }
       if (P === 'bracket' && this.phaseT > 4.4) {
         const nx = this.tour.next;
@@ -7840,6 +7871,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       if (P === 'champion' && this.phaseT > 7) this.finishTour();
       if (P === 'intro' || P === 'countdown' || P === 'bracket' || P === 'champion' || P === 'between') simulate = false;
       if (P !== 'outro') {
+        this.musicFaded = false;
         this.memeDone = false;
         this.winLine = false;
       }
@@ -7892,6 +7924,7 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       this.episode++;
       this.seed = seed != null ? seed >>> 0 : SQ.randomSeed();
       const rng = SQ.makeRng(this.seed);
+      this.recorder.abort();
       this.tour = { seed: this.seed, rng, rounds: [rng.shuffle(SQ.TEAMS)], results: [[], [], []], round: 0, match: 0, part: 0, lastMode: null, champion: null, lastResult: null };
       this.videos = [];
       this.video = null;
@@ -8005,12 +8038,8 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
           this.video = { blob, ext, name: `squares-trinity-${this.modeInfo.id}-${this.seed}.${ext}` };
         }
       }
+      // the page starts the next match itself when auto-next is on, so its buttons stay in step
       this.emit('done', { winner: this.mode.winner, video: this.video });
-      if (this.opts.autoNext) {
-        setTimeout(() => {
-          if (this.phase === 'done' && this.opts.autoNext) this.newMatch();
-        }, 2500);
-      }
     }
 
     // ---------------- rendering ----------------
@@ -8175,11 +8204,19 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
         const x = SQ.W / 2 - total / 2 + size / 2 + i * (size + gap);
         const y = A.y + A.size * 0.6 - Math.abs(Math.sin(t * 5 + i)) * 16;
         SQ.drawSquare(ctx, x, y, size * SQ.ease.outBack(kk), tm, { mood: i % 2 ? 'angry' : 'normal', lookX: Math.sin(t * 2 + i), squash: Math.sin(t * 10 + i) * 0.06 });
-        SQ.outlinedText(ctx, tm.name, x, y + size * 0.85, Math.min(36, size * 0.36), tm.color, { stroke: 7 });
+        // each label is shrunk to its own slot so long names like DOUCHECUBE never run into a neighbour
+        const slot = size + gap - 6;
+        const nameSize = SQ.fitSize(ctx, [{ t: tm.name }], slot, Math.min(36, size * 0.36));
+        SQ.outlinedText(ctx, tm.name, x, y + size * 0.85, nameSize, tm.color, { stroke: 7 });
         const P = SQ.persona(tm);
         const L = SQ.LORE[tm.base];
         const home = L && teams.length <= 4 ? ` · ${L.sector.replace(/^(Sector|the) /, '')}` : '';
-        SQ.outlinedText(ctx, P.title + home, x, y + size * 0.85 + Math.min(36, size * 0.36) * 0.95, Math.min(24, size * 0.24), '#ffffff', { stroke: 5, font: SQ.fontBody, weight: 700 });
+        const sub = P.title + home;
+        let subSize = Math.min(24, size * 0.24);
+        ctx.font = `700 ${subSize}px ${SQ.fontBody}`;
+        const sw = ctx.measureText(sub).width;
+        if (sw > slot) subSize = Math.floor((subSize * slot) / sw);
+        SQ.outlinedText(ctx, sub, x, y + size * 0.85 + Math.min(36, size * 0.36) * 0.95, subSize, '#ffffff', { stroke: 5, font: SQ.fontBody, weight: 700 });
       });
       ctx.restore();
       if (t > 1.2) {
@@ -8234,7 +8271,15 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
       const gy = w.y - size * 0.04 - (1 - SQ.ease.outCubic(k)) * 320;
       SQ.drawSunglasses(ctx, w.x, gy, size * 0.95);
       if (this.winnerCaption) {
-        SQ.outlinedText(ctx, this.winnerCaption, w.x, w.y + size * 0.5 + 30, Math.max(22, size * 0.5), '#ffffff', { stroke: 7 });
+        const cs = Math.max(22, size * 0.5);
+        ctx.font = `${cs}px ${SQ.fontDisplay}`;
+        const half = ctx.measureText(this.winnerCaption).width / 2 + 12;
+        // keep it inside the arena; near the top the speech bubble flips below the square, so go under that
+        const cx = SQ.clamp(w.x, half, SQ.WORLD - half);
+        const worldH = this.mode.worldH || SQ.WORLD;
+        const bubbleBelow = w.y - size / 2 - 40 < 28; // same test as the bubble in fx.js
+        const cy = Math.min(w.y + size * 0.5 + (bubbleBelow ? 100 : 30), worldH - cs * 0.6);
+        SQ.outlinedText(ctx, this.winnerCaption, cx, cy, cs, '#ffffff', { stroke: 7 });
       }
     }
 
@@ -8450,7 +8495,9 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
 
   // ----- win stats, kept in this browser -----
   const MODE_NAMES = { chase: 'Color Chase', territory: 'Tile Wars', domain: 'Domain Duel', race: 'Square Race', brawl: 'Weapon Brawl', bounce: 'Bounce Brawl', marble: 'Marble Race', hill: 'King of the Hill' };
-  let stats = store.get('stats', { total: 0, modes: {} });
+  let stats = store.get('stats', null);
+  // anything odd in storage (an old version, a hand edit) starts the stats fresh instead of breaking the page
+  if (!stats || typeof stats !== 'object' || !stats.modes || typeof stats.modes !== 'object') stats = { total: 0, modes: {} };
   const statsSel = $('stats-mode');
   const fillStatsModes = () => {
     statsSel.innerHTML = '';
@@ -8536,8 +8583,11 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
   });
 
   // ----- custom names -----
-  const names = store.get('names', {});
-  SQ.starred = store.get('stars', []).filter((b) => SQ.TEAMS.some((t) => t.base === b));
+  const storedNames = store.get('names', {});
+  const names = storedNames && typeof storedNames === 'object' ? storedNames : {};
+  const storedStars = store.get('stars', []);
+  SQ.starred = (Array.isArray(storedStars) ? storedStars : []).filter((b) => SQ.TEAMS.some((t) => t.base === b));
+  let posterTimer = null;
   const applyNames = () => {
     SQ.TEAMS.forEach((t) => (t.name = (names[t.base] || '').trim() || t.canon));
     game.headerCache = null;
@@ -8557,12 +8607,16 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     inp.autocomplete = 'off';
     inp.setAttribute('aria-label', `Name for ${t.base}`);
     inp.addEventListener('input', () => {
-      names[t.base] = inp.value.replace(/[^\p{L}\p{N} _.-]/gu, '');
+      const clean = inp.value.replace(/[^\p{L}\p{N} _.-]/gu, '');
+      if (clean !== inp.value) inp.value = clean; // show what will actually be used
+      names[t.base] = clean;
       store.set('names', names);
       applyNames();
       renderStats();
       renderLore();
-      renderPosters();
+      // redrawing all the posters on every key press is slow on phones, so wait for a pause in typing
+      clearTimeout(posterTimer);
+      posterTimer = setTimeout(renderPosters, 350);
     });
     const star = document.createElement('label');
     star.className = 'star';
@@ -8807,8 +8861,10 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
   }
 
   game.on('done', async ({ winner, video }) => {
-    if (farm.on) {
-      if (video && !(await farmSave(video))) return;
+    // the last tournament part may still be on its way to the folder
+    if (farm.pending) await farm.pending;
+    // if saving fails the farm stops, and the match ends like a normal one so the clip can still be saved
+    if (farm.on && (!video || (await farmSave(video)))) {
       game.video = null;
       $('save').hidden = true;
       if (farm.saved >= farm.max) return stopFarm(`Done: saved ${farm.saved} clips.`);
@@ -8818,9 +8874,17 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
     }
     $('overlay-title').textContent = winner ? winner.text : 'Match over';
     $('overlay-text').textContent = 'Ready for another one?';
-    $('overlay-start').textContent = game.tour ? 'New tournament' : 'Next match';
+    $('overlay-start').textContent = game.opts.mode === 'tournament' ? 'New tournament' : 'Next match';
     $('overlay').classList.add('compact');
-    $('overlay').hidden = !!game.opts.autoNext;
+    const auto = game.opts.autoNext && !game.tour;
+    $('overlay').hidden = auto;
+    if (auto) {
+      setTimeout(() => {
+        if (game.phase !== 'done') return;
+        if (game.opts.autoNext) start();
+        else $('overlay').hidden = false; // auto-next was switched off while waiting
+      }, 2500);
+    }
     if (game.tour && game.videos.length) status(`Tournament recorded in ${game.videos.length} parts. Save the ones you want.`);
     if (video) {
       const mb = (video.blob.size / 1048576).toFixed(1);
@@ -8841,7 +8905,11 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
   // one save button per tournament part
   game.on('part', async (v) => {
     if (farm.on) {
-      if (await farmSave(v)) farmStatus(`Saved ${farm.saved} clip${farm.saved === 1 ? '' : 's'}. Recording the next one…`);
+      farm.pending = farmSave(v).then((ok) => {
+        if (ok) farmStatus(`Saved ${farm.saved} clip${farm.saved === 1 ? '' : 's'}. Recording the next one…`);
+      });
+      await farm.pending;
+      farm.pending = null;
       return;
     }
     const b = document.createElement('button');
@@ -8967,7 +9035,9 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
 
   // keyboard: space or enter starts a match when nothing is focused
   document.addEventListener('keydown', (e) => {
-    if ((e.key === ' ' || e.key === 'Enter') && document.activeElement === document.body) {
+    // only between matches, so a stray key press never throws away a match that is being recorded
+    const between = game.phase === 'idle' || game.phase === 'done';
+    if ((e.key === ' ' || e.key === 'Enter') && document.activeElement === document.body && between) {
       e.preventDefault();
       start();
     }
