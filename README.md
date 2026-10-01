@@ -134,10 +134,10 @@ a little more, so a run of posts slowly loses its signal. Within a video it stay
 
 ### The signal event and the hidden transmission
 
-When the static reaches 100%, or when you press "Reboot the signal next video", the next video
+When the static reaches 100%, or when you press "Reboot event in next video", the next video
 has the signal event: SIGNAL LOST, the match freezes, a hiss and hum take over, and after a
 search one fragment of a secret message decodes out of the noise, numbered like
-"FRAGMENT 07 / 66". Then the Frame reboots, the picture comes back clean and the static starts
+"FRAGMENT 07 / 15". Then the Frame reboots, the picture comes back clean and the static starts
 over. Every reboot shows the next fragment, so viewers have to collect the videos and put the
 message together, like an ARG. The Look tab shows the full message (you can rewrite it), how many
 words each fragment has, and which fragment the next reboot will show; Back, Skip and Start over
@@ -154,7 +154,7 @@ and descriptions.
 
 ### Mysteries
 
-Smaller secrets for people who look closely, set in the Mysteries part of the Look tab:
+Smaller secrets for people who look closely, set in the Extras part of the Look tab:
 
 - During the signal loss every square slowly stops and stares straight out of the screen.
 - A grey ninth square with no name sometimes stands in a corner of the arena for a couple of

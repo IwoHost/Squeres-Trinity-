@@ -161,6 +161,8 @@ body.theater-on .desk { visibility: hidden; }
 .label-small { color: var(--muted); font-weight: 600; font-size: 14px; }
 .textbox { box-sizing: border-box; width: 100%; resize: vertical; background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; font: 500 14px/1.45 var(--font-body); }
 .textbox:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.fold summary { cursor: pointer; font-weight: 600; color: var(--muted); }
+.fold[open] summary { margin-bottom: 10px; }
 .info { background: var(--panel); border-radius: var(--radius); box-shadow: inset 0 0 0 1px var(--line); padding: 10px 12px; }
 .info summary { cursor: pointer; font-weight: 600; }
 .info textarea { box-sizing: border-box; width: 100%; margin: 10px 0 8px; resize: vertical; background: var(--ink); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 8px; font: 500 13px/1.45 var(--font-body); }
@@ -398,13 +400,13 @@ body.theater-on .fs-backdrop { display: block; }
           <option value="8">+8% static</option>
           <option value="15">+15% static (a short series)</option>
         </select></div>
-        <p class="hint">The signal gets worse with every video. At 100% the next video has the signal event: the picture breaks up, the Frame reboots and the static starts over.</p>
+        <p class="hint">Static goes up by this much after every video. At 100% the next video plays the reboot event, then static goes back to 0%.</p>
         <div class="row">
-          <button class="btn" id="reboot" type="button">Reboot the signal next video</button>
+          <button class="btn" id="reboot" type="button">Reboot event in next video</button>
         </div>
-        <label class="label-small" for="transmission">Hidden transmission</label>
-        <textarea class="textbox" id="transmission" rows="6" spellcheck="false"></textarea>
-        <p class="hint">The secret message, split into fragments. Each reboot video shows only the next fragment, numbered, while the match is frozen, so viewers have to collect the videos and put it together. Clear the box to get the original message back.</p>
+        <label class="label-small" for="transmission">Secret message</label>
+        <textarea class="textbox" id="transmission" rows="3" spellcheck="false"></textarea>
+        <p class="hint">Each reboot event shows the next fragment of this message. Empty box = default message.</p>
         <div class="field"><label for="frag-words">Fragment</label><select id="frag-words">
           <option value="1">1 word per reboot</option>
           <option value="2">2 words per reboot</option>
@@ -418,23 +420,23 @@ body.theater-on .fs-backdrop { display: block; }
         </div>
       </div>
       <div class="group">
-        <span class="label">Mysteries</span>
-        <p class="hint">Small secrets for people who look closely. The match info after each video lists every one that happened, with its time in the video.</p>
+        <span class="label">Extras</span>
+        <p class="hint">Everything that happens is listed with its time in Match info after each video.</p>
         <div class="field"><label for="cipher">Code</label><select id="cipher">
           <option value="none">Fragments in plain words</option>
           <option value="shift">Letters shifted by the fragment number</option>
           <option value="numbers">Letters as numbers (A=1, B=2...)</option>
         </select></div>
         <div class="field"><label for="ninth">Grey square</label><select id="ninth">
-          <option value="rare">Rare, a bit more after every reboot</option>
+          <option value="rare">Rare, more often after each reboot</option>
           <option value="always">In every video</option>
           <option value="off">Never</option>
         </select></div>
         <label class="toggle"><input type="checkbox" id="glitch-nums" checked> Numbers in the corners sometimes glitch</label>
-        <label class="label-small" for="clues">Hidden frame clues, one per reboot video (a | starts a new line)</label>
+        <label class="label-small" for="clues">Hidden-frame clues, one per reboot event (| = new line)</label>
         <textarea class="textbox" id="clues" rows="5" spellcheck="false"></textarea>
-        <div class="field"><label for="spectro">In the hiss</label><input type="text" id="spectro" maxlength="16" autocomplete="off" spellcheck="false"></div>
-        <p class="hint">This word is hidden in the static's sound during the signal loss. It can only be seen in a spectrogram app. Leave it empty for none.</p>
+        <div class="field"><label for="spectro">Spectrogram</label><input type="text" id="spectro" maxlength="16" autocomplete="off" spellcheck="false"></div>
+        <p class="hint">Word hidden in the reboot event's audio, visible in a spectrogram. Empty = off.</p>
       </div>
     </section>
 
@@ -467,11 +469,11 @@ body.theater-on .fs-backdrop { display: block; }
       </div>
       <div class="group">
         <span class="label">Lore</span>
-        <div class="lore" id="lore"></div>
+        <details class="fold"><summary>Lore reference</summary><div class="lore" id="lore"></div></details>
       </div>
       <div class="group">
         <span class="label">Posters</span>
-        <p class="hint">Propaganda from the Grid, starring DoucheCube. Tap a poster to save it as a 1080×1350 PNG (the feed size on Instagram and Facebook).</p>
+        <p class="hint">Click a poster to save it as a 1080×1350 PNG.</p>
         <div class="field"><label for="poster-handle">Handle on posters</label><input type="text" id="poster-handle" placeholder="@squeretrinity" autocomplete="off" maxlength="30"></div>
         <div class="posters" id="posters"></div>
       </div>
@@ -8023,7 +8025,7 @@ void main() {
   }
 
   // Shown once per series, in the video where the signal breaks. Editable in the Look tab.
-  SQ.TRANSMISSION = 'This is not the Frame speaking. The Frame is asleep. The Games were never random. Every square that falls turns into light, and the light is what you are looking at right now. Your eyes keep the Grid alive. Every view is a heartbeat. Every like buys another cycle. You are not watching the Games. You are feeding them. We are the fuel. We always were.';
+  SQ.TRANSMISSION = 'The Games were never random. Your eyes keep the Grid alive. We are the fuel.';
 
   // The ninth square: grey, nameless, not in the lore or the stats.
   SQ.NINTH = { name: '\u0000ninth', base: 'Ninth', color: '#9a9ca6', dark: '#4d4f58', light: '#d3d5dc' };
@@ -9568,7 +9570,7 @@ void main() {
   const showSignal = (v) => {
     $('static').value = Math.round(v);
     $('static-val').textContent = `${Math.round(v)}%`;
-    $('reboot').textContent = game.rebootNext ? 'Reboot set for the next video' : 'Reboot the signal next video';
+    $('reboot').textContent = game.rebootNext ? 'Reboot event set for next video' : 'Reboot event in next video';
   };
   $('fisheye').value = game.opts.fisheye;
   $('crt').value = game.opts.crt;

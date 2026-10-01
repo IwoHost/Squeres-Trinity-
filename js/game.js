@@ -89,7 +89,7 @@
   }
 
   // Shown once per series, in the video where the signal breaks. Editable in the Look tab.
-  SQ.TRANSMISSION = 'This is not the Frame speaking. The Frame is asleep. The Games were never random. Every square that falls turns into light, and the light is what you are looking at right now. Your eyes keep the Grid alive. Every view is a heartbeat. Every like buys another cycle. You are not watching the Games. You are feeding them. We are the fuel. We always were.';
+  SQ.TRANSMISSION = 'The Games were never random. Your eyes keep the Grid alive. We are the fuel.';
 
   // The ninth square: grey, nameless, not in the lore or the stats.
   SQ.NINTH = { name: '\u0000ninth', base: 'Ninth', color: '#9a9ca6', dark: '#4d4f58', light: '#d3d5dc' };

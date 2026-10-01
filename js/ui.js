@@ -294,7 +294,7 @@
   const showSignal = (v) => {
     $('static').value = Math.round(v);
     $('static-val').textContent = `${Math.round(v)}%`;
-    $('reboot').textContent = game.rebootNext ? 'Reboot set for the next video' : 'Reboot the signal next video';
+    $('reboot').textContent = game.rebootNext ? 'Reboot event set for next video' : 'Reboot event in next video';
   };
   $('fisheye').value = game.opts.fisheye;
   $('crt').value = game.opts.crt;
