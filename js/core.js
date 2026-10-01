@@ -176,7 +176,7 @@
     },
   };
   // Official names from the lore. Colors without one go by their color name.
-  SQ.CANON_NAMES = { Red: 'DoucheCube', Yellow: 'VoltCube', Purple: 'Cubert', Orange: 'Carnie' };
+  SQ.CANON_NAMES = { Red: 'DoucheCube', Green: 'Mossimo', Blue: 'Professor Cache', Yellow: 'VoltCube', Purple: 'Cubert', Cyan: 'Shivers', Orange: 'Carnie', Pink: 'Sugarcube' };
 
   // The world of the Trinity Games, and where each square comes from.
   SQ.WORLD_LORE = [
@@ -195,14 +195,14 @@
     Green: {
       sector: 'Sector Moss',
       home: 'the greenhouses that feed the whole Grid',
-      story: 'Green is either the calmest square alive or the best actor in the Games. Moss has never won a single cycle, and Green says that is fine. Mostly. It smuggles a pocket of seeds into every arena, just in case.',
+      story: 'Mossimo is either the calmest square alive or the best actor in the Games. Moss has never won a single cycle, and Mossimo says that is fine. Mostly. It smuggles a pocket of seeds into every arena, just in case.',
       rival: 'nobody',
       rivalWhy: 'is friends with everyone, which makes everyone nervous',
     },
     Blue: {
       sector: 'Sector Cache',
       home: 'the data archives where the Frame stores every match ever played',
-      story: 'Blue memorised every recorded Game and believes they can be solved. It has a theory that the arena is rigged, and 43 pages of notes to prove it. Page 44 is still being written.',
+      story: 'Professor Cache memorised every recorded Game and believes they can be solved. It has a theory that the arena is rigged, and 43 pages of notes to prove it. Page 44 is still being written.',
       rival: 'Red',
       rivalWhy: 'ruins every plan by charging straight in',
     },
@@ -223,7 +223,7 @@
     Cyan: {
       sector: 'Sector Coolant',
       home: 'the freezing vents that keep the Grid from overheating',
-      story: 'Cyan was never supposed to be picked. Its name came out of the Frame\'s lottery by accident, or so it keeps telling everyone. It has survived more Games than anyone by running away, and is still not sure that counts as winning.',
+      story: 'Shivers was never supposed to be picked. Its name came out of the Frame\'s lottery by accident, or so it keeps telling everyone. It has survived more Games than anyone by running away, and is still not sure that counts as winning.',
       rival: 'everyone, apparently',
       rivalWhy: 'they all keep chasing it',
     },
@@ -237,7 +237,7 @@
     Pink: {
       sector: 'Sector Candy',
       home: 'the factories that make the sweets handed out at every Game',
-      story: 'Pink hands out candy to the other contestants before every match. Some call it kindness, some call it strategy. Either way, Sector Candy has more sponsors than any other Sector in the Grid.',
+      story: 'Sugarcube hands out candy to the other contestants before every match. Some call it kindness, some call it strategy. Either way, Sector Candy has more sponsors than any other Sector in the Grid.',
       rival: 'Purple',
       rivalWhy: 'never says thank you for the candy',
     },
