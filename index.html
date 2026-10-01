@@ -311,7 +311,7 @@ body.theater-on .fs-backdrop { display: block; }
       <button class="btn btn-save" id="save" type="button" hidden>Save video</button>
       <div class="parts" id="parts" hidden></div>
       <details class="info" id="info" hidden>
-        <summary>Match info for titles and descriptions</summary>
+        <summary>Title, caption and match info</summary>
         <textarea id="info-text" readonly rows="7" aria-label="Match info"></textarea>
         <button class="btn" id="info-copy" type="button">Copy match info</button>
       </details>
@@ -380,6 +380,7 @@ body.theater-on .fs-backdrop { display: block; }
           <button class="btn" id="farm-folder" type="button">Choose folder</button>
         </div>
         <div class="field"><label for="farm-max">Stop after</label><input type="text" id="farm-max" inputmode="numeric" value="30" autocomplete="off"></div>
+        <label class="toggle"><input type="checkbox" id="farm-captions" checked> Save a caption file (.txt) with each clip</label>
         <div class="row">
           <button class="btn btn-primary" id="farm-start" type="button">Start clip farm</button>
         </div>
@@ -493,6 +494,7 @@ body.theater-on .fs-backdrop { display: block; }
 <script src="js/modes/marble.js"></script>
 <script src="js/modes/hill.js"></script>
 <script src="js/posters.js"></script>
+<script src="js/captions.js"></script>
 <script src="js/game.js"></script>
 <script src="js/ui.js"></script>
 <!-- /body -->

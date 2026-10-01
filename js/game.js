@@ -213,7 +213,15 @@
       const mseed = o.tour ? seed >>> 0 : this.seed;
       const rng = SQ.makeRng(mseed);
       let id = o.mode || this.opts.mode;
-      if (id === 'random' || !SQ.modes[id]) id = MODE_IDS[Math.floor(rng() * MODE_IDS.length)];
+      if (id === 'random' || !SQ.modes[id]) {
+        id = MODE_IDS[Math.floor(rng() * MODE_IDS.length)];
+        // a fresh random match never repeats the last mode (a replayed seed stays exactly the same)
+        if (seed == null && !o.tour && id === this.lastRandomMode) {
+          const rest = MODE_IDS.filter((x) => x !== id);
+          id = rest[Math.floor(rng() * rest.length)];
+        }
+        if (!o.tour) this.lastRandomMode = id;
+      }
       this.modeInfo = SQ.modes[id];
       const reel = this.opts.reel && !o.tour;
       // Reel mode uses the quick settings (the race is already short; quick makes it longer)
@@ -798,7 +806,7 @@
       if (!blob || !blob.size) return;
       const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
       const info = this.matchInfo();
-      const v = { blob, ext, part: this.tour.part, name: `${info.name}.${ext}`, info: info.text };
+      const v = { blob, ext, part: this.tour.part, name: `${info.name}.${ext}`, info: info.file };
       this.videos.push(v);
       this.emit('part', v);
     }
@@ -857,7 +865,30 @@
       if (this.tour && this.tour.champion) lines.push(`Champion of the Trinity Games: ${this.tour.champion.name}`);
       if (this.reboot) lines.push(`Hidden transmission: fragment ${this.reboot.idx + 1} of ${this.reboot.total}, "${this.reboot.plain}"${this.reboot.text !== this.reboot.plain ? `, shown in code as "${this.reboot.text}"` : ''}`);
       if (this.myst && this.myst.log.length) lines.push('Secrets in this video (times are from the start of the video):', ...this.myst.log.map((l) => '  ' + l));
-      return { name, text: lines.join('\n') };
+      // a ready-to-post title and caption; the same match always gets the same one
+      const post = w
+        ? SQ.writeCaption(
+            {
+              mode: this.modeInfo.id,
+              modeName: this.modeInfo.name,
+              cycle: this.cycle || this.episode,
+              winner: w.team,
+              losers,
+              tie: !!w.tie,
+              tied: w.tied || [],
+              sub: w.sub,
+              rebooted: !!this.reboot,
+              fragment: this.reboot ? this.reboot.idx + 1 : 0,
+              fragments: this.reboot ? this.reboot.total : 0,
+              ninthSeen: !!(this.myst && this.myst.ninth && this.myst.ninth.logged),
+              count: teams.length,
+            },
+            SQ.makeRng((this.seed ^ 0x5bd1e995) >>> 0)
+          )
+        : null;
+      const text = lines.join('\n');
+      const file = post ? `TITLE\n${post.title}\n\nCAPTION\n${post.caption}\n\n${post.tags}\n\nMATCH INFO\n${text}\n` : text + '\n';
+      return { name, text, post, file };
     }
 
     // Tells the page who played and who won, for the win stats.
@@ -881,7 +912,8 @@
         const blob = await this.recorder.stop();
         if (blob && blob.size) {
           const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
-          this.video = { blob, ext, name: `${this.matchInfo().name}.${ext}`, info: this.matchInfo().text };
+          const info = this.matchInfo();
+          this.video = { blob, ext, name: `${info.name}.${ext}`, info: info.file };
         }
       }
       // the page starts the next match itself when auto-next is on, so its buttons stay in step

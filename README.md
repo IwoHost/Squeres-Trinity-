@@ -190,6 +190,34 @@ hear; videos always get the full sound. The settings are in tabs: Play, Video, L
 World (names, win stats, lore and posters). In full screen on a wide screen, a blurred copy of
 the game fills the sides instead of black bars.
 
+## Making videos in bulk
+
+`tools/make_videos.py` plays matches and saves the videos for you, each with a `.txt` next to it:
+a ready title, caption and hashtags, plus the match info (who won, what happened, any secrets and
+their times). Random mode never plays the same mode twice in a row.
+
+Setup, once (needs Python 3):
+
+    pip install playwright
+    python -m playwright install chromium
+
+Then, from the project folder:
+
+    python tools/make_videos.py                     5 reels, random modes, into the folder videos
+    python tools/make_videos.py -n 10               10 reels
+    python tools/make_videos.py -n 3 --mode marble  3 marble races
+    python tools/make_videos.py --mode tournament   one tournament, every match its own part
+    python tools/make_videos.py --reboot            the first video plays the reboot event
+
+Other options: `--out FOLDER`, `--quality 720|1080`, `--no-reel`, `--speed 1|1.5|2`,
+`--static 0-100`, `--per-video 0|2|4|8|15`, `--fisheye 0-100`, `--crt 0-100`, `--headless`
+(no window) and `--browser PATH`. The script keeps its own static level, next fragment and
+cycle count between runs, so a series carries on. It plays in real time, so 10 reels take about
+5 minutes; leave the window alone while it runs.
+
+In the browser, the clip farm (Video tab) does the same and also saves a caption file with each
+clip, and the Match info box after a match starts with the title and caption.
+
 ## Video export
 
 Keep "Record each match with sound" on. **Quality** sets the resolution: Auto uses 720p on

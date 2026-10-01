@@ -311,7 +311,7 @@ body.theater-on .fs-backdrop { display: block; }
       <button class="btn btn-save" id="save" type="button" hidden>Save video</button>
       <div class="parts" id="parts" hidden></div>
       <details class="info" id="info" hidden>
-        <summary>Match info for titles and descriptions</summary>
+        <summary>Title, caption and match info</summary>
         <textarea id="info-text" readonly rows="7" aria-label="Match info"></textarea>
         <button class="btn" id="info-copy" type="button">Copy match info</button>
       </details>
@@ -380,6 +380,7 @@ body.theater-on .fs-backdrop { display: block; }
           <button class="btn" id="farm-folder" type="button">Choose folder</button>
         </div>
         <div class="field"><label for="farm-max">Stop after</label><input type="text" id="farm-max" inputmode="numeric" value="30" autocomplete="off"></div>
+        <label class="toggle"><input type="checkbox" id="farm-captions" checked> Save a caption file (.txt) with each clip</label>
         <div class="row">
           <button class="btn btn-primary" id="farm-start" type="button">Start clip farm</button>
         </div>
@@ -7933,6 +7934,68 @@ void main() {
 })();
 
 </script>
+<script>/* js/captions.js */
+// Writes a ready-to-post title, caption and hashtags for a finished match, in the voice of the lore.
+// Used by the match info box, the clip farm's caption files and tools/make_videos.py.
+(function () {
+  const SQ = window.SQ;
+
+  const MODE_TAGS = {
+    chase: '#colorchase',
+    territory: '#tilewars',
+    domain: '#domainduel',
+    race: '#squarerace',
+    brawl: '#weaponbrawl',
+    bounce: '#bouncebrawl',
+    marble: '#marblerace',
+    hill: '#kingofthehill',
+  };
+
+  const sectorOf = (t) => {
+    const L = SQ.LORE[t.base];
+    return L ? L.sector : '';
+  };
+  const shortSector = (t) => sectorOf(t).replace(/^(Sector|the) /, '');
+
+  // d: { mode, modeName, cycle, winner, losers, tie, tied, sub, rebooted, fragment, ninthSeen, count }
+  SQ.writeCaption = function (d, rand) {
+    const R = rand || Math.random;
+    const pick = (list) => list[Math.floor(R() * list.length)];
+    const c = d.cycle;
+    let title;
+    const lines = [];
+    if (d.tie) {
+      const names = d.tied.map((t) => t.name).join(' and ');
+      title = pick([`Cycle ${c} has no winner.`, `Nobody leaves Cycle ${c}.`, `${names} went down together.`]);
+      lines.push(`${names} took each other out. The Frame does not do ties, so nobody gets the peace this cycle.`);
+    } else {
+      const W = d.winner;
+      const L = d.losers.length ? pick(d.losers) : null;
+      const lore = SQ.LORE[W.base];
+      const rival = lore && d.losers.find((t) => t.base === lore.rival);
+      const options = [`${W.name} survives Cycle ${c}.`, `Cycle ${c} belongs to ${W.name}.`, `${shortSector(W)} eats tonight.`];
+      if (L) options.push(`${L.name} did not make it out of Cycle ${c}.`);
+      if (d.mode === 'marble') options.push(`${W.name} reached the bottom first. The rest met the lava.`);
+      if (d.mode === 'race') options.push(`${W.name} found the way out first.`);
+      if (d.mode === 'hill') options.push(`${W.name} held the hill. Nobody else did.`);
+      if (d.mode === 'brawl' || d.mode === 'bounce' || d.mode === 'domain') options.push(`Last square standing: ${W.name}.`);
+      title = rival && R() < 0.6 ? `${W.name} finally settles it with ${rival.name}.` : pick(options);
+      lines.push(`${W.name} of ${sectorOf(W) || 'the Grid'} wins the ${d.modeName}${d.sub ? ` (${d.sub})` : ''}. ${shortSector(W) ? `${shortSector(W)} gets one more cycle of peace.` : ''}`.trim());
+      if (rival) lines.push(`${rival.name} ${lore.rivalWhy}. ${W.name} remembers.`);
+    }
+    if (d.rebooted) {
+      title = pick([`Cycle ${c}. The signal broke.`, `Cycle ${c}. Something got through.`, `Cycle ${c}. The Frame went quiet.`]);
+      lines.push(`For a few seconds the Frame was not watching. Fragment ${d.fragment} of ${d.fragments}. Keep count.`);
+    }
+    // viewers who count the squares will find one more than this
+    if (d.ninthSeen) lines.push(`${d.count} contestants entered.`);
+    lines.push(pick(['Which Sector are you from?', 'Comment your color.', 'Who do you want in the next cycle?', 'Who saw that coming?', 'Pick a color before the next one.']));
+    const tags = ['#squares', '#simulation', '#satisfying', '#animation', '#trinitygames', MODE_TAGS[d.mode]].filter(Boolean);
+    return { title, caption: lines.join('\n'), tags: tags.join(' ') };
+  };
+})();
+
+</script>
 <script>/* js/game.js */
 // The game director: runs a match through intro, countdown, play, finale and outro,
 // drives the camera and slow motion, and draws the frame that gets recorded.
@@ -8149,7 +8212,15 @@ void main() {
       const mseed = o.tour ? seed >>> 0 : this.seed;
       const rng = SQ.makeRng(mseed);
       let id = o.mode || this.opts.mode;
-      if (id === 'random' || !SQ.modes[id]) id = MODE_IDS[Math.floor(rng() * MODE_IDS.length)];
+      if (id === 'random' || !SQ.modes[id]) {
+        id = MODE_IDS[Math.floor(rng() * MODE_IDS.length)];
+        // a fresh random match never repeats the last mode (a replayed seed stays exactly the same)
+        if (seed == null && !o.tour && id === this.lastRandomMode) {
+          const rest = MODE_IDS.filter((x) => x !== id);
+          id = rest[Math.floor(rng() * rest.length)];
+        }
+        if (!o.tour) this.lastRandomMode = id;
+      }
       this.modeInfo = SQ.modes[id];
       const reel = this.opts.reel && !o.tour;
       // Reel mode uses the quick settings (the race is already short; quick makes it longer)
@@ -8734,7 +8805,7 @@ void main() {
       if (!blob || !blob.size) return;
       const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
       const info = this.matchInfo();
-      const v = { blob, ext, part: this.tour.part, name: `${info.name}.${ext}`, info: info.text };
+      const v = { blob, ext, part: this.tour.part, name: `${info.name}.${ext}`, info: info.file };
       this.videos.push(v);
       this.emit('part', v);
     }
@@ -8793,7 +8864,30 @@ void main() {
       if (this.tour && this.tour.champion) lines.push(`Champion of the Trinity Games: ${this.tour.champion.name}`);
       if (this.reboot) lines.push(`Hidden transmission: fragment ${this.reboot.idx + 1} of ${this.reboot.total}, "${this.reboot.plain}"${this.reboot.text !== this.reboot.plain ? `, shown in code as "${this.reboot.text}"` : ''}`);
       if (this.myst && this.myst.log.length) lines.push('Secrets in this video (times are from the start of the video):', ...this.myst.log.map((l) => '  ' + l));
-      return { name, text: lines.join('\n') };
+      // a ready-to-post title and caption; the same match always gets the same one
+      const post = w
+        ? SQ.writeCaption(
+            {
+              mode: this.modeInfo.id,
+              modeName: this.modeInfo.name,
+              cycle: this.cycle || this.episode,
+              winner: w.team,
+              losers,
+              tie: !!w.tie,
+              tied: w.tied || [],
+              sub: w.sub,
+              rebooted: !!this.reboot,
+              fragment: this.reboot ? this.reboot.idx + 1 : 0,
+              fragments: this.reboot ? this.reboot.total : 0,
+              ninthSeen: !!(this.myst && this.myst.ninth && this.myst.ninth.logged),
+              count: teams.length,
+            },
+            SQ.makeRng((this.seed ^ 0x5bd1e995) >>> 0)
+          )
+        : null;
+      const text = lines.join('\n');
+      const file = post ? `TITLE\n${post.title}\n\nCAPTION\n${post.caption}\n\n${post.tags}\n\nMATCH INFO\n${text}\n` : text + '\n';
+      return { name, text, post, file };
     }
 
     // Tells the page who played and who won, for the win stats.
@@ -8817,7 +8911,8 @@ void main() {
         const blob = await this.recorder.stop();
         if (blob && blob.size) {
           const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
-          this.video = { blob, ext, name: `${this.matchInfo().name}.${ext}`, info: this.matchInfo().text };
+          const info = this.matchInfo();
+          this.video = { blob, ext, name: `${info.name}.${ext}`, info: info.file };
         }
       }
       // the page starts the next match itself when auto-next is on, so its buttons stay in step
@@ -9773,12 +9868,21 @@ void main() {
   async function farmSave(v) {
     const name = clipName(v);
     try {
+      const txt = $('farm-captions').checked && v.info ? new Blob([v.info], { type: 'text/plain' }) : null;
+      const txtName = name.replace(/\.[a-z0-9]+$/i, '') + '.txt';
       if (farm.dir) {
-        const fh = await farm.dir.getFileHandle(name, { create: true });
-        const w = await fh.createWritable();
-        await w.write(v.blob);
-        await w.close();
-      } else await saveVideo(Object.assign({}, v, { name }), true);
+        const write = async (n, blob) => {
+          const fh = await farm.dir.getFileHandle(n, { create: true });
+          const w = await fh.createWritable();
+          await w.write(blob);
+          await w.close();
+        };
+        await write(name, v.blob);
+        if (txt) await write(txtName, txt);
+      } else {
+        await saveVideo(Object.assign({}, v, { name }), true);
+        if (txt) await saveVideo({ name: txtName, blob: txt }, true);
+      }
       farm.saved++;
       v.blob = null; // free the memory once it is on disk
       return true;
@@ -9789,7 +9893,37 @@ void main() {
     }
   }
 
+  // ----- batch hook for tools/make_videos.py: play one match (or tournament), return its files -----
+  let batchWait = null;
+  const toB64 = (blob) =>
+    new Promise((res) => {
+      const r = new FileReader();
+      r.onload = () => res(String(r.result).split(',')[1] || '');
+      r.readAsDataURL(blob);
+    });
+  SQ.makeOne = () =>
+    new Promise((resolve) => {
+      batchWait = { resolve, items: [] };
+      start();
+    });
+  async function batchFinish(video) {
+    const w = batchWait;
+    batchWait = null;
+    if (video) w.items.push(video);
+    const files = [];
+    for (const v of w.items) {
+      if (!v.blob) continue;
+      files.push({ name: v.name, data: await toB64(v.blob) });
+      if (v.info) files.push({ name: v.name.replace(/\.[a-z0-9]+$/i, '') + '.txt', data: await toB64(new Blob([v.info], { type: 'text/plain' })) });
+    }
+    w.resolve({ files, static: game.opts.static, fragment: game.opts.fragIndex || 0, cycle: game.cycle || 0 });
+  }
+  game.on('part', (v) => {
+    if (batchWait) batchWait.items.push(v);
+  });
+
   game.on('done', async ({ winner, video }) => {
+    if (batchWait) batchFinish(game.tour ? null : video);
     // the last tournament part may still be on its way to the folder
     if (farm.pending) await farm.pending;
     // if saving fails the farm stops, and the match ends like a normal one so the clip can still be saved
@@ -9815,7 +9949,7 @@ void main() {
       }, 2500);
     }
     if (game.tour && game.videos.length) status(`Tournament recorded in ${game.videos.length} parts. Save the ones you want.`);
-    showInfo(video && video.info ? `File: ${video.name}\n${video.info}` : game.mode && game.mode.winner ? game.matchInfo().text : '');
+    showInfo(video && video.info ? `File: ${video.name}\n\n${video.info}` : game.mode && game.mode.winner ? game.matchInfo().file : '');
     if (video) {
       const mb = (video.blob.size / 1048576).toFixed(1);
       $('save').hidden = false;
@@ -9916,7 +10050,7 @@ void main() {
     b.textContent = `Save part ${v.part}`;
     b.title = `${(v.blob.size / 1048576).toFixed(1)} MB`;
     b.addEventListener('click', () => saveVideo(v));
-    showInfo(`${$('info-text').value ? $('info-text').value + '\n\n' : ''}File: ${v.name}\n${v.info}`);
+    showInfo(`${$('info-text').value ? $('info-text').value + '\n\n' : ''}File: ${v.name}\n\n${v.info}`);
     $('parts').appendChild(b);
     $('parts').hidden = false;
     status(`Part ${v.part} recorded.`);

@@ -497,12 +497,21 @@
   async function farmSave(v) {
     const name = clipName(v);
     try {
+      const txt = $('farm-captions').checked && v.info ? new Blob([v.info], { type: 'text/plain' }) : null;
+      const txtName = name.replace(/\.[a-z0-9]+$/i, '') + '.txt';
       if (farm.dir) {
-        const fh = await farm.dir.getFileHandle(name, { create: true });
-        const w = await fh.createWritable();
-        await w.write(v.blob);
-        await w.close();
-      } else await saveVideo(Object.assign({}, v, { name }), true);
+        const write = async (n, blob) => {
+          const fh = await farm.dir.getFileHandle(n, { create: true });
+          const w = await fh.createWritable();
+          await w.write(blob);
+          await w.close();
+        };
+        await write(name, v.blob);
+        if (txt) await write(txtName, txt);
+      } else {
+        await saveVideo(Object.assign({}, v, { name }), true);
+        if (txt) await saveVideo({ name: txtName, blob: txt }, true);
+      }
       farm.saved++;
       v.blob = null; // free the memory once it is on disk
       return true;
@@ -513,7 +522,37 @@
     }
   }
 
+  // ----- batch hook for tools/make_videos.py: play one match (or tournament), return its files -----
+  let batchWait = null;
+  const toB64 = (blob) =>
+    new Promise((res) => {
+      const r = new FileReader();
+      r.onload = () => res(String(r.result).split(',')[1] || '');
+      r.readAsDataURL(blob);
+    });
+  SQ.makeOne = () =>
+    new Promise((resolve) => {
+      batchWait = { resolve, items: [] };
+      start();
+    });
+  async function batchFinish(video) {
+    const w = batchWait;
+    batchWait = null;
+    if (video) w.items.push(video);
+    const files = [];
+    for (const v of w.items) {
+      if (!v.blob) continue;
+      files.push({ name: v.name, data: await toB64(v.blob) });
+      if (v.info) files.push({ name: v.name.replace(/\.[a-z0-9]+$/i, '') + '.txt', data: await toB64(new Blob([v.info], { type: 'text/plain' })) });
+    }
+    w.resolve({ files, static: game.opts.static, fragment: game.opts.fragIndex || 0, cycle: game.cycle || 0 });
+  }
+  game.on('part', (v) => {
+    if (batchWait) batchWait.items.push(v);
+  });
+
   game.on('done', async ({ winner, video }) => {
+    if (batchWait) batchFinish(game.tour ? null : video);
     // the last tournament part may still be on its way to the folder
     if (farm.pending) await farm.pending;
     // if saving fails the farm stops, and the match ends like a normal one so the clip can still be saved
@@ -539,7 +578,7 @@
       }, 2500);
     }
     if (game.tour && game.videos.length) status(`Tournament recorded in ${game.videos.length} parts. Save the ones you want.`);
-    showInfo(video && video.info ? `File: ${video.name}\n${video.info}` : game.mode && game.mode.winner ? game.matchInfo().text : '');
+    showInfo(video && video.info ? `File: ${video.name}\n\n${video.info}` : game.mode && game.mode.winner ? game.matchInfo().file : '');
     if (video) {
       const mb = (video.blob.size / 1048576).toFixed(1);
       $('save').hidden = false;
@@ -640,7 +679,7 @@
     b.textContent = `Save part ${v.part}`;
     b.title = `${(v.blob.size / 1048576).toFixed(1)} MB`;
     b.addEventListener('click', () => saveVideo(v));
-    showInfo(`${$('info-text').value ? $('info-text').value + '\n\n' : ''}File: ${v.name}\n${v.info}`);
+    showInfo(`${$('info-text').value ? $('info-text').value + '\n\n' : ''}File: ${v.name}\n\n${v.info}`);
     $('parts').appendChild(b);
     $('parts').hidden = false;
     status(`Part ${v.part} recorded.`);
