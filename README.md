@@ -225,6 +225,14 @@ phones (smooth) and 1080p on computers; you can force either one. It changes at 
 Edge save MP4 where supported, otherwise WebM; Firefox saves WebM. Recording uses the browser's
 built-in `MediaRecorder`, so no upload or server is involved.
 
+### MP4 in Firefox
+
+Chrome and Edge record MP4 directly. Firefox can only record WebM, which many sites refuse, so with
+"Always save MP4" on (Video tab, on by default) the game converts each Firefox recording to MP4
+(H.264 video, AAC sound) right after it ends; the status line shows the progress. It uses the
+browser's own video encoder and the bundled Mediabunny library (`lib/`, MPL-2.0). If a browser has
+no H.264 encoder, the video is kept as WebM and the status line says so.
+
 ## Reel mode
 
 On by default. Matches skip the title card and countdown, so the recording starts with the squares

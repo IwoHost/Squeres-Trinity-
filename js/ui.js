@@ -251,7 +251,7 @@
 
   // ----- restore preferences -----
   const prefs = store.get('prefs2', {});
-  Object.assign(game.opts, { mode: prefs.mode || 'random', memes: prefs.memes != null ? prefs.memes : 1, speed: prefs.speed || 1, music: prefs.music || 'shuffle', record: prefs.record != null ? prefs.record : true, autoNext: !!prefs.autoNext, quality: prefs.quality || 'auto', voices: prefs.voices !== false, reel: prefs.reel !== false, fisheye: prefs.fisheye != null ? prefs.fisheye : 30, crt: prefs.crt != null ? prefs.crt : 35, static: prefs.static || 0, decay: prefs.decay != null ? prefs.decay : 4, transmission: typeof prefs.transmission === 'string' ? prefs.transmission : '', fragWords: prefs.fragWords || 1, fragIndex: prefs.fragIndex || 0, reboots: prefs.reboots || 0, cipher: prefs.cipher || 'none', ninth: prefs.ninth || 'rare', glitchNums: prefs.glitchNums !== false, clues: typeof prefs.clues === 'string' ? prefs.clues : '', spectro: typeof prefs.spectro === 'string' ? prefs.spectro : SQ.SPECTRO_WORD });
+  Object.assign(game.opts, { mode: prefs.mode || 'random', memes: prefs.memes != null ? prefs.memes : 1, speed: prefs.speed || 1, music: prefs.music || 'shuffle', record: prefs.record != null ? prefs.record : true, autoNext: !!prefs.autoNext, quality: prefs.quality || 'auto', voices: prefs.voices !== false, reel: prefs.reel !== false, fisheye: prefs.fisheye != null ? prefs.fisheye : 30, crt: prefs.crt != null ? prefs.crt : 35, static: prefs.static || 0, decay: prefs.decay != null ? prefs.decay : 4, transmission: typeof prefs.transmission === 'string' ? prefs.transmission : '', fragWords: prefs.fragWords || 1, fragIndex: prefs.fragIndex || 0, reboots: prefs.reboots || 0, mp4: prefs.mp4 !== false, cipher: prefs.cipher || 'none', ninth: prefs.ninth || 'rare', glitchNums: prefs.glitchNums !== false, clues: typeof prefs.clues === 'string' ? prefs.clues : '', spectro: typeof prefs.spectro === 'string' ? prefs.spectro : SQ.SPECTRO_WORD });
   if (game.opts.music.startsWith('up')) game.opts.music = 'shuffle';
   fillMusic();
   const setRadio = (name, value) => {
@@ -586,6 +586,12 @@
       status('Match recorded. Save it before the next one starts.');
     }
   });
+
+  // ----- MP4 conversion (Firefox) -----
+  $('mp4').checked = game.opts.mp4;
+  $('mp4').addEventListener('change', (e) => ((game.opts.mp4 = e.target.checked), save()));
+  game.on('converting', (p) => status(p >= 1 ? 'Converted to MP4.' : `Converting to MP4… ${Math.round(p * 100)}%`));
+  game.on('mp4failed', (why) => status(`Could not convert to MP4 (${why}). Saved as WebM; Chrome or Edge record MP4 directly.`, 'bad'));
 
   // ----- recording badge -----
   setInterval(() => {

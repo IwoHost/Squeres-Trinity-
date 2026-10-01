@@ -23,6 +23,13 @@ def main():
 
     html = re.sub(r'<script src="([^"]+)"></script>', inline, html)
 
+    # the MP4 converter's libraries load only when needed, so they ride along as inert text blocks
+    libs = ""
+    for src in ("lib/mediabunny.min.js", "lib/mediabunny-aac-encoder.min.js"):
+        code = (ROOT / src).read_text(encoding="utf-8").replace("</script", "<\\/script")
+        libs += f'<script type="text/plain" data-lib="{src}">{code}</script>\n'
+    html = html.replace("<!-- /body -->", libs + "<!-- /body -->") if "<!-- /body -->" in html else html.replace("</body>", libs + "</body>")
+
     if artifact:
         html = html.split("<!-- /head -->", 1)[1]
         html = html.split("<!-- /body -->", 1)[0]

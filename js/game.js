@@ -800,9 +800,23 @@
       this.enterBracket();
     }
 
+    // Firefox records WebM; turn it into MP4 so it uploads anywhere. Keeps the WebM if that fails.
+    async toMp4(blob) {
+      if (!blob || this.opts.mp4 === false || !SQ.mp4 || !SQ.mp4.needed(blob)) return blob;
+      this.emit('converting', 0);
+      try {
+        const mp4 = await SQ.mp4.convert(blob, (p) => this.emit('converting', p));
+        this.emit('converting', 1);
+        return mp4;
+      } catch (e) {
+        this.emit('mp4failed', e && e.message ? e.message : String(e));
+        return blob;
+      }
+    }
+
     async savePart() {
       if (!this.recorder.active) return;
-      const blob = await this.recorder.stop();
+      const blob = await this.toMp4(await this.recorder.stop());
       if (!blob || !blob.size) return;
       const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
       const info = this.matchInfo();
@@ -909,7 +923,7 @@
       this.emitResult();
       this.setPhase('done');
       if (this.recorder.active) {
-        const blob = await this.recorder.stop();
+        const blob = await this.toMp4(await this.recorder.stop());
         if (blob && blob.size) {
           const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
           const info = this.matchInfo();
