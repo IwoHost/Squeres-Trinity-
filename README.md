@@ -86,10 +86,11 @@ with "Voice lines". The differences are small multipliers, so every color can st
 The squares live in the Grid, ruled by the Frame, a glowing border that sees everything. Every
 cycle each of the eight Sectors sends one square into the Trinity Games (the tournament). Each
 color has a home Sector, a backstory and a rival, readable in the Lore panel, and some of their
-voice lines refer to it. Red, officially named DoucheCube, is from Ember (foundries), Green from Moss (greenhouses), Blue from
-Cache (archives), Yellow from Volt (power plants), Purple from the Crown Quarter (old royals),
-Cyan from Coolant (freezing vents), Orange from Carnival (the broadcast district) and Pink from
-Candy (sweet factories).
+voice lines refer to it. Red (DoucheCube, the mascot) is from Ember (foundries), Green from Moss (greenhouses), Blue from
+Cache (archives), Yellow (VoltCube) from Volt (power plants), Purple (Cubert) from the Crown Quarter
+(old royals), Cyan from Coolant (freezing vents), Orange (Carnie) from Carnival (the broadcast
+district) and Pink from Candy (sweet factories). The colors without a name go by their color. There
+is no ninth square.
 
 ## Posters
 
