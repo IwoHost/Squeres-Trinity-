@@ -503,8 +503,24 @@
 
   // Draws one square character centred on (x, y).
   // o: { angle, squash, pop, lookX, lookY, mood, blink, flash, shield, face, alpha, glow, glowColor, outline }
+  // SQ.stare (0..1): during the signal event every square slowly stops what it is doing and looks
+  // straight out of the screen, eyes centred, pupils small, no expression.
+  SQ.stare = 0;
   SQ.drawSquare = function (ctx, x, y, size, team, o) {
     o = o || {};
+    const st = SQ.stare;
+    if (st > 0 && o.mood !== 'dead' && o.face !== false) {
+      const keep = 1 - st;
+      o = Object.assign({}, o, {
+        lookX: (o.lookX || 0) * keep,
+        lookY: (o.lookY || 0) * keep,
+        angle: (o.angle || 0) * keep,
+        squash: (o.squash || 0) * keep,
+        blink: false,
+        mood: st > 0.35 ? 'normal' : o.mood,
+        pupil: 1 - 0.5 * st,
+      });
+    }
     const s = size * (1 + (o.pop || 0) * 0.45);
     const half = s / 2;
     ctx.save();
@@ -568,7 +584,7 @@
       }
       return;
     }
-    const pw = ew * (mood === 'scared' ? 0.35 : 0.55);
+    const pw = ew * (mood === 'scared' ? 0.35 : 0.55) * (o.pupil || 1);
     const lx = SQ.clamp(o.lookX || 0, -1, 1) * (ew - pw) * 0.5;
     const ly = SQ.clamp(o.lookY || 0, -1, 1) * (ew - pw) * 0.5;
     for (const sx of [-1, 1]) {
@@ -608,6 +624,7 @@
       er *= 1.2;
       pr *= 0.6;
     }
+    if (o.pupil) pr *= o.pupil;
     const lx = SQ.clamp(o.lookX || 0, -1, 1) * er * 0.45;
     const ly = SQ.clamp(o.lookY || 0, -1, 1) * er * 0.45;
 

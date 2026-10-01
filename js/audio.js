@@ -322,6 +322,59 @@
       o.stop(t + dur + 0.1);
     }
 
+    // Writes a word into the sound itself: each pixel row of the word becomes a tone, low rows low and
+    // high rows high, so a spectrogram app (frequency over time) shows the word in the hiss.
+    spectrogram(word, delay) {
+      if (!this.ctx) return;
+      const ctx = this.ctx;
+      const rows = 24;
+      const c = document.createElement('canvas');
+      const g = c.getContext('2d');
+      g.font = `700 ${rows}px sans-serif`;
+      const cols = Math.ceil(g.measureText(word).width) + 4;
+      c.width = cols;
+      c.height = rows + 4;
+      g.font = `700 ${rows}px sans-serif`;
+      g.fillStyle = '#fff';
+      g.textBaseline = 'middle';
+      g.fillText(word, 2, (rows + 4) / 2);
+      const img = g.getImageData(0, 0, cols, rows + 4).data;
+      const H = rows + 4;
+      const colDur = 0.032; // seconds per pixel column
+      const sr = ctx.sampleRate;
+      const len = Math.ceil(cols * colDur * sr);
+      const buf = ctx.createBuffer(1, len, sr);
+      const out = buf.getChannelData(0);
+      const fLo = 2500;
+      const fHi = 9000;
+      const step = Math.floor(colDur * sr);
+      for (let y = 0; y < H; y++) {
+        const f = fHi - ((fHi - fLo) * y) / (H - 1); // the top of the word is the highest pitch
+        const w = (2 * Math.PI * f) / sr;
+        for (let x = 0; x < cols; x++) {
+          const a = img[(y * cols + x) * 4] / 255;
+          if (a < 0.2) continue;
+          const s0 = x * step;
+          for (let i = 0; i < step && s0 + i < len; i++) {
+            // a soft edge on every pixel so it reads as a clean shape, not clicks
+            const win = Math.sin((Math.PI * i) / step);
+            out[s0 + i] += Math.sin(w * (s0 + i)) * a * win;
+          }
+        }
+      }
+      let peak = 0;
+      for (let i = 0; i < len; i++) peak = Math.max(peak, Math.abs(out[i]));
+      if (peak > 0) for (let i = 0; i < len; i++) out[i] /= peak;
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      const gain = ctx.createGain();
+      gain.gain.value = 0.34; // loud enough to stand out of the hiss in a spectrogram
+      src.connect(gain);
+      gain.connect(this.sfxBus);
+      src.start(this.now + (delay || 0));
+      return buf;
+    }
+
     // Muffles the music, e.g. during slow motion.
     muffle(on) {
       if (!this.musicFilter) return;

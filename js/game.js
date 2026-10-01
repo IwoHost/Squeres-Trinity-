@@ -91,6 +91,30 @@
   // Shown once per series, in the video where the signal breaks. Editable in the Look tab.
   SQ.TRANSMISSION = 'This is not the Frame speaking. The Frame is asleep. The Games were never random. Every square that falls turns into light, and the light is what you are looking at right now. Your eyes keep the Grid alive. Every view is a heartbeat. Every like buys another cycle. You are not watching the Games. You are feeding them. We are the fuel. We always were.';
 
+  // The ninth square: grey, nameless, not in the lore or the stats.
+  SQ.NINTH = { name: '\u0000ninth', base: 'Ninth', color: '#9a9ca6', dark: '#4d4f58', light: '#d3d5dc' };
+  // Default clues for the hidden frame in each reboot video, one per line; "|" breaks a line.
+  SQ.CLUES = 'CYCLE 0\nTHERE WERE|NINE\nCOUNT THE|FRAGMENTS\nTHE FRAME|IS NOT ASLEEP\n03:33\nASK THE|GREY ONE\nWHO IS|WATCHING\nKEEP|WATCHING';
+  SQ.SPECTRO_WORD = 'WE ARE FUEL';
+  SQ.clueList = (text) => String(text || SQ.CLUES).split('\n').map((l) => l.trim()).filter(Boolean);
+  SQ.pick = (list) => list[Math.floor(Math.random() * list.length)];
+  SQ.fmtClock = (t) => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, '0')}`;
+  // Fragments can be shown in code: letters shifted by the fragment number, or letters as numbers.
+  SQ.encodeFragment = function (text, cipher, idx) {
+    if (cipher === 'shift') {
+      const k = (idx + 1) % 26;
+      return text.replace(/[A-Z]/g, (c) => String.fromCharCode(((c.charCodeAt(0) - 65 + k) % 26) + 65));
+    }
+    if (cipher === 'numbers') {
+      return text
+        .split(' ')
+        .map((w) => w.replace(/[^A-Z]/g, '').split('').map((c) => c.charCodeAt(0) - 64).join('-'))
+        .filter(Boolean)
+        .join(' / ');
+    }
+    return text;
+  };
+
   // Splits the message into the pieces the reboot videos show, one piece per video.
   SQ.fragments = function (text, words) {
     const w = String(text).replace(/\s+/g, ' ').trim().toUpperCase().split(' ').filter(Boolean);
@@ -180,6 +204,10 @@
         this.seed = seed != null ? seed >>> 0 : SQ.randomSeed();
       }
       this.reboot = null;
+      SQ.stare = 0;
+      this.videoT = 0;
+      this.playT = 0;
+      this.planMysteries();
       this.matchLog = [];
       this.matchSignal = Math.round(this.opts.static || 0);
       const mseed = o.tour ? seed >>> 0 : this.seed;
@@ -310,9 +338,16 @@
         const frags = SQ.fragments(this.opts.transmission || SQ.TRANSMISSION, this.opts.fragWords || 1);
         const idx = (this.opts.fragIndex || 0) % frags.length;
         this.opts.fragIndex = idx + 1;
+        this.opts.reboots = (this.opts.reboots || 0) + 1;
         this.emit('fragment', this.opts.fragIndex);
         const decode = SQ.clamp(frags[idx].length * 0.18, 1.6, 4);
-        this.reboot = { t: 0, from: this.opts.static || 0, text: frags[idx], idx, total: frags.length, decode, end: 0.6 + 1.4 + decode + 3.4 };
+        const plain = frags[idx];
+        const shown = SQ.encodeFragment(plain, this.opts.cipher || 'none', idx);
+        this.reboot = { t: 0, from: this.opts.static || 0, text: shown, plain, idx, total: frags.length, decode, end: 0.6 + 1.4 + decode + 3.4, at: this.videoT };
+        // a word hidden in the hiss, readable in a spectrogram app
+        const word = (this.opts.spectro != null ? this.opts.spectro : SQ.SPECTRO_WORD).trim();
+        if (word) this.audio.spectrogram(word.toUpperCase(), 0.6);
+        this.myst.log.push(`${SQ.fmtClock(this.videoT)} signal lost; fragment ${idx + 1}/${frags.length} "${plain}"${shown !== plain ? ` shown as "${shown}"` : ''}${word ? `; "${word.toUpperCase()}" hidden in the hiss (see it in a spectrogram)` : ''}`);
         this.fx.banner('SIGNAL LOST', 'the Frame is not responding', '#ffffff', 1.4);
         this.audio.boom();
         this.audio.hiss(this.reboot.end);
@@ -327,6 +362,8 @@
         // full static first, then a little less so the words can get through
         const k = Math.min(1, r.t / 0.6);
         this.opts.static = r.t < 0.6 ? r.from + (100 - r.from) * k : 72;
+        // the squares slowly stop and look straight out of the screen
+        SQ.stare = SQ.clamp((r.t - 0.8) / 2.2, 0, 1);
         // steady, not random spikes: the picture breaks up but never strobes
         this.glitch = Math.max(this.glitch, r.t < 0.6 ? 0.7 : 0.1);
       } else if (!r.done) {
@@ -338,7 +375,116 @@
         this.fx.banner('SIGNAL RESTORED', 'the Frame has rebooted', '#35d97a', 1.6);
         this.audio.ding();
         this.emit('signal', 0);
+        // one frame with a clue, a few seconds later, for people who go through the video frame by frame
+        const clues = SQ.clueList(this.opts.clues);
+        if (clues.length) {
+          const text = clues[r.idx % clues.length];
+          this.myst.hidden = { at: this.videoT + 2 + Math.random() * 3, text };
+        }
       }
+      if (r.done && SQ.stare > 0) SQ.stare = Math.max(0, SQ.stare - realDt * 1.5);
+    }
+
+    // The small mysteries of a video, decided when it starts: whether the grey square shows up and
+    // when the numbers glitch. Everything that happens is logged with its time for the match info.
+    planMysteries() {
+      const reb = this.opts.reboots || 0;
+      const mode = this.opts.ninth || 'rare';
+      const pNinth = mode === 'off' ? 0 : mode === 'always' ? 1 : Math.min(0.6, 0.08 + 0.08 * reb);
+      const R = Math.random;
+      this.myst = { log: [], glitches: [], hidden: null, ninth: null };
+      if (R() < pNinth) {
+        const corner = [[0.12, 0.14], [0.86, 0.12], [0.1, 0.86], [0.88, 0.88]][(R() * 4) | 0];
+        this.myst.ninth = { at: 3 + R() * 9, dur: 2.6, x: corner[0], y: corner[1] };
+      }
+      if (this.opts.glitchNums !== false && R() < Math.min(0.7, 0.2 + 0.1 * reb)) {
+        const n = R() < 0.3 ? 2 : 1;
+        for (let i = 0; i < n; i++) {
+          const kind = R() < 0.6 ? 'seed' : 'track';
+          const text = kind === 'seed' ? SQ.pick(['seed 0', 'seed 3:33', 'seed 0000', 'seed 09.09', 'seed ????', 'cycle 0', 'seed 1 of 9']) : SQ.pick(['♪ we are listening', '♪ ??????', '♪ do not stop watching', '♪ signal 0%', '♪ the ninth']);
+          this.myst.glitches.push({ at: 3 + R() * 18, dur: 0.35, kind, text });
+        }
+      }
+    }
+
+    // The grey square nobody talks about. Drawn in screen space inside the arena, never in the game.
+    drawNinth(ctx) {
+      const m = this.myst;
+      if (!m) return;
+      const A = SQ.ARENA;
+      let alpha = 0;
+      let x = 0;
+      let y = 0;
+      const n = m.ninth;
+      if (n && this.phase === 'play' && this.playT >= n.at && this.playT < n.at + n.dur) {
+        const t = this.playT - n.at;
+        alpha = 0.5 * Math.min(1, t / 0.8, (n.dur - t) / 0.8);
+        x = n.x;
+        y = n.y;
+        if (!n.logged) {
+          n.logged = true;
+          m.log.push(`${SQ.fmtClock(this.videoT)} the grey ninth square appeared (${y < 0.5 ? 'top' : 'bottom'} ${x < 0.5 ? 'left' : 'right'}) for about 2 seconds`);
+        }
+      }
+      // in a reboot video it stands in a corner while the Frame is down
+      const r = this.reboot;
+      if (r && !r.done && r.t > 2.2 && r.t < r.end - 0.6) {
+        alpha = Math.max(alpha, 0.38 * Math.min(1, (r.t - 2.2) / 1, (r.end - 0.6 - r.t) / 0.5));
+        x = 0.86;
+        y = 0.86;
+        if (!r.ninthLogged) {
+          r.ninthLogged = true;
+          m.log.push(`${SQ.fmtClock(this.videoT)} the grey square watches from the bottom right during the signal loss`);
+        }
+      }
+      if (alpha <= 0.01) return;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(A.x, A.y, A.size, A.size);
+      ctx.clip();
+      ctx.globalAlpha = alpha;
+      SQ.drawSquare(ctx, A.x + x * A.size, A.y + y * A.size, 64, SQ.NINTH, { lookX: 0, lookY: 0, mood: 'normal', pupil: 0.55 });
+      ctx.restore();
+    }
+
+    // The one-frame clue: dark, dim text, gone before the eye can catch it.
+    drawHiddenFrame(ctx) {
+      const h = this.myst && this.myst.hidden;
+      if (!h || this.videoT < h.at || this.videoT >= h.at + 0.07) return;
+      if (!h.logged) {
+        h.logged = true;
+        this.myst.log.push(`${SQ.fmtClock(this.videoT)} hidden frame: "${h.text.split('|').map((l) => l.trim()).join(' ')}" (about 2 frames long)`);
+      }
+      const A = SQ.ARENA;
+      ctx.save();
+      ctx.fillStyle = 'rgba(6,8,10,0.96)';
+      ctx.fillRect(A.x, A.y, A.size, A.size);
+      ctx.fillStyle = '#5a6e60';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const lines = h.text.split('|');
+      let size = 64;
+      ctx.font = `700 ${size}px ${SQ.fontBody}`;
+      for (const l of lines) size = Math.min(size, SQ.fitSize(ctx, [{ t: l }], A.size - 120, 64));
+      ctx.font = `700 ${size}px ${SQ.fontBody}`;
+      lines.forEach((l, i) => ctx.fillText(l.trim(), A.x + A.size / 2, A.y + A.size / 2 + (i - (lines.length - 1) / 2) * size * 1.3));
+      ctx.restore();
+    }
+
+    // A footer number that is wrong for a moment, if this video has one.
+    glitchText(kind) {
+      const m = this.myst;
+      if (!m || this.phase !== 'play') return null;
+      for (const g of m.glitches) {
+        if (g.kind === kind && this.playT >= g.at && this.playT < g.at + g.dur) {
+          if (!g.logged) {
+            g.logged = true;
+            m.log.push(`${SQ.fmtClock(this.videoT)} the ${kind === 'seed' ? 'seed' : 'song name'} in the corner read "${g.text}" for a moment`);
+          }
+          return g.text;
+        }
+      }
+      return null;
     }
 
     // The hidden fragment, drawn over the frozen match: a search, then the word decodes out of noise.
@@ -351,7 +497,7 @@
       const fade = Math.min(1, (r.t - 0.3) / 0.5) * Math.min(1, (r.end - r.t) / 0.3);
       const cy = A.y + A.size / 2;
       ctx.save();
-      ctx.fillStyle = `rgba(4,6,8,${0.6 * fade})`;
+      ctx.fillStyle = `rgba(4,6,8,${0.42 * fade})`; // light enough to see the squares staring
       ctx.fillRect(0, 0, W, SQ.H);
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -408,6 +554,9 @@
         requestAnimationFrame((t) => this.frame(t));
         return;
       }
+      this.videoT = (this.videoT || 0) + realDt;
+      // play time stands still while the Frame is down, so nothing scheduled happens during the event
+      if (this.phase === 'play' && !(this.reboot && !this.reboot.done)) this.playT = (this.playT || 0) + realDt;
       this.real += realDt;
       this.phaseT += realDt;
       if (this.slowT > 0) {
@@ -682,8 +831,9 @@
       const losers = w && !w.tie ? teams.filter((t) => t !== w.team) : [];
       const result = !w ? 'no result' : w.tie ? `tie between ${w.tied.map((t) => t.name).join(' and ')}` : `${w.team.name} beats ${losers.map((t) => t.name).join(' ')}`;
       const where = this.tour ? `Trinity Games ${this.tour.seed} ${title(this.stage || '')}` : `Cycle ${this.cycle || this.episode}`;
-      const signal = this.reboot ? `signal lost at ${this.matchSignal}%, Frame rebooted, fragment ${this.reboot.idx + 1} of ${this.reboot.total} ${this.reboot.text}` : `signal ${this.matchSignal}%`;
-      const parts = [where, this.modeInfo.name, result, w && w.sub ? w.sub : '', events.join(', '), signal, `seed ${this.tour ? this.tour.seed : this.seed}`];
+      const signal = this.reboot ? `signal lost at ${this.matchSignal}%, Frame rebooted, fragment ${this.reboot.idx + 1} of ${this.reboot.total} ${this.reboot.plain}` : `signal ${this.matchSignal}%`;
+      const seen = this.myst && this.myst.ninth && this.myst.ninth.logged ? 'grey square seen' : '';
+      const parts = [where, this.modeInfo.name, result, w && w.sub ? w.sub : '', events.join(', '), seen, signal, `seed ${this.tour ? this.tour.seed : this.seed}`];
       let name = parts.filter(Boolean).join(' - ').replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, ' ');
       if (name.length > 200) name = name.slice(0, 200).trim();
       // the long version, with where each square is from
@@ -705,7 +855,8 @@
       if (events.length) lines.push(`What happened: ${events.join(', ')}`);
       lines.push(`Signal: ${this.reboot ? `lost at ${this.matchSignal}%, the Frame rebooted mid-match` : `${this.matchSignal}% static`}`);
       if (this.tour && this.tour.champion) lines.push(`Champion of the Trinity Games: ${this.tour.champion.name}`);
-      if (this.reboot) lines.push(`Hidden transmission: fragment ${this.reboot.idx + 1} of ${this.reboot.total}, "${this.reboot.text}"`);
+      if (this.reboot) lines.push(`Hidden transmission: fragment ${this.reboot.idx + 1} of ${this.reboot.total}, "${this.reboot.plain}"${this.reboot.text !== this.reboot.plain ? `, shown in code as "${this.reboot.text}"` : ''}`);
+      if (this.myst && this.myst.log.length) lines.push('Secrets in this video (times are from the start of the video):', ...this.myst.log.map((l) => '  ' + l));
       return { name, text: lines.join('\n') };
     }
 
@@ -805,6 +956,7 @@
       this.fx.drawWorld(ctx);
       this.drawWinnerMeme(ctx);
       ctx.restore();
+      this.drawNinth(ctx);
 
       this.drawBelow(ctx);
       if (m.drawScreen && this.phase !== 'idle') m.drawScreen(ctx);
@@ -815,6 +967,7 @@
       this.fx.drawScreen(ctx);
       if (this.phase === 'done') this.drawEndCard(ctx);
       this.drawFooter(ctx);
+      this.drawHiddenFrame(ctx);
     }
 
     drawBackdrop(ctx) {
@@ -1163,13 +1316,13 @@
       ctx.textBaseline = 'middle';
       ctx.fillStyle = 'rgba(255,255,255,0.45)';
       ctx.textAlign = 'left';
-      if (this.phase !== 'idle') ctx.fillText(`seed ${this.seed}`, 44, SQ.H - 44);
+      if (this.phase !== 'idle') ctx.fillText(this.glitchText('seed') || `seed ${this.seed}`, 44, SQ.H - 44);
       ctx.textAlign = 'right';
       if (this.track && this.phase !== 'idle') {
         const a = this.trackToast > 0 ? 1 : 0.45;
         ctx.globalAlpha = a;
         ctx.fillStyle = '#ffffff';
-        ctx.fillText(`♪ ${this.track.name}`, SQ.W - 44, SQ.H - 44);
+        ctx.fillText(this.glitchText('track') || `♪ ${this.track.name}`, SQ.W - 44, SQ.H - 44);
       }
       ctx.restore();
     }

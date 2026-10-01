@@ -417,6 +417,25 @@ body.theater-on .fs-backdrop { display: block; }
           <button class="btn" id="frag-reset" type="button">Start over</button>
         </div>
       </div>
+      <div class="group">
+        <span class="label">Mysteries</span>
+        <p class="hint">Small secrets for people who look closely. The match info after each video lists every one that happened, with its time in the video.</p>
+        <div class="field"><label for="cipher">Code</label><select id="cipher">
+          <option value="none">Fragments in plain words</option>
+          <option value="shift">Letters shifted by the fragment number</option>
+          <option value="numbers">Letters as numbers (A=1, B=2...)</option>
+        </select></div>
+        <div class="field"><label for="ninth">Grey square</label><select id="ninth">
+          <option value="rare">Rare, a bit more after every reboot</option>
+          <option value="always">In every video</option>
+          <option value="off">Never</option>
+        </select></div>
+        <label class="toggle"><input type="checkbox" id="glitch-nums" checked> Numbers in the corners sometimes glitch</label>
+        <label class="label-small" for="clues">Hidden frame clues, one per reboot video (a | starts a new line)</label>
+        <textarea class="textbox" id="clues" rows="5" spellcheck="false"></textarea>
+        <div class="field"><label for="spectro">In the hiss</label><input type="text" id="spectro" maxlength="16" autocomplete="off" spellcheck="false"></div>
+        <p class="hint">This word is hidden in the static's sound during the signal loss. It can only be seen in a spectrogram app. Leave it empty for none.</p>
+      </div>
     </section>
 
     <section class="tab-panel" id="tab-sound" role="tabpanel" aria-labelledby="tabbtn-sound" hidden>

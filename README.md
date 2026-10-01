@@ -151,6 +151,26 @@ also shows "Match info": the same data plus every square's personality and Secto
 that was settled, and whether the Frame rebooted. Copy it into a chat to get lore-style titles
 and descriptions.
 
+### Mysteries
+
+Smaller secrets for people who look closely, set in the Mysteries part of the Look tab:
+
+- During the signal loss every square slowly stops and stares straight out of the screen.
+- A grey ninth square with no name sometimes stands in a corner of the arena for a couple of
+  seconds. It is not in the lore or the stats. It appears a little more often after every reboot,
+  and it always watches from a corner during the signal loss.
+- One frame (about 1/15 of a second) a few seconds after the signal comes back shows a dim clue,
+  like "THERE WERE NINE". Only someone going through the video frame by frame will see it. One clue
+  per reboot, from a list you can edit.
+- Fragments can be shown in code: letters shifted by the fragment number (fragment 7 shifts by 7),
+  or letters as numbers.
+- A word is hidden in the static's sound during the signal loss, readable only in a spectrogram app.
+- Sometimes the seed or the song name in the corners shows something wrong for a moment, like
+  "seed 3:33" or "we are listening".
+
+The match info after each video lists every secret that happened in it, with its time in the
+video.
+
 ### Flashing and flicker
 
 Everything is kept gentle for people who are sensitive to flashing light. Screen flashes are never

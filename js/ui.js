@@ -251,7 +251,7 @@
 
   // ----- restore preferences -----
   const prefs = store.get('prefs2', {});
-  Object.assign(game.opts, { mode: prefs.mode || 'random', memes: prefs.memes != null ? prefs.memes : 1, speed: prefs.speed || 1, music: prefs.music || 'shuffle', record: prefs.record != null ? prefs.record : true, autoNext: !!prefs.autoNext, quality: prefs.quality || 'auto', voices: prefs.voices !== false, reel: prefs.reel !== false, fisheye: prefs.fisheye != null ? prefs.fisheye : 30, crt: prefs.crt != null ? prefs.crt : 35, static: prefs.static || 0, decay: prefs.decay != null ? prefs.decay : 4, transmission: typeof prefs.transmission === 'string' ? prefs.transmission : '', fragWords: prefs.fragWords || 1, fragIndex: prefs.fragIndex || 0 });
+  Object.assign(game.opts, { mode: prefs.mode || 'random', memes: prefs.memes != null ? prefs.memes : 1, speed: prefs.speed || 1, music: prefs.music || 'shuffle', record: prefs.record != null ? prefs.record : true, autoNext: !!prefs.autoNext, quality: prefs.quality || 'auto', voices: prefs.voices !== false, reel: prefs.reel !== false, fisheye: prefs.fisheye != null ? prefs.fisheye : 30, crt: prefs.crt != null ? prefs.crt : 35, static: prefs.static || 0, decay: prefs.decay != null ? prefs.decay : 4, transmission: typeof prefs.transmission === 'string' ? prefs.transmission : '', fragWords: prefs.fragWords || 1, fragIndex: prefs.fragIndex || 0, reboots: prefs.reboots || 0, cipher: prefs.cipher || 'none', ninth: prefs.ninth || 'rare', glitchNums: prefs.glitchNums !== false, clues: typeof prefs.clues === 'string' ? prefs.clues : '', spectro: typeof prefs.spectro === 'string' ? prefs.spectro : SQ.SPECTRO_WORD });
   if (game.opts.music.startsWith('up')) game.opts.music = 'shuffle';
   fillMusic();
   const setRadio = (name, value) => {
@@ -345,6 +345,25 @@
     showFragment();
   });
   showFragment();
+
+  // ----- mysteries -----
+  $('cipher').value = game.opts.cipher;
+  $('cipher').addEventListener('change', (e) => ((game.opts.cipher = e.target.value), save()));
+  $('ninth').value = game.opts.ninth;
+  $('ninth').addEventListener('change', (e) => ((game.opts.ninth = e.target.value), save()));
+  $('glitch-nums').checked = game.opts.glitchNums;
+  $('glitch-nums').addEventListener('change', (e) => ((game.opts.glitchNums = e.target.checked), save()));
+  $('clues').value = game.opts.clues || SQ.CLUES;
+  $('clues').addEventListener('input', (e) => {
+    const t = e.target.value.trim();
+    game.opts.clues = t && t !== SQ.CLUES ? t : '';
+    save();
+  });
+  $('clues').addEventListener('blur', (e) => {
+    if (!e.target.value.trim()) e.target.value = SQ.CLUES;
+  });
+  $('spectro').value = game.opts.spectro;
+  $('spectro').addEventListener('input', (e) => ((game.opts.spectro = e.target.value.replace(/[^\p{L}\p{N} ]/gu, '')), save()));
   $('transmission').addEventListener('blur', (e) => {
     if (!e.target.value.trim()) e.target.value = SQ.TRANSMISSION;
   });
