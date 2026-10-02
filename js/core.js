@@ -573,62 +573,146 @@
   SQ.wear = 0; // tiredness for modes without health: bags only, never blood
   function drawDamage(ctx, s, hurt, team, small) {
     const h = s / 2;
-    // which side the cut is on stays the same for each square
-    const side = (team.name.charCodeAt(0) + (team.name.length || 0)) % 2 ? 1 : -1;
+    // which side the cut is on, and where the splatter lands, stay the same for each square
+    const seed = team.name.charCodeAt(0) * 7 + (team.name.length || 0) * 13;
+    const side = seed % 2 ? 1 : -1;
+    const rnd = (i) => {
+      const v = Math.sin(seed * 12.9898 + i * 78.233) * 43758.5453;
+      return v - Math.floor(v);
+    };
+    const BLOOD = '#a3101c';
+    const DARK = '#6e0a13';
     const ex = s * 0.2;
     const bagY = small ? -s * 0.1 + s * 0.17 : -s * 0.04 + s * 0.13;
     const bagW = small ? s * 0.13 : s * 0.12;
     const bagH = s * (0.035 + 0.05 * Math.min(1, hurt));
     ctx.save();
-    ctx.fillStyle = `rgba(104, 38, 140, ${Math.min(0.8, 0.15 + hurt * 0.85)})`;
+    // bags under both eyes; the eye on the cut side swells into a black eye
     for (const sx of [-1, 1]) {
+      const swollen = sx === side && hurt > 0.55;
+      ctx.fillStyle = swollen ? `rgba(60, 18, 80, ${Math.min(0.85, 0.3 + hurt * 0.6)})` : `rgba(104, 38, 140, ${Math.min(0.8, 0.15 + hurt * 0.85)})`;
       ctx.beginPath();
-      ctx.ellipse(sx * ex, bagY, bagW, bagH, 0, 0, Math.PI);
+      if (swollen) ctx.ellipse(sx * ex, bagY - s * 0.05, bagW * 1.35, bagH * 2.2, 0, 0, Math.PI * 2);
+      else ctx.ellipse(sx * ex, bagY, bagW, bagH, 0, 0, Math.PI);
       ctx.fill();
     }
-    if (hurt > 0.45) {
-      // a bruise on the cheek opposite the cut
-      ctx.fillStyle = `rgba(118, 44, 150, ${Math.min(0.55, (hurt - 0.45) * 1.4)})`;
+    if (hurt > 0.4) {
+      // a bruise on the other cheek
+      ctx.fillStyle = `rgba(118, 44, 150, ${Math.min(0.6, (hurt - 0.4) * 1.4)})`;
       ctx.beginPath();
-      ctx.ellipse(-side * s * 0.3, s * 0.16, s * 0.09, s * 0.07, 0.4, 0, Math.PI * 2);
+      ctx.ellipse(-side * s * 0.3, s * 0.16, s * 0.1, s * 0.075, 0.4, 0, Math.PI * 2);
       ctx.fill();
     }
-    if (hurt > 0.35 && !small) {
-      const k = Math.min(1, (hurt - 0.35) / 0.65);
+    if (small) {
+      if (hurt > 0.25) {
+        ctx.fillStyle = BLOOD;
+        ctx.fillRect(side * s * 0.3 - s * 0.06, -h + s * 0.05, s * 0.12, s * (0.15 + 0.35 * hurt));
+        if (hurt > 0.6) ctx.fillRect(-side * s * 0.15 - s * 0.05, -h + s * 0.05, s * 0.1, s * 0.25 * hurt);
+      }
+      ctx.restore();
+      return;
+    }
+    if (hurt > 0.25) {
+      const k = Math.min(1, (hurt - 0.25) / 0.75);
       const drip = (x, len, w) => {
-        ctx.strokeStyle = '#a3101c';
+        ctx.strokeStyle = BLOOD;
         ctx.lineCap = 'round';
         ctx.lineWidth = w;
         ctx.beginPath();
         ctx.moveTo(x, -h + s * 0.08);
-        ctx.lineTo(x, -h + s * 0.08 + len);
+        // runs down with a slight wobble, like it found its own way
+        ctx.quadraticCurveTo(x + w * 0.6, -h + s * 0.08 + len * 0.5, x, -h + s * 0.08 + len);
         ctx.stroke();
-        ctx.fillStyle = '#a3101c';
+        ctx.fillStyle = BLOOD;
         ctx.beginPath();
-        ctx.arc(x, -h + s * 0.08 + len, w * 0.85, 0, Math.PI * 2);
+        ctx.arc(x, -h + s * 0.08 + len, w * 0.9, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = 'rgba(255,255,255,0.35)';
         ctx.beginPath();
         ctx.arc(x - w * 0.25, -h + s * 0.08 + len - w * 0.3, w * 0.25, 0, Math.PI * 2);
         ctx.fill();
       };
-      // the cut
-      ctx.strokeStyle = '#6e0a13';
-      ctx.lineWidth = s * 0.035;
+      // the cut, opening wider the worse it gets
+      ctx.strokeStyle = DARK;
+      ctx.lineWidth = s * (0.035 + 0.03 * k);
       ctx.lineCap = 'round';
       ctx.beginPath();
-      ctx.moveTo(side * s * 0.26, -h + s * 0.1);
-      ctx.lineTo(side * s * 0.42, -h + s * 0.05);
+      ctx.moveTo(side * s * 0.22, -h + s * 0.11);
+      ctx.lineTo(side * s * 0.44, -h + s * 0.04);
       ctx.stroke();
-      drip(side * s * 0.38, s * (0.12 + 0.42 * k), s * 0.06);
-      if (hurt > 0.7) drip(side * s * 0.29, s * (0.06 + 0.2 * (hurt - 0.7) / 0.3), s * 0.045);
-    } else if (hurt > 0.35 && small) {
-      // tiny squares just get a red mark
-      ctx.fillStyle = '#a3101c';
-      ctx.fillRect(side * s * 0.3 - s * 0.05, -h + s * 0.06, s * 0.1, s * (0.12 + 0.25 * hurt));
+      drip(side * s * 0.4, s * (0.14 + 0.62 * k), s * (0.06 + 0.03 * k));
+      if (hurt > 0.5) drip(side * s * 0.3, s * (0.08 + 0.45 * (hurt - 0.5) / 0.5), s * 0.05);
+      if (hurt > 0.72) {
+        // a second cut on the other side, and a nosebleed
+        ctx.strokeStyle = DARK;
+        ctx.lineWidth = s * 0.04;
+        ctx.beginPath();
+        ctx.moveTo(-side * s * 0.12, -h + s * 0.06);
+        ctx.lineTo(-side * s * 0.3, -h + s * 0.13);
+        ctx.stroke();
+        drip(-side * s * 0.2, s * (0.1 + 0.3 * (hurt - 0.72) / 0.28), s * 0.05);
+        drip(side * s * 0.02, s * (0.06 + 0.16 * (hurt - 0.72) / 0.28), s * 0.04);
+      }
+      if (hurt > 0.45) {
+        // splatter across the face
+        ctx.fillStyle = BLOOD;
+        const n = Math.round(4 + 10 * k);
+        for (let i = 0; i < n; i++) {
+          const px = (rnd(i) - 0.5) * s * 0.85;
+          const py = (rnd(i + 50) - 0.5) * s * 0.85;
+          const r = s * (0.012 + 0.03 * rnd(i + 99));
+          ctx.beginPath();
+          ctx.arc(px, py, r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
     }
     ctx.restore();
   }
+
+  // Blood on the arena floor: spray from hits, trails from the badly hurt, a splash where a square fell.
+  // Stains stay for the whole match (up to a limit), drawn under everything else.
+  SQ.Blood = class {
+    constructor(max) {
+      this.stains = [];
+      this.max = max || 220;
+    }
+    add(x, y, rx, ry, a) {
+      if (!SQ.gore) return;
+      if (this.stains.length >= this.max) this.stains.shift();
+      this.stains.push({ x, y, rx, ry: ry || rx * 0.75, a: a != null ? a : Math.random() * 6, dark: Math.random() < 0.35 });
+    }
+    // drops thrown away from the hit, stretched along the way they flew
+    spray(x, y, dx, dy, amt) {
+      const n = Math.round(3 + Math.min(10, amt / 2.5));
+      const ang = Math.atan2(dy, dx);
+      for (let i = 0; i < n; i++) {
+        const a = ang + (Math.random() - 0.5) * 1.1;
+        const d = 10 + Math.random() * (30 + amt * 2.5);
+        const r = 2.5 + Math.random() * (3 + amt * 0.25);
+        this.add(x + Math.cos(a) * d, y + Math.sin(a) * d, r * (1.6 + Math.random()), r * 0.6, a);
+      }
+    }
+    splash(x, y, size) {
+      this.add(x, y, size * 0.75, size * 0.6);
+      this.add(x + size * 0.2, y - size * 0.15, size * 0.45, size * 0.35);
+      for (let i = 0; i < 14; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const d = size * (0.6 + Math.random() * 1.1);
+        const r = 3 + Math.random() * size * 0.12;
+        this.add(x + Math.cos(a) * d, y + Math.sin(a) * d, r * 1.8, r * 0.7, a);
+      }
+    }
+    draw(ctx) {
+      if (!SQ.gore || !this.stains.length) return;
+      for (const st of this.stains) {
+        ctx.fillStyle = st.dark ? 'rgba(98, 6, 16, 0.7)' : 'rgba(150, 12, 26, 0.62)';
+        ctx.beginPath();
+        ctx.ellipse(st.x, st.y, st.rx, st.ry, st.a, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  };
 
   // Blocky eyes made of plain rectangles: cheap enough for a hundred squares.
   function drawSmallFace(ctx, s, o) {

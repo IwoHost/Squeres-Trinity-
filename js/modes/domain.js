@@ -7,6 +7,7 @@
     constructor(g, rng, opts) {
       opts = opts || {};
       this.g = g;
+      this.blood = new SQ.Blood(200);
       this.rng = rng;
       this.teams = opts.teams || SQ.pickTeams(rng, rng.pick([2, 2, 2, 3, 4]));
       const n = this.teams.length;
@@ -76,6 +77,14 @@
         s.turnT -= dt;
         for (const k of ['shieldT', 'boost', 'rage', 'big', 'frozen']) s[k] -= dt;
         s.size = SQ.lerp(s.size, s.big > 0 ? 160 : s.base, Math.min(1, dt * 4));
+        // badly hurt squares leave a trail
+        if (SQ.gore && s.hp < this.maxHp * 0.5) {
+          s.trailT = (s.trailT || 0) - dt;
+          if (s.trailT <= 0 && Math.hypot(s.vx, s.vy) > 60) {
+            s.trailT = s.hp <= 2 ? 0.1 : 0.22;
+            this.blood.add(s.x + (Math.random() - 0.5) * s.size * 0.4, s.y + (Math.random() - 0.5) * s.size * 0.4, 4 + Math.random() * 7);
+          }
+        }
         if (s.frozen > 0) continue;
         const P = SQ.persona(this.teams[s.team]);
         const sp = (320 + Math.min(160, this.time * 1.6)) * P.speed * (s.boost > 0 ? 1.6 : 1);
@@ -227,7 +236,10 @@
         const dmg = (crit ? 3 : 1) * (atk.rage > 0 ? 2 : 1);
         v.hp = Math.max(0, v.hp - dmg);
         v.flash = 1;
-        if (SQ.gore) g.fx.burst(v.x, v.y, '#b3121f', 4 + dmg * 2, 260, 8);
+        if (SQ.gore) {
+          g.fx.burst(v.x, v.y, '#b3121f', 8 + dmg * 3, 300, 10);
+          this.blood.spray(v.x, v.y, v.x - atk.x, v.y - atk.y, dmg * 8);
+        }
         atk.hits++;
         g.fx.burst(v.x, v.y, this.teams[v.team].color, 14, 300, 12);
         g.fx.text(v.x, v.y - 80, crit ? `CRIT -${dmg}` : `-${dmg}`, crit ? '#ffd23f' : '#ffffff', crit ? 54 : 42);
@@ -236,6 +248,10 @@
           g.hitstop(0.14);
           g.audio.explode();
           g.fx.burst(v.x, v.y, this.teams[v.team].color, 60, 520, 18);
+          if (SQ.gore) {
+            g.fx.burst(v.x, v.y, '#b3121f', 50, 560, 14);
+            this.blood.splash(v.x, v.y, v.size * 0.8);
+          }
           g.fx.flash(0.6, this.teams[v.team].light);
           g.fx.voice(v, 'lose', true);
           g.highlight(v.x, v.y, 2, 1.4, 0.25);
@@ -334,6 +350,7 @@
         ctx.fillStyle = age > SETTLE ? t.dark : SQ.rgba(t.dark, 0.45);
         ctx.fillRect(x, y, c + 0.5, c + 0.5);
       }
+      this.blood.draw(ctx);
       for (const it of this.items) SQ.drawItem(ctx, it.x, it.y, it.type, it.t, 60, it.life - it.t);
       for (const s of this.sq) {
         if (!s.alive) continue;

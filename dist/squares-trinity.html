@@ -1060,62 +1060,146 @@ body.theater-on .fs-backdrop { display: block; }
   SQ.wear = 0; // tiredness for modes without health: bags only, never blood
   function drawDamage(ctx, s, hurt, team, small) {
     const h = s / 2;
-    // which side the cut is on stays the same for each square
-    const side = (team.name.charCodeAt(0) + (team.name.length || 0)) % 2 ? 1 : -1;
+    // which side the cut is on, and where the splatter lands, stay the same for each square
+    const seed = team.name.charCodeAt(0) * 7 + (team.name.length || 0) * 13;
+    const side = seed % 2 ? 1 : -1;
+    const rnd = (i) => {
+      const v = Math.sin(seed * 12.9898 + i * 78.233) * 43758.5453;
+      return v - Math.floor(v);
+    };
+    const BLOOD = '#a3101c';
+    const DARK = '#6e0a13';
     const ex = s * 0.2;
     const bagY = small ? -s * 0.1 + s * 0.17 : -s * 0.04 + s * 0.13;
     const bagW = small ? s * 0.13 : s * 0.12;
     const bagH = s * (0.035 + 0.05 * Math.min(1, hurt));
     ctx.save();
-    ctx.fillStyle = `rgba(104, 38, 140, ${Math.min(0.8, 0.15 + hurt * 0.85)})`;
+    // bags under both eyes; the eye on the cut side swells into a black eye
     for (const sx of [-1, 1]) {
+      const swollen = sx === side && hurt > 0.55;
+      ctx.fillStyle = swollen ? `rgba(60, 18, 80, ${Math.min(0.85, 0.3 + hurt * 0.6)})` : `rgba(104, 38, 140, ${Math.min(0.8, 0.15 + hurt * 0.85)})`;
       ctx.beginPath();
-      ctx.ellipse(sx * ex, bagY, bagW, bagH, 0, 0, Math.PI);
+      if (swollen) ctx.ellipse(sx * ex, bagY - s * 0.05, bagW * 1.35, bagH * 2.2, 0, 0, Math.PI * 2);
+      else ctx.ellipse(sx * ex, bagY, bagW, bagH, 0, 0, Math.PI);
       ctx.fill();
     }
-    if (hurt > 0.45) {
-      // a bruise on the cheek opposite the cut
-      ctx.fillStyle = `rgba(118, 44, 150, ${Math.min(0.55, (hurt - 0.45) * 1.4)})`;
+    if (hurt > 0.4) {
+      // a bruise on the other cheek
+      ctx.fillStyle = `rgba(118, 44, 150, ${Math.min(0.6, (hurt - 0.4) * 1.4)})`;
       ctx.beginPath();
-      ctx.ellipse(-side * s * 0.3, s * 0.16, s * 0.09, s * 0.07, 0.4, 0, Math.PI * 2);
+      ctx.ellipse(-side * s * 0.3, s * 0.16, s * 0.1, s * 0.075, 0.4, 0, Math.PI * 2);
       ctx.fill();
     }
-    if (hurt > 0.35 && !small) {
-      const k = Math.min(1, (hurt - 0.35) / 0.65);
+    if (small) {
+      if (hurt > 0.25) {
+        ctx.fillStyle = BLOOD;
+        ctx.fillRect(side * s * 0.3 - s * 0.06, -h + s * 0.05, s * 0.12, s * (0.15 + 0.35 * hurt));
+        if (hurt > 0.6) ctx.fillRect(-side * s * 0.15 - s * 0.05, -h + s * 0.05, s * 0.1, s * 0.25 * hurt);
+      }
+      ctx.restore();
+      return;
+    }
+    if (hurt > 0.25) {
+      const k = Math.min(1, (hurt - 0.25) / 0.75);
       const drip = (x, len, w) => {
-        ctx.strokeStyle = '#a3101c';
+        ctx.strokeStyle = BLOOD;
         ctx.lineCap = 'round';
         ctx.lineWidth = w;
         ctx.beginPath();
         ctx.moveTo(x, -h + s * 0.08);
-        ctx.lineTo(x, -h + s * 0.08 + len);
+        // runs down with a slight wobble, like it found its own way
+        ctx.quadraticCurveTo(x + w * 0.6, -h + s * 0.08 + len * 0.5, x, -h + s * 0.08 + len);
         ctx.stroke();
-        ctx.fillStyle = '#a3101c';
+        ctx.fillStyle = BLOOD;
         ctx.beginPath();
-        ctx.arc(x, -h + s * 0.08 + len, w * 0.85, 0, Math.PI * 2);
+        ctx.arc(x, -h + s * 0.08 + len, w * 0.9, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = 'rgba(255,255,255,0.35)';
         ctx.beginPath();
         ctx.arc(x - w * 0.25, -h + s * 0.08 + len - w * 0.3, w * 0.25, 0, Math.PI * 2);
         ctx.fill();
       };
-      // the cut
-      ctx.strokeStyle = '#6e0a13';
-      ctx.lineWidth = s * 0.035;
+      // the cut, opening wider the worse it gets
+      ctx.strokeStyle = DARK;
+      ctx.lineWidth = s * (0.035 + 0.03 * k);
       ctx.lineCap = 'round';
       ctx.beginPath();
-      ctx.moveTo(side * s * 0.26, -h + s * 0.1);
-      ctx.lineTo(side * s * 0.42, -h + s * 0.05);
+      ctx.moveTo(side * s * 0.22, -h + s * 0.11);
+      ctx.lineTo(side * s * 0.44, -h + s * 0.04);
       ctx.stroke();
-      drip(side * s * 0.38, s * (0.12 + 0.42 * k), s * 0.06);
-      if (hurt > 0.7) drip(side * s * 0.29, s * (0.06 + 0.2 * (hurt - 0.7) / 0.3), s * 0.045);
-    } else if (hurt > 0.35 && small) {
-      // tiny squares just get a red mark
-      ctx.fillStyle = '#a3101c';
-      ctx.fillRect(side * s * 0.3 - s * 0.05, -h + s * 0.06, s * 0.1, s * (0.12 + 0.25 * hurt));
+      drip(side * s * 0.4, s * (0.14 + 0.62 * k), s * (0.06 + 0.03 * k));
+      if (hurt > 0.5) drip(side * s * 0.3, s * (0.08 + 0.45 * (hurt - 0.5) / 0.5), s * 0.05);
+      if (hurt > 0.72) {
+        // a second cut on the other side, and a nosebleed
+        ctx.strokeStyle = DARK;
+        ctx.lineWidth = s * 0.04;
+        ctx.beginPath();
+        ctx.moveTo(-side * s * 0.12, -h + s * 0.06);
+        ctx.lineTo(-side * s * 0.3, -h + s * 0.13);
+        ctx.stroke();
+        drip(-side * s * 0.2, s * (0.1 + 0.3 * (hurt - 0.72) / 0.28), s * 0.05);
+        drip(side * s * 0.02, s * (0.06 + 0.16 * (hurt - 0.72) / 0.28), s * 0.04);
+      }
+      if (hurt > 0.45) {
+        // splatter across the face
+        ctx.fillStyle = BLOOD;
+        const n = Math.round(4 + 10 * k);
+        for (let i = 0; i < n; i++) {
+          const px = (rnd(i) - 0.5) * s * 0.85;
+          const py = (rnd(i + 50) - 0.5) * s * 0.85;
+          const r = s * (0.012 + 0.03 * rnd(i + 99));
+          ctx.beginPath();
+          ctx.arc(px, py, r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
     }
     ctx.restore();
   }
+
+  // Blood on the arena floor: spray from hits, trails from the badly hurt, a splash where a square fell.
+  // Stains stay for the whole match (up to a limit), drawn under everything else.
+  SQ.Blood = class {
+    constructor(max) {
+      this.stains = [];
+      this.max = max || 220;
+    }
+    add(x, y, rx, ry, a) {
+      if (!SQ.gore) return;
+      if (this.stains.length >= this.max) this.stains.shift();
+      this.stains.push({ x, y, rx, ry: ry || rx * 0.75, a: a != null ? a : Math.random() * 6, dark: Math.random() < 0.35 });
+    }
+    // drops thrown away from the hit, stretched along the way they flew
+    spray(x, y, dx, dy, amt) {
+      const n = Math.round(3 + Math.min(10, amt / 2.5));
+      const ang = Math.atan2(dy, dx);
+      for (let i = 0; i < n; i++) {
+        const a = ang + (Math.random() - 0.5) * 1.1;
+        const d = 10 + Math.random() * (30 + amt * 2.5);
+        const r = 2.5 + Math.random() * (3 + amt * 0.25);
+        this.add(x + Math.cos(a) * d, y + Math.sin(a) * d, r * (1.6 + Math.random()), r * 0.6, a);
+      }
+    }
+    splash(x, y, size) {
+      this.add(x, y, size * 0.75, size * 0.6);
+      this.add(x + size * 0.2, y - size * 0.15, size * 0.45, size * 0.35);
+      for (let i = 0; i < 14; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const d = size * (0.6 + Math.random() * 1.1);
+        const r = 3 + Math.random() * size * 0.12;
+        this.add(x + Math.cos(a) * d, y + Math.sin(a) * d, r * 1.8, r * 0.7, a);
+      }
+    }
+    draw(ctx) {
+      if (!SQ.gore || !this.stains.length) return;
+      for (const st of this.stains) {
+        ctx.fillStyle = st.dark ? 'rgba(98, 6, 16, 0.7)' : 'rgba(150, 12, 26, 0.62)';
+        ctx.beginPath();
+        ctx.ellipse(st.x, st.y, st.rx, st.ry, st.a, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  };
 
   // Blocky eyes made of plain rectangles: cheap enough for a hundred squares.
   function drawSmallFace(ctx, s, o) {
@@ -4016,6 +4100,7 @@ void main() {
     constructor(g, rng, opts) {
       opts = opts || {};
       this.g = g;
+      this.blood = new SQ.Blood(200);
       this.rng = rng;
       this.teams = opts.teams || SQ.pickTeams(rng, rng.pick([2, 2, 2, 3, 4]));
       const n = this.teams.length;
@@ -4085,6 +4170,14 @@ void main() {
         s.turnT -= dt;
         for (const k of ['shieldT', 'boost', 'rage', 'big', 'frozen']) s[k] -= dt;
         s.size = SQ.lerp(s.size, s.big > 0 ? 160 : s.base, Math.min(1, dt * 4));
+        // badly hurt squares leave a trail
+        if (SQ.gore && s.hp < this.maxHp * 0.5) {
+          s.trailT = (s.trailT || 0) - dt;
+          if (s.trailT <= 0 && Math.hypot(s.vx, s.vy) > 60) {
+            s.trailT = s.hp <= 2 ? 0.1 : 0.22;
+            this.blood.add(s.x + (Math.random() - 0.5) * s.size * 0.4, s.y + (Math.random() - 0.5) * s.size * 0.4, 4 + Math.random() * 7);
+          }
+        }
         if (s.frozen > 0) continue;
         const P = SQ.persona(this.teams[s.team]);
         const sp = (320 + Math.min(160, this.time * 1.6)) * P.speed * (s.boost > 0 ? 1.6 : 1);
@@ -4236,7 +4329,10 @@ void main() {
         const dmg = (crit ? 3 : 1) * (atk.rage > 0 ? 2 : 1);
         v.hp = Math.max(0, v.hp - dmg);
         v.flash = 1;
-        if (SQ.gore) g.fx.burst(v.x, v.y, '#b3121f', 4 + dmg * 2, 260, 8);
+        if (SQ.gore) {
+          g.fx.burst(v.x, v.y, '#b3121f', 8 + dmg * 3, 300, 10);
+          this.blood.spray(v.x, v.y, v.x - atk.x, v.y - atk.y, dmg * 8);
+        }
         atk.hits++;
         g.fx.burst(v.x, v.y, this.teams[v.team].color, 14, 300, 12);
         g.fx.text(v.x, v.y - 80, crit ? `CRIT -${dmg}` : `-${dmg}`, crit ? '#ffd23f' : '#ffffff', crit ? 54 : 42);
@@ -4245,6 +4341,10 @@ void main() {
           g.hitstop(0.14);
           g.audio.explode();
           g.fx.burst(v.x, v.y, this.teams[v.team].color, 60, 520, 18);
+          if (SQ.gore) {
+            g.fx.burst(v.x, v.y, '#b3121f', 50, 560, 14);
+            this.blood.splash(v.x, v.y, v.size * 0.8);
+          }
           g.fx.flash(0.6, this.teams[v.team].light);
           g.fx.voice(v, 'lose', true);
           g.highlight(v.x, v.y, 2, 1.4, 0.25);
@@ -4343,6 +4443,7 @@ void main() {
         ctx.fillStyle = age > SETTLE ? t.dark : SQ.rgba(t.dark, 0.45);
         ctx.fillRect(x, y, c + 0.5, c + 0.5);
       }
+      this.blood.draw(ctx);
       for (const it of this.items) SQ.drawItem(ctx, it.x, it.y, it.type, it.t, 60, it.life - it.t);
       for (const s of this.sq) {
         if (!s.alive) continue;
@@ -5121,6 +5222,7 @@ void main() {
       const forced = opts.variant;
       this.g = g;
       this.rng = rng;
+      this.blood = new SQ.Blood(260);
       this.teams = opts.teams || SQ.pickTeams(rng, rng.int(4, 7));
       const n = this.teams.length;
       this.maxHp = opts.quick ? 55 : 100;
@@ -5292,6 +5394,14 @@ void main() {
         }
         s.blink -= dt;
         if (s.blink < -0.12) s.blink = rng.range(2, 5);
+        // badly hurt squares leave a trail
+        if (SQ.gore && s.alive && s.hp < this.maxHp * 0.5) {
+          s.trailT = (s.trailT || 0) - dt;
+          if (s.trailT <= 0 && Math.hypot(s.vx, s.vy) > 60) {
+            s.trailT = s.hp < this.maxHp * 0.25 ? 0.12 : 0.25;
+            this.blood.add(s.x + (Math.random() - 0.5) * s.size * 0.5, s.y + (Math.random() - 0.5) * s.size * 0.5, 3 + Math.random() * 5);
+          }
+        }
         for (const k in s.hitCool) s.hitCool[k] -= dt;
         const sp = s.speed * SQ.persona(this.teams[s.team]).speed * (s.boost > 0 ? 1.6 : 1) * (1 + Math.min(0.4, this.time / 150));
         const cur = Math.hypot(s.vx, s.vy) || 1;
@@ -5566,11 +5676,11 @@ void main() {
       v.hp -= amt;
       v.flash = 1;
       if (SQ.gore) {
-        // a few drops fly off, and some land on the floor and stay
-        g.fx.burst(v.x, v.y, '#b3121f', 3 + Math.min(8, Math.round(amt / 3)), 240, 7);
-        this.stains = this.stains || [];
-        if (this.stains.length > 90) this.stains.shift();
-        this.stains.push({ x: v.x + (Math.random() - 0.5) * v.size, y: v.y + (Math.random() - 0.5) * v.size, r: 5 + Math.min(16, amt * 0.5), a: Math.random() * 6 });
+        // drops fly off, away from whoever hit it, and land on the floor
+        g.fx.burst(v.x, v.y, '#b3121f', 6 + Math.min(14, Math.round(amt / 2)), 300, 9);
+        const dx = by ? v.x - by.x : Math.random() - 0.5;
+        const dy = by ? v.y - by.y : Math.random() - 0.5;
+        this.blood.spray(v.x, v.y, dx, dy, amt);
       }
       if (amt >= 8) g.fx.text(v.x + (Math.random() - 0.5) * 30, v.y - v.size * 0.7, `-${Math.round(amt)}`, amt >= 15 ? '#ffd23f' : '#ffffff', amt >= 15 ? 40 : 30);
       if (v.hp <= 0) {
@@ -5581,6 +5691,10 @@ void main() {
         g.hitstop(0.14);
         g.audio.explode();
         g.fx.burst(v.x, v.y, this.teams[v.team].color, 60, 520, 14);
+        if (SQ.gore) {
+          g.fx.burst(v.x, v.y, '#b3121f', 50, 560, 12);
+          this.blood.splash(v.x, v.y, v.size * 0.9);
+        }
         g.fx.ring(v.x, v.y, this.teams[v.team].color, 120);
         g.fx.flash(0.4, this.teams[v.team].light);
         g.cam.shake(14);
@@ -5660,14 +5774,7 @@ void main() {
         ctx.strokeRect(s, s, 1000 - 2 * s, 1000 - 2 * s);
       }
       // blood on the floor, under everything else
-      if (this.stains && SQ.gore) {
-        ctx.fillStyle = 'rgba(140, 14, 26, 0.55)';
-        for (const st of this.stains) {
-          ctx.beginPath();
-          ctx.ellipse(st.x, st.y, st.r, st.r * 0.7, st.a, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
+      this.blood.draw(ctx);
       for (const d of this.drops) SQ.drawItem(ctx, d.x, d.y, d.type, d.t, 54, d.life - d.t, d.wtype ? WEAPONS[d.wtype].icon : null);
       for (const s of this.sq) {
         const t = this.teams[s.team];

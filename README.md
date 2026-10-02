@@ -135,9 +135,10 @@ a little more, so a run of posts slowly loses its signal. Within a video it stay
 ### Battle damage
 
 With "Battle damage" on (Look tab, on by default) squares show what they have been through:
-purple bags under the eyes first, then a bruise, then a cut on the forehead that bleeds down the
-face as they lose health, all in cartoon style. Hits throw a few red drops, and in Weapon Brawl and
-Bounce Brawl the stains stay on the floor. Modes without health only get tired eye bags as the
+purple bags under the eyes first, then a bruise and a black eye, then cuts that bleed down the
+face, splatter and a nosebleed as they lose health, all in cartoon style. Hits spray blood away from
+the hit, badly hurt squares leave a trail, and a knockout leaves a big splash; in the brawls and
+Domain Duel the floor keeps every stain. Modes without health only get tired eye bags as the
 match goes on.
 
 ### The signal event and the hidden transmission

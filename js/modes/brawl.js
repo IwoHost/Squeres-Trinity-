@@ -31,6 +31,7 @@
       const forced = opts.variant;
       this.g = g;
       this.rng = rng;
+      this.blood = new SQ.Blood(260);
       this.teams = opts.teams || SQ.pickTeams(rng, rng.int(4, 7));
       const n = this.teams.length;
       this.maxHp = opts.quick ? 55 : 100;
@@ -202,6 +203,14 @@
         }
         s.blink -= dt;
         if (s.blink < -0.12) s.blink = rng.range(2, 5);
+        // badly hurt squares leave a trail
+        if (SQ.gore && s.alive && s.hp < this.maxHp * 0.5) {
+          s.trailT = (s.trailT || 0) - dt;
+          if (s.trailT <= 0 && Math.hypot(s.vx, s.vy) > 60) {
+            s.trailT = s.hp < this.maxHp * 0.25 ? 0.12 : 0.25;
+            this.blood.add(s.x + (Math.random() - 0.5) * s.size * 0.5, s.y + (Math.random() - 0.5) * s.size * 0.5, 3 + Math.random() * 5);
+          }
+        }
         for (const k in s.hitCool) s.hitCool[k] -= dt;
         const sp = s.speed * SQ.persona(this.teams[s.team]).speed * (s.boost > 0 ? 1.6 : 1) * (1 + Math.min(0.4, this.time / 150));
         const cur = Math.hypot(s.vx, s.vy) || 1;
@@ -476,11 +485,11 @@
       v.hp -= amt;
       v.flash = 1;
       if (SQ.gore) {
-        // a few drops fly off, and some land on the floor and stay
-        g.fx.burst(v.x, v.y, '#b3121f', 3 + Math.min(8, Math.round(amt / 3)), 240, 7);
-        this.stains = this.stains || [];
-        if (this.stains.length > 90) this.stains.shift();
-        this.stains.push({ x: v.x + (Math.random() - 0.5) * v.size, y: v.y + (Math.random() - 0.5) * v.size, r: 5 + Math.min(16, amt * 0.5), a: Math.random() * 6 });
+        // drops fly off, away from whoever hit it, and land on the floor
+        g.fx.burst(v.x, v.y, '#b3121f', 6 + Math.min(14, Math.round(amt / 2)), 300, 9);
+        const dx = by ? v.x - by.x : Math.random() - 0.5;
+        const dy = by ? v.y - by.y : Math.random() - 0.5;
+        this.blood.spray(v.x, v.y, dx, dy, amt);
       }
       if (amt >= 8) g.fx.text(v.x + (Math.random() - 0.5) * 30, v.y - v.size * 0.7, `-${Math.round(amt)}`, amt >= 15 ? '#ffd23f' : '#ffffff', amt >= 15 ? 40 : 30);
       if (v.hp <= 0) {
@@ -491,6 +500,10 @@
         g.hitstop(0.14);
         g.audio.explode();
         g.fx.burst(v.x, v.y, this.teams[v.team].color, 60, 520, 14);
+        if (SQ.gore) {
+          g.fx.burst(v.x, v.y, '#b3121f', 50, 560, 12);
+          this.blood.splash(v.x, v.y, v.size * 0.9);
+        }
         g.fx.ring(v.x, v.y, this.teams[v.team].color, 120);
         g.fx.flash(0.4, this.teams[v.team].light);
         g.cam.shake(14);
@@ -570,14 +583,7 @@
         ctx.strokeRect(s, s, 1000 - 2 * s, 1000 - 2 * s);
       }
       // blood on the floor, under everything else
-      if (this.stains && SQ.gore) {
-        ctx.fillStyle = 'rgba(140, 14, 26, 0.55)';
-        for (const st of this.stains) {
-          ctx.beginPath();
-          ctx.ellipse(st.x, st.y, st.r, st.r * 0.7, st.a, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
+      this.blood.draw(ctx);
       for (const d of this.drops) SQ.drawItem(ctx, d.x, d.y, d.type, d.t, 54, d.life - d.t, d.wtype ? WEAPONS[d.wtype].icon : null);
       for (const s of this.sq) {
         const t = this.teams[s.team];
