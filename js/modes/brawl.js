@@ -475,6 +475,13 @@
       if (by && by.megaT > 0) amt *= 1.5;
       v.hp -= amt;
       v.flash = 1;
+      if (SQ.gore) {
+        // a few drops fly off, and some land on the floor and stay
+        g.fx.burst(v.x, v.y, '#b3121f', 3 + Math.min(8, Math.round(amt / 3)), 240, 7);
+        this.stains = this.stains || [];
+        if (this.stains.length > 90) this.stains.shift();
+        this.stains.push({ x: v.x + (Math.random() - 0.5) * v.size, y: v.y + (Math.random() - 0.5) * v.size, r: 5 + Math.min(16, amt * 0.5), a: Math.random() * 6 });
+      }
       if (amt >= 8) g.fx.text(v.x + (Math.random() - 0.5) * 30, v.y - v.size * 0.7, `-${Math.round(amt)}`, amt >= 15 ? '#ffd23f' : '#ffffff', amt >= 15 ? 40 : 30);
       if (v.hp <= 0) {
         v.hp = 0;
@@ -562,6 +569,15 @@
         ctx.lineWidth = 6;
         ctx.strokeRect(s, s, 1000 - 2 * s, 1000 - 2 * s);
       }
+      // blood on the floor, under everything else
+      if (this.stains && SQ.gore) {
+        ctx.fillStyle = 'rgba(140, 14, 26, 0.55)';
+        for (const st of this.stains) {
+          ctx.beginPath();
+          ctx.ellipse(st.x, st.y, st.r, st.r * 0.7, st.a, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
       for (const d of this.drops) SQ.drawItem(ctx, d.x, d.y, d.type, d.t, 54, d.life - d.t, d.wtype ? WEAPONS[d.wtype].icon : null);
       for (const s of this.sq) {
         const t = this.teams[s.team];
@@ -595,6 +611,7 @@
           flash: s.flash,
           blink: s.blink < 0,
           mood: s.hp < this.maxHp * 0.3 ? 'scared' : s.w ? 'angry' : 'normal',
+          hurt: 1 - s.hp / this.maxHp,
           glow: s.boost > 0 || s.megaT > 0 ? 18 : 0,
           glowColor: s.megaT > 0 ? '#ff6ac1' : null,
           shield: s.shieldT,

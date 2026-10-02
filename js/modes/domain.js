@@ -227,6 +227,7 @@
         const dmg = (crit ? 3 : 1) * (atk.rage > 0 ? 2 : 1);
         v.hp = Math.max(0, v.hp - dmg);
         v.flash = 1;
+        if (SQ.gore) g.fx.burst(v.x, v.y, '#b3121f', 4 + dmg * 2, 260, 8);
         atk.hits++;
         g.fx.burst(v.x, v.y, this.teams[v.team].color, 14, 300, 12);
         g.fx.text(v.x, v.y - 80, crit ? `CRIT -${dmg}` : `-${dmg}`, crit ? '#ffd23f' : '#ffffff', crit ? 54 : 42);
@@ -344,6 +345,7 @@
           squash: s.squash,
           flash: s.flash,
           mood: s.frozen > 0 || s.hp <= 2 ? 'scared' : s.safe ? 'normal' : 'angry',
+          hurt: 1 - s.hp / this.maxHp,
           glow: s.safe || s.rage > 0 || s.boost > 0 ? 28 : 0,
           glowColor: s.rage > 0 ? '#ff8f33' : s.boost > 0 ? '#ffc21a' : null,
           shield: s.shieldT,

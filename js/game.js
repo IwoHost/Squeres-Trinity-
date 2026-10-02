@@ -137,7 +137,7 @@
       this.cam = new SQ.Camera();
       this.fx = new SQ.FX(this);
       this.recorder = new Recorder();
-      this.opts = { mode: 'random', memes: 1, speed: 1, music: 'shuffle', record: false, autoNext: false, quality: 'auto', voices: true, reel: true, fisheye: 30, crt: 35, static: 0, decay: 4 };
+      this.opts = { mode: 'random', memes: 1, speed: 1, music: 'shuffle', record: false, autoNext: false, quality: 'auto', voices: true, reel: true, fisheye: 30, crt: 35, static: 0, decay: 4, gore: true };
       this.setQuality('auto');
       this.fixedDt = 1 / 60;
       this.hitstopT = 0;
@@ -701,6 +701,9 @@
       }
       if (P === 'idle' && m.winner) this.makeIdle();
       this.updateReboot(realDt);
+      // modes without health get tired as the match goes on: eye bags only
+      SQ.gore = this.opts.gore !== false;
+      SQ.wear = this.phase === 'play' || this.phase === 'finale' || this.phase === 'outro' ? Math.min(0.3, (this.playT || 0) / 90) : this.phase === 'done' ? SQ.wear : 0;
       this.glitch = Math.max(0, this.glitch - realDt * 2.4);
       this.cam.update(realDt);
       this.fx.update(realDt * this.timeScale, realDt);

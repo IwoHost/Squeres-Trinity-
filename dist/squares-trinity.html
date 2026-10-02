@@ -394,6 +394,7 @@ body.theater-on .fs-backdrop { display: block; }
         <span class="label">Screen</span>
         <div class="field"><label for="fisheye">Fish-eye</label><input type="range" id="fisheye" min="0" max="100" step="5" value="30"></div>
         <div class="field"><label for="crt">CRT</label><input type="range" id="crt" min="0" max="100" step="5" value="35"></div>
+        <label class="toggle"><input type="checkbox" id="gore" checked> Battle damage (eye bags, bruises, cartoon blood)</label>
         <div class="field"><label for="static">Static <output id="static-val">0%</output></label><input type="range" id="static" min="0" max="100" step="1" value="0"></div>
         <div class="field"><label for="decay">Per video</label><select id="decay">
           <option value="0">Stays the same</option>
@@ -1040,6 +1041,8 @@ body.theater-on .fs-backdrop { display: block; }
     if (s >= 10 && o.face !== false) {
       if (s < 36 && o.face !== 'moai') drawSmallFace(ctx, s, o);
       else drawFace(ctx, s, o);
+      const hurt = SQ.gore ? (o.hurt != null ? o.hurt : SQ.wear) : 0;
+      if (hurt > 0.02) drawDamage(ctx, s, hurt, team, s < 36);
     }
 
     if (o.shield > 0) {
@@ -1050,6 +1053,69 @@ body.theater-on .fs-backdrop { display: block; }
     }
     ctx.restore();
   };
+
+  // Battle damage, from 0 (fresh) to 1 (nearly out): purple bags under the eyes first, then a bruise,
+  // then a cut on the forehead that bleeds down the face. Cartoon style, drawn on top of the face.
+  SQ.gore = true;
+  SQ.wear = 0; // tiredness for modes without health: bags only, never blood
+  function drawDamage(ctx, s, hurt, team, small) {
+    const h = s / 2;
+    // which side the cut is on stays the same for each square
+    const side = (team.name.charCodeAt(0) + (team.name.length || 0)) % 2 ? 1 : -1;
+    const ex = s * 0.2;
+    const bagY = small ? -s * 0.1 + s * 0.17 : -s * 0.04 + s * 0.13;
+    const bagW = small ? s * 0.13 : s * 0.12;
+    const bagH = s * (0.035 + 0.05 * Math.min(1, hurt));
+    ctx.save();
+    ctx.fillStyle = `rgba(104, 38, 140, ${Math.min(0.8, 0.15 + hurt * 0.85)})`;
+    for (const sx of [-1, 1]) {
+      ctx.beginPath();
+      ctx.ellipse(sx * ex, bagY, bagW, bagH, 0, 0, Math.PI);
+      ctx.fill();
+    }
+    if (hurt > 0.45) {
+      // a bruise on the cheek opposite the cut
+      ctx.fillStyle = `rgba(118, 44, 150, ${Math.min(0.55, (hurt - 0.45) * 1.4)})`;
+      ctx.beginPath();
+      ctx.ellipse(-side * s * 0.3, s * 0.16, s * 0.09, s * 0.07, 0.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (hurt > 0.35 && !small) {
+      const k = Math.min(1, (hurt - 0.35) / 0.65);
+      const drip = (x, len, w) => {
+        ctx.strokeStyle = '#a3101c';
+        ctx.lineCap = 'round';
+        ctx.lineWidth = w;
+        ctx.beginPath();
+        ctx.moveTo(x, -h + s * 0.08);
+        ctx.lineTo(x, -h + s * 0.08 + len);
+        ctx.stroke();
+        ctx.fillStyle = '#a3101c';
+        ctx.beginPath();
+        ctx.arc(x, -h + s * 0.08 + len, w * 0.85, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.beginPath();
+        ctx.arc(x - w * 0.25, -h + s * 0.08 + len - w * 0.3, w * 0.25, 0, Math.PI * 2);
+        ctx.fill();
+      };
+      // the cut
+      ctx.strokeStyle = '#6e0a13';
+      ctx.lineWidth = s * 0.035;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(side * s * 0.26, -h + s * 0.1);
+      ctx.lineTo(side * s * 0.42, -h + s * 0.05);
+      ctx.stroke();
+      drip(side * s * 0.38, s * (0.12 + 0.42 * k), s * 0.06);
+      if (hurt > 0.7) drip(side * s * 0.29, s * (0.06 + 0.2 * (hurt - 0.7) / 0.3), s * 0.045);
+    } else if (hurt > 0.35 && small) {
+      // tiny squares just get a red mark
+      ctx.fillStyle = '#a3101c';
+      ctx.fillRect(side * s * 0.3 - s * 0.05, -h + s * 0.06, s * 0.1, s * (0.12 + 0.25 * hurt));
+    }
+    ctx.restore();
+  }
 
   // Blocky eyes made of plain rectangles: cheap enough for a hundred squares.
   function drawSmallFace(ctx, s, o) {
@@ -4170,6 +4236,7 @@ void main() {
         const dmg = (crit ? 3 : 1) * (atk.rage > 0 ? 2 : 1);
         v.hp = Math.max(0, v.hp - dmg);
         v.flash = 1;
+        if (SQ.gore) g.fx.burst(v.x, v.y, '#b3121f', 4 + dmg * 2, 260, 8);
         atk.hits++;
         g.fx.burst(v.x, v.y, this.teams[v.team].color, 14, 300, 12);
         g.fx.text(v.x, v.y - 80, crit ? `CRIT -${dmg}` : `-${dmg}`, crit ? '#ffd23f' : '#ffffff', crit ? 54 : 42);
@@ -4287,6 +4354,7 @@ void main() {
           squash: s.squash,
           flash: s.flash,
           mood: s.frozen > 0 || s.hp <= 2 ? 'scared' : s.safe ? 'normal' : 'angry',
+          hurt: 1 - s.hp / this.maxHp,
           glow: s.safe || s.rage > 0 || s.boost > 0 ? 28 : 0,
           glowColor: s.rage > 0 ? '#ff8f33' : s.boost > 0 ? '#ffc21a' : null,
           shield: s.shieldT,
@@ -5497,6 +5565,13 @@ void main() {
       if (by && by.megaT > 0) amt *= 1.5;
       v.hp -= amt;
       v.flash = 1;
+      if (SQ.gore) {
+        // a few drops fly off, and some land on the floor and stay
+        g.fx.burst(v.x, v.y, '#b3121f', 3 + Math.min(8, Math.round(amt / 3)), 240, 7);
+        this.stains = this.stains || [];
+        if (this.stains.length > 90) this.stains.shift();
+        this.stains.push({ x: v.x + (Math.random() - 0.5) * v.size, y: v.y + (Math.random() - 0.5) * v.size, r: 5 + Math.min(16, amt * 0.5), a: Math.random() * 6 });
+      }
       if (amt >= 8) g.fx.text(v.x + (Math.random() - 0.5) * 30, v.y - v.size * 0.7, `-${Math.round(amt)}`, amt >= 15 ? '#ffd23f' : '#ffffff', amt >= 15 ? 40 : 30);
       if (v.hp <= 0) {
         v.hp = 0;
@@ -5584,6 +5659,15 @@ void main() {
         ctx.lineWidth = 6;
         ctx.strokeRect(s, s, 1000 - 2 * s, 1000 - 2 * s);
       }
+      // blood on the floor, under everything else
+      if (this.stains && SQ.gore) {
+        ctx.fillStyle = 'rgba(140, 14, 26, 0.55)';
+        for (const st of this.stains) {
+          ctx.beginPath();
+          ctx.ellipse(st.x, st.y, st.r, st.r * 0.7, st.a, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
       for (const d of this.drops) SQ.drawItem(ctx, d.x, d.y, d.type, d.t, 54, d.life - d.t, d.wtype ? WEAPONS[d.wtype].icon : null);
       for (const s of this.sq) {
         const t = this.teams[s.team];
@@ -5617,6 +5701,7 @@ void main() {
           flash: s.flash,
           blink: s.blink < 0,
           mood: s.hp < this.maxHp * 0.3 ? 'scared' : s.w ? 'angry' : 'normal',
+          hurt: 1 - s.hp / this.maxHp,
           glow: s.boost > 0 || s.megaT > 0 ? 18 : 0,
           glowColor: s.megaT > 0 ? '#ff6ac1' : null,
           shield: s.shieldT,
@@ -8197,7 +8282,7 @@ void main() {
       this.cam = new SQ.Camera();
       this.fx = new SQ.FX(this);
       this.recorder = new Recorder();
-      this.opts = { mode: 'random', memes: 1, speed: 1, music: 'shuffle', record: false, autoNext: false, quality: 'auto', voices: true, reel: true, fisheye: 30, crt: 35, static: 0, decay: 4 };
+      this.opts = { mode: 'random', memes: 1, speed: 1, music: 'shuffle', record: false, autoNext: false, quality: 'auto', voices: true, reel: true, fisheye: 30, crt: 35, static: 0, decay: 4, gore: true };
       this.setQuality('auto');
       this.fixedDt = 1 / 60;
       this.hitstopT = 0;
@@ -8761,6 +8846,9 @@ void main() {
       }
       if (P === 'idle' && m.winner) this.makeIdle();
       this.updateReboot(realDt);
+      // modes without health get tired as the match goes on: eye bags only
+      SQ.gore = this.opts.gore !== false;
+      SQ.wear = this.phase === 'play' || this.phase === 'finale' || this.phase === 'outro' ? Math.min(0.3, (this.playT || 0) / 90) : this.phase === 'done' ? SQ.wear : 0;
       this.glitch = Math.max(0, this.glitch - realDt * 2.4);
       this.cam.update(realDt);
       this.fx.update(realDt * this.timeScale, realDt);
@@ -9697,7 +9785,7 @@ void main() {
 
   // ----- restore preferences -----
   const prefs = store.get('prefs2', {});
-  Object.assign(game.opts, { mode: prefs.mode || 'random', memes: prefs.memes != null ? prefs.memes : 1, speed: prefs.speed || 1, music: prefs.music || 'shuffle', record: prefs.record != null ? prefs.record : true, autoNext: !!prefs.autoNext, quality: prefs.quality || 'auto', voices: prefs.voices !== false, reel: prefs.reel !== false, fisheye: prefs.fisheye != null ? prefs.fisheye : 30, crt: prefs.crt != null ? prefs.crt : 35, static: prefs.static || 0, decay: prefs.decay != null ? prefs.decay : 4, transmission: typeof prefs.transmission === 'string' ? prefs.transmission : '', fragWords: prefs.fragWords || 1, fragIndex: prefs.fragIndex || 0, reboots: prefs.reboots || 0, mp4: prefs.mp4 !== false, cipher: prefs.cipher || 'none', ninth: prefs.ninth || 'rare', glitchNums: prefs.glitchNums !== false, clues: typeof prefs.clues === 'string' ? prefs.clues : '', spectro: typeof prefs.spectro === 'string' ? prefs.spectro : SQ.SPECTRO_WORD });
+  Object.assign(game.opts, { mode: prefs.mode || 'random', memes: prefs.memes != null ? prefs.memes : 1, speed: prefs.speed || 1, music: prefs.music || 'shuffle', record: prefs.record != null ? prefs.record : true, autoNext: !!prefs.autoNext, quality: prefs.quality || 'auto', voices: prefs.voices !== false, reel: prefs.reel !== false, fisheye: prefs.fisheye != null ? prefs.fisheye : 30, crt: prefs.crt != null ? prefs.crt : 35, static: prefs.static || 0, decay: prefs.decay != null ? prefs.decay : 4, transmission: typeof prefs.transmission === 'string' ? prefs.transmission : '', fragWords: prefs.fragWords || 1, fragIndex: prefs.fragIndex || 0, reboots: prefs.reboots || 0, mp4: prefs.mp4 !== false, gore: prefs.gore !== false, cipher: prefs.cipher || 'none', ninth: prefs.ninth || 'rare', glitchNums: prefs.glitchNums !== false, clues: typeof prefs.clues === 'string' ? prefs.clues : '', spectro: typeof prefs.spectro === 'string' ? prefs.spectro : SQ.SPECTRO_WORD });
   if (game.opts.music.startsWith('up')) game.opts.music = 'shuffle';
   fillMusic();
   const setRadio = (name, value) => {
@@ -9744,6 +9832,8 @@ void main() {
   };
   $('fisheye').value = game.opts.fisheye;
   $('crt').value = game.opts.crt;
+  $('gore').checked = game.opts.gore;
+  $('gore').addEventListener('change', (e) => ((game.opts.gore = e.target.checked), save()));
   $('crt').addEventListener('input', (e) => ((game.opts.crt = +e.target.value), save()));
   $('decay').value = String(game.opts.decay);
   if ($('decay').value === '') $('decay').value = '4';

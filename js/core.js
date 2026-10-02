@@ -554,6 +554,8 @@
     if (s >= 10 && o.face !== false) {
       if (s < 36 && o.face !== 'moai') drawSmallFace(ctx, s, o);
       else drawFace(ctx, s, o);
+      const hurt = SQ.gore ? (o.hurt != null ? o.hurt : SQ.wear) : 0;
+      if (hurt > 0.02) drawDamage(ctx, s, hurt, team, s < 36);
     }
 
     if (o.shield > 0) {
@@ -564,6 +566,69 @@
     }
     ctx.restore();
   };
+
+  // Battle damage, from 0 (fresh) to 1 (nearly out): purple bags under the eyes first, then a bruise,
+  // then a cut on the forehead that bleeds down the face. Cartoon style, drawn on top of the face.
+  SQ.gore = true;
+  SQ.wear = 0; // tiredness for modes without health: bags only, never blood
+  function drawDamage(ctx, s, hurt, team, small) {
+    const h = s / 2;
+    // which side the cut is on stays the same for each square
+    const side = (team.name.charCodeAt(0) + (team.name.length || 0)) % 2 ? 1 : -1;
+    const ex = s * 0.2;
+    const bagY = small ? -s * 0.1 + s * 0.17 : -s * 0.04 + s * 0.13;
+    const bagW = small ? s * 0.13 : s * 0.12;
+    const bagH = s * (0.035 + 0.05 * Math.min(1, hurt));
+    ctx.save();
+    ctx.fillStyle = `rgba(104, 38, 140, ${Math.min(0.8, 0.15 + hurt * 0.85)})`;
+    for (const sx of [-1, 1]) {
+      ctx.beginPath();
+      ctx.ellipse(sx * ex, bagY, bagW, bagH, 0, 0, Math.PI);
+      ctx.fill();
+    }
+    if (hurt > 0.45) {
+      // a bruise on the cheek opposite the cut
+      ctx.fillStyle = `rgba(118, 44, 150, ${Math.min(0.55, (hurt - 0.45) * 1.4)})`;
+      ctx.beginPath();
+      ctx.ellipse(-side * s * 0.3, s * 0.16, s * 0.09, s * 0.07, 0.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (hurt > 0.35 && !small) {
+      const k = Math.min(1, (hurt - 0.35) / 0.65);
+      const drip = (x, len, w) => {
+        ctx.strokeStyle = '#a3101c';
+        ctx.lineCap = 'round';
+        ctx.lineWidth = w;
+        ctx.beginPath();
+        ctx.moveTo(x, -h + s * 0.08);
+        ctx.lineTo(x, -h + s * 0.08 + len);
+        ctx.stroke();
+        ctx.fillStyle = '#a3101c';
+        ctx.beginPath();
+        ctx.arc(x, -h + s * 0.08 + len, w * 0.85, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.beginPath();
+        ctx.arc(x - w * 0.25, -h + s * 0.08 + len - w * 0.3, w * 0.25, 0, Math.PI * 2);
+        ctx.fill();
+      };
+      // the cut
+      ctx.strokeStyle = '#6e0a13';
+      ctx.lineWidth = s * 0.035;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(side * s * 0.26, -h + s * 0.1);
+      ctx.lineTo(side * s * 0.42, -h + s * 0.05);
+      ctx.stroke();
+      drip(side * s * 0.38, s * (0.12 + 0.42 * k), s * 0.06);
+      if (hurt > 0.7) drip(side * s * 0.29, s * (0.06 + 0.2 * (hurt - 0.7) / 0.3), s * 0.045);
+    } else if (hurt > 0.35 && small) {
+      // tiny squares just get a red mark
+      ctx.fillStyle = '#a3101c';
+      ctx.fillRect(side * s * 0.3 - s * 0.05, -h + s * 0.06, s * 0.1, s * (0.12 + 0.25 * hurt));
+    }
+    ctx.restore();
+  }
 
   // Blocky eyes made of plain rectangles: cheap enough for a hundred squares.
   function drawSmallFace(ctx, s, o) {
