@@ -138,7 +138,8 @@ With "Battle damage" on (Look tab, on by default) squares show what they have be
 purple bags under the eyes first, then a bruise and a black eye, then cuts that bleed down the
 face, splatter and a nosebleed as they lose health, all in cartoon style. Hits spray blood away from
 the hit, badly hurt squares leave a trail, and a knockout leaves a big splash; in the brawls and
-Domain Duel the floor keeps every stain. Modes without health only get tired eye bags as the
+Domain Duel the floor keeps every stain. In Bounce Brawl the knocked-out squares stay on the floor
+as faded, X-eyed bodies in a spreading pool, so the arena fills up as the fight goes on. Modes without health only get tired eye bags as the
 match goes on.
 
 ### The signal event and the hidden transmission

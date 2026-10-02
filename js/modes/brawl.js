@@ -496,6 +496,7 @@
         v.hp = 0;
         v.alive = false;
         v.dead = 0;
+        v.corpseA = (Math.random() - 0.5) * 0.9; // how the body comes to rest
         g.fx.voice(v, 'lose', true);
         g.hitstop(0.14);
         g.audio.explode();
@@ -566,6 +567,37 @@
       return n <= 2 ? 1 : n <= 3 ? 0.8 : 0.6;
     }
 
+    // A knocked-out square that stays: it slumps, tilts, loses its colour and bleeds out under itself.
+    drawBody(ctx, s) {
+      const t = this.teams[s.team];
+      if (!s.deadTeam) {
+        const mix = (a, b, k) => {
+          const pa = parseInt(a.slice(1), 16);
+          const pb = parseInt(b.slice(1), 16);
+          const ch = (sh) => Math.round(((pa >> sh) & 255) * (1 - k) + ((pb >> sh) & 255) * k);
+          return '#' + ((1 << 24) | (ch(16) << 16) | (ch(8) << 8) | ch(0)).toString(16).slice(1);
+        };
+        s.deadTeam = { name: t.name + '\u0000body', base: t.base, color: mix(t.color, '#3b3e4c', 0.5), dark: mix(t.dark, '#20222b', 0.45), light: mix(t.light, '#6a6d7a', 0.55) };
+      }
+      const k = Math.min(1, s.dead / 0.5); // the fall
+      const ease = 1 - Math.pow(1 - k, 3);
+      if (SQ.gore) {
+        // a pool that keeps spreading for a few seconds
+        const pool = s.size * (0.35 + 0.4 * Math.min(1, s.dead / 4));
+        ctx.fillStyle = 'rgba(110, 8, 20, 0.7)';
+        ctx.beginPath();
+        ctx.ellipse(s.x + s.size * 0.08, s.y + s.size * 0.12, pool, pool * 0.72, s.corpseA || 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      SQ.drawSquare(ctx, s.x, s.y, s.size * (1 - 0.08 * ease), s.deadTeam, {
+        mood: 'dead',
+        angle: (s.corpseA || 0) * ease,
+        squash: 0.1 * ease,
+        hurt: 1,
+        flash: 1 - k,
+      });
+    }
+
     draw(ctx) {
       ctx.fillStyle = '#1b1d27';
       ctx.fillRect(0, 0, 1000, 1000);
@@ -585,10 +617,12 @@
       // blood on the floor, under everything else
       this.blood.draw(ctx);
       for (const d of this.drops) SQ.drawItem(ctx, d.x, d.y, d.type, d.t, 54, d.life - d.t, d.wtype ? WEAPONS[d.wtype].icon : null);
+      // in Bounce Brawl the fallen stay where they dropped, under everyone still fighting
+      if (this.variant === 'grow') for (const s of this.sq) if (!s.alive) this.drawBody(ctx, s);
       for (const s of this.sq) {
         const t = this.teams[s.team];
         if (!s.alive) {
-          if (s.dead < 0.6) SQ.drawSquare(ctx, s.x, s.y, s.size * (1 - s.dead / 0.6), t, { mood: 'dead', alpha: 1 - s.dead / 0.6 });
+          if (this.variant !== 'grow' && s.dead < 0.6) SQ.drawSquare(ctx, s.x, s.y, s.size * (1 - s.dead / 0.6), t, { mood: 'dead', alpha: 1 - s.dead / 0.6 });
           continue;
         }
         if (s.w) this.drawWeapon(ctx, s);
