@@ -220,7 +220,9 @@ Then, from the project folder:
     python tools/make_videos.py --reboot            the first video plays the reboot event
 
 Other options: `--out FOLDER`, `--quality 720|1080`, `--no-reel`, `--speed 1|1.5|2`,
-`--static 0-100`, `--per-video 0|2|4|8|15`, `--fisheye 0-100`, `--crt 0-100`, `--headless`
+`--static 0-100`, `--per-video 0|2|4|8|15`, `--fisheye 0-100`, `--crt 0-100`,
+`--words 1|2|3` (words of the message per reboot), `--fragment N` (which fragment comes next),
+`--cipher none|shift|numbers`, `--grey rare|always|off`, `--gore on|off`, `--headless`
 (no window) and `--browser PATH`. The script keeps its own static level, next fragment and
 cycle count between runs, so a series carries on. It plays in real time, so 10 reels take about
 5 minutes; leave the window alone while it runs.

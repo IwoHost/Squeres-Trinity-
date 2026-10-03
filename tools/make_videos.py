@@ -14,6 +14,8 @@ Examples:
     python tools/make_videos.py -n 3 --mode marble  3 marble races
     python tools/make_videos.py --mode tournament   one tournament, every match its own part
     python tools/make_videos.py --reboot            the first video plays the reboot event
+    python tools/make_videos.py -n 6 --static 25 --per-video 15 --words 3 --fragment 1
+                                                    six videos, the sixth one reboots with the first three words
 
 The script keeps its own settings between runs (static level, which fragment is next, the cycle
 count) in tools/.profile, so a series carries on from one run to the next. Your settings from the
@@ -42,6 +44,11 @@ def main():
     ap.add_argument("--reboot", action="store_true", help="the first video plays the reboot event")
     ap.add_argument("--fisheye", type=int, help="fish-eye strength 0-100")
     ap.add_argument("--crt", type=int, help="CRT strength 0-100")
+    ap.add_argument("--words", type=int, choices=[1, 2, 3], help="words of the hidden message per reboot (changing it starts the message over)")
+    ap.add_argument("--fragment", type=int, help="which fragment the next reboot shows, from 1")
+    ap.add_argument("--cipher", choices=["none", "shift", "numbers"], help="how the fragment is shown: plain, letters shifted, or letters as numbers")
+    ap.add_argument("--grey", choices=["rare", "always", "off"], help="how often the grey square shows up")
+    ap.add_argument("--gore", choices=["on", "off"], help="battle damage and blood")
     ap.add_argument("--headless", action="store_true", help="no browser window (can be choppy on some computers)")
     ap.add_argument("--browser", help="path to a Chrome or Chromium program to use instead of finding one")
     a = ap.parse_args()
@@ -83,9 +90,16 @@ def main():
             "speed": a.speed,
             "quality": a.quality,
         }
-        for key, val in (("static", a.static), ("decay", a.per_video), ("fisheye", a.fisheye), ("crt", a.crt)):
+        for key, val in (("static", a.static), ("decay", a.per_video), ("fisheye", a.fisheye), ("crt", a.crt), ("cipher", a.cipher), ("ninth", a.grey)):
             if val is not None:
                 settings[key] = val
+        if a.gore is not None:
+            settings["gore"] = a.gore == "on"
+        if a.words is not None:
+            settings["fragWords"] = a.words
+            settings["fragIndex"] = 0
+        if a.fragment is not None:
+            settings["fragIndex"] = max(0, a.fragment - 1)
         page.evaluate(
             """([s, reboot]) => {
                 Object.assign(SQ.game.opts, s);
