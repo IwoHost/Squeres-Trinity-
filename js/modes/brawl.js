@@ -204,7 +204,7 @@
         s.blink -= dt;
         if (s.blink < -0.12) s.blink = rng.range(2, 5);
         // badly hurt squares leave a trail
-        if (SQ.gore && s.alive && s.hp < this.maxHp * 0.5) {
+        if (SQ.blood && s.alive && s.hp < this.maxHp * 0.5) {
           s.trailT = (s.trailT || 0) - dt;
           if (s.trailT <= 0 && Math.hypot(s.vx, s.vy) > 60) {
             s.trailT = s.hp < this.maxHp * 0.25 ? 0.12 : 0.25;
@@ -484,7 +484,7 @@
       if (by && by.megaT > 0) amt *= 1.5;
       v.hp -= amt;
       v.flash = 1;
-      if (SQ.gore) {
+      if (SQ.blood) {
         // drops fly off, away from whoever hit it, and land on the floor
         g.fx.burst(v.x, v.y, '#b3121f', 6 + Math.min(14, Math.round(amt / 2)), 300, 9);
         const dx = by ? v.x - by.x : Math.random() - 0.5;
@@ -501,7 +501,7 @@
         g.hitstop(0.14);
         g.audio.explode();
         g.fx.burst(v.x, v.y, this.teams[v.team].color, 60, 520, 14);
-        if (SQ.gore) {
+        if (SQ.blood) {
           g.fx.burst(v.x, v.y, '#b3121f', 50, 560, 12);
           this.blood.splash(v.x, v.y, v.size * 0.9);
         }
@@ -581,7 +581,7 @@
       }
       const k = Math.min(1, s.dead / 0.5); // the fall
       const ease = 1 - Math.pow(1 - k, 3);
-      if (SQ.gore) {
+      if (SQ.blood) {
         // a pool that keeps spreading for a few seconds
         const pool = s.size * (0.35 + 0.4 * Math.min(1, s.dead / 4));
         ctx.fillStyle = 'rgba(110, 8, 20, 0.7)';

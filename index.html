@@ -396,7 +396,11 @@ body.theater-on .fs-backdrop { display: block; }
         <div class="field"><label for="crt">CRT</label><input type="range" id="crt" min="0" max="100" step="5" value="35"></div>
         <div class="field"><label for="glitch-fx">Glitch</label><input type="range" id="glitch-fx" min="0" max="100" step="5" value="30"></div>
         <label class="toggle"><input type="checkbox" id="feed" checked> Camera overlay (REC, camera number, signal bars, timecode)</label>
-        <label class="toggle"><input type="checkbox" id="gore" checked> Battle damage (eye bags, bruises, cartoon blood)</label>
+        <div class="field"><label for="gore">Battle damage</label><select id="gore">
+          <option value="off">Off</option>
+          <option value="bruises">Bruises only (eye bags, bruises, black eyes)</option>
+          <option value="full">Full (bruises and cartoon blood)</option>
+        </select></div>
         <div class="field"><label for="static">Static <output id="static-val">0%</output></label><input type="range" id="static" min="0" max="100" step="1" value="0"></div>
         <div class="field"><label for="decay">Per video</label><select id="decay">
           <option value="0">Stays the same</option>

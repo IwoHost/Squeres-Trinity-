@@ -251,7 +251,7 @@
 
   // ----- restore preferences -----
   const prefs = store.get('prefs2', {});
-  Object.assign(game.opts, { mode: prefs.mode || 'random', memes: prefs.memes != null ? prefs.memes : 1, speed: prefs.speed || 1, music: prefs.music || 'shuffle', record: prefs.record != null ? prefs.record : true, autoNext: !!prefs.autoNext, quality: prefs.quality || 'auto', voices: prefs.voices !== false, reel: prefs.reel !== false, fisheye: prefs.fisheye != null ? prefs.fisheye : 30, crt: prefs.crt != null ? prefs.crt : 35, glitchFx: prefs.glitchFx != null ? prefs.glitchFx : 30, feed: prefs.feed !== false, static: prefs.static || 0, decay: prefs.decay != null ? prefs.decay : 4, transmission: typeof prefs.transmission === 'string' ? prefs.transmission : '', fragWords: prefs.fragWords || 1, fragIndex: prefs.fragIndex || 0, reboots: prefs.reboots || 0, mp4: prefs.mp4 !== false, gore: prefs.gore !== false, cipher: prefs.cipher || 'none', ninth: prefs.ninth || 'rare', glitchNums: prefs.glitchNums !== false, clues: typeof prefs.clues === 'string' ? prefs.clues : '', spectro: typeof prefs.spectro === 'string' ? prefs.spectro : SQ.SPECTRO_WORD });
+  Object.assign(game.opts, { mode: prefs.mode || 'random', memes: prefs.memes != null ? prefs.memes : 1, speed: prefs.speed || 1, music: prefs.music || 'shuffle', record: prefs.record != null ? prefs.record : true, autoNext: !!prefs.autoNext, quality: prefs.quality || 'auto', voices: prefs.voices !== false, reel: prefs.reel !== false, fisheye: prefs.fisheye != null ? prefs.fisheye : 30, crt: prefs.crt != null ? prefs.crt : 35, glitchFx: prefs.glitchFx != null ? prefs.glitchFx : 30, feed: prefs.feed !== false, static: prefs.static || 0, decay: prefs.decay != null ? prefs.decay : 4, transmission: typeof prefs.transmission === 'string' ? prefs.transmission : '', fragWords: prefs.fragWords || 1, fragIndex: prefs.fragIndex || 0, reboots: prefs.reboots || 0, mp4: prefs.mp4 !== false, gore: SQ.goreLevel(prefs.gore), cipher: prefs.cipher || 'none', ninth: prefs.ninth || 'rare', glitchNums: prefs.glitchNums !== false, clues: typeof prefs.clues === 'string' ? prefs.clues : '', spectro: typeof prefs.spectro === 'string' ? prefs.spectro : SQ.SPECTRO_WORD });
   if (game.opts.music.startsWith('up')) game.opts.music = 'shuffle';
   fillMusic();
   const setRadio = (name, value) => {
@@ -298,8 +298,8 @@
   };
   $('fisheye').value = game.opts.fisheye;
   $('crt').value = game.opts.crt;
-  $('gore').checked = game.opts.gore;
-  $('gore').addEventListener('change', (e) => ((game.opts.gore = e.target.checked), save()));
+  $('gore').value = game.opts.gore;
+  $('gore').addEventListener('change', (e) => ((game.opts.gore = e.target.value), save()));
   $('crt').addEventListener('input', (e) => ((game.opts.crt = +e.target.value), save()));
   $('glitch-fx').value = game.opts.glitchFx;
   $('glitch-fx').addEventListener('input', (e) => ((game.opts.glitchFx = +e.target.value), save()));

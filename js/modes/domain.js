@@ -78,7 +78,7 @@
         for (const k of ['shieldT', 'boost', 'rage', 'big', 'frozen']) s[k] -= dt;
         s.size = SQ.lerp(s.size, s.big > 0 ? 160 : s.base, Math.min(1, dt * 4));
         // badly hurt squares leave a trail
-        if (SQ.gore && s.hp < this.maxHp * 0.5) {
+        if (SQ.blood && s.hp < this.maxHp * 0.5) {
           s.trailT = (s.trailT || 0) - dt;
           if (s.trailT <= 0 && Math.hypot(s.vx, s.vy) > 60) {
             s.trailT = s.hp <= 2 ? 0.1 : 0.22;
@@ -236,7 +236,7 @@
         const dmg = (crit ? 3 : 1) * (atk.rage > 0 ? 2 : 1);
         v.hp = Math.max(0, v.hp - dmg);
         v.flash = 1;
-        if (SQ.gore) {
+        if (SQ.blood) {
           g.fx.burst(v.x, v.y, '#b3121f', 8 + dmg * 3, 300, 10);
           this.blood.spray(v.x, v.y, v.x - atk.x, v.y - atk.y, dmg * 8);
         }
@@ -248,7 +248,7 @@
           g.hitstop(0.14);
           g.audio.explode();
           g.fx.burst(v.x, v.y, this.teams[v.team].color, 60, 520, 18);
-          if (SQ.gore) {
+          if (SQ.blood) {
             g.fx.burst(v.x, v.y, '#b3121f', 50, 560, 14);
             this.blood.splash(v.x, v.y, v.size * 0.8);
           }

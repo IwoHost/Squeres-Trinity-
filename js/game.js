@@ -96,6 +96,8 @@
   // Default clues for the hidden frame in each reboot video, one per line; "|" breaks a line.
   SQ.CLUES = 'CYCLE 0\nTHERE WERE|NINE\nCOUNT THE|FRAGMENTS\nTHE FRAME|IS NOT ASLEEP\n03:33\nASK THE|GREY ONE\nWHO IS|WATCHING\nKEEP|WATCHING';
   SQ.SPECTRO_WORD = 'WE ARE FUEL';
+  // older settings saved battle damage as true or false
+  SQ.goreLevel = (v) => (v === false || v === 'off' ? 'off' : v === 'bruises' ? 'bruises' : 'full');
   SQ.clueList = (text) => String(text || SQ.CLUES).split('\n').map((l) => l.trim()).filter(Boolean);
   SQ.pick = (list) => list[Math.floor(Math.random() * list.length)];
   SQ.fmtClock = (t) => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, '0')}`;
@@ -138,7 +140,7 @@
       this.cam = new SQ.Camera();
       this.fx = new SQ.FX(this);
       this.recorder = new Recorder();
-      this.opts = { mode: 'random', memes: 1, speed: 1, music: 'shuffle', record: false, autoNext: false, quality: 'auto', voices: true, reel: true, fisheye: 30, crt: 35, glitchFx: 30, feed: true, static: 0, decay: 4, gore: true };
+      this.opts = { mode: 'random', memes: 1, speed: 1, music: 'shuffle', record: false, autoNext: false, quality: 'auto', voices: true, reel: true, fisheye: 30, crt: 35, glitchFx: 30, feed: true, static: 0, decay: 4, gore: 'full' };
       this.setQuality('auto');
       this.fixedDt = 1 / 60;
       this.hitstopT = 0;
@@ -732,7 +734,10 @@
       if (P === 'idle' && m.winner) this.makeIdle();
       this.updateReboot(realDt);
       // modes without health get tired as the match goes on: eye bags only
-      SQ.gore = this.opts.gore !== false;
+      // battle damage: 'off', 'bruises' (eye bags, bruises, black eyes) or 'full' (with blood)
+      const gore = SQ.goreLevel(this.opts.gore);
+      SQ.gore = gore !== 'off';
+      SQ.blood = gore === 'full';
       SQ.wear = this.phase === 'play' || this.phase === 'finale' || this.phase === 'outro' ? Math.min(0.3, (this.playT || 0) / 90) : this.phase === 'done' ? SQ.wear : 0;
       this.glitch = Math.max(0, this.glitch - realDt * 2.4);
       this.updateGlitchFx(realDt);

@@ -569,7 +569,8 @@
 
   // Battle damage, from 0 (fresh) to 1 (nearly out): purple bags under the eyes first, then a bruise,
   // then a cut on the forehead that bleeds down the face. Cartoon style, drawn on top of the face.
-  SQ.gore = true;
+  SQ.gore = true; // eye bags and bruises
+  SQ.blood = true; // cuts, drips, sprays and pools on top of that
   SQ.wear = 0; // tiredness for modes without health: bags only, never blood
   function drawDamage(ctx, s, hurt, team, small) {
     const h = s / 2;
@@ -604,7 +605,7 @@
       ctx.fill();
     }
     if (small) {
-      if (hurt > 0.25) {
+      if (SQ.blood && hurt > 0.25) {
         ctx.fillStyle = BLOOD;
         ctx.fillRect(side * s * 0.3 - s * 0.06, -h + s * 0.05, s * 0.12, s * (0.15 + 0.35 * hurt));
         if (hurt > 0.6) ctx.fillRect(-side * s * 0.15 - s * 0.05, -h + s * 0.05, s * 0.1, s * 0.25 * hurt);
@@ -612,7 +613,7 @@
       ctx.restore();
       return;
     }
-    if (hurt > 0.25) {
+    if (SQ.blood && hurt > 0.25) {
       const k = Math.min(1, (hurt - 0.25) / 0.75);
       const drip = (x, len, w) => {
         ctx.strokeStyle = BLOOD;
@@ -678,7 +679,7 @@
       this.max = max || 220;
     }
     add(x, y, rx, ry, a) {
-      if (!SQ.gore) return;
+      if (!SQ.blood) return;
       if (this.stains.length >= this.max) this.stains.shift();
       this.stains.push({ x, y, rx, ry: ry || rx * 0.75, a: a != null ? a : Math.random() * 6, dark: Math.random() < 0.35 });
     }
@@ -704,7 +705,7 @@
       }
     }
     draw(ctx) {
-      if (!SQ.gore || !this.stains.length) return;
+      if (!SQ.blood || !this.stains.length) return;
       for (const st of this.stains) {
         ctx.fillStyle = st.dark ? 'rgba(98, 6, 16, 0.7)' : 'rgba(150, 12, 26, 0.62)';
         ctx.beginPath();

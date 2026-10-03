@@ -50,7 +50,7 @@ def main():
     ap.add_argument("--fragment", type=int, help="which fragment the next reboot shows, from 1")
     ap.add_argument("--cipher", choices=["none", "shift", "numbers"], help="how the fragment is shown: plain, letters shifted, or letters as numbers")
     ap.add_argument("--grey", choices=["rare", "always", "off"], help="how often the grey square shows up")
-    ap.add_argument("--gore", choices=["on", "off"], help="battle damage and blood")
+    ap.add_argument("--gore", choices=["off", "bruises", "on"], help="battle damage: off, bruises only, or on (bruises and blood)")
     ap.add_argument("--headless", action="store_true", help="no browser window (can be choppy on some computers)")
     ap.add_argument("--browser", help="path to a Chrome or Chromium program to use instead of finding one")
     a = ap.parse_args()
@@ -98,7 +98,7 @@ def main():
         if a.overlay is not None:
             settings["feed"] = a.overlay == "on"
         if a.gore is not None:
-            settings["gore"] = a.gore == "on"
+            settings["gore"] = "full" if a.gore == "on" else a.gore
         if a.words is not None:
             settings["fragWords"] = a.words
             settings["fragIndex"] = 0
