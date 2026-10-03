@@ -199,6 +199,7 @@
     newMatch(seed, o) {
       o = o || {};
       this.audio.init();
+      if (!o.tour) this.promo = null;
       this.setPaused(false);
       if (!o.tour) {
         this.recorder.abort(); // a match or tournament cut short is not saved
@@ -612,6 +613,7 @@
     }
 
     tick(realDt) {
+      if (this.promo) return this.tickPromo(realDt);
       const m = this.mode;
       const P = this.phase;
       let simulate = P === 'play' || P === 'finale' || P === 'outro' || P === 'idle' || P === 'done';
@@ -761,6 +763,7 @@
     // ---------------- tournament ----------------
     newTournament(seed) {
       this.audio.init();
+      this.promo = null;
       this.episode++;
       this.seed = seed != null ? seed >>> 0 : SQ.randomSeed();
       const rng = SQ.makeRng(this.seed);
@@ -1015,6 +1018,7 @@
       const m = this.mode;
       ctx.setTransform(SQ.RES, 0, 0, SQ.RES, 0, 0);
       this.drawBackdrop(ctx);
+      if (this.promo) return this.drawPromo(ctx);
       if (this.tour && (this.phase === 'bracket' || this.phase === 'champion' || (this.phase === 'done' && this.tour.champion))) {
         this.drawBracket(ctx);
         this.fx.drawScreen(ctx);
@@ -1101,10 +1105,10 @@
       text(r ? 'REC  NO SIGNAL' : 'REC', x0 + 50, ty, 'left');
       // the camera number reads 09 while the grey square is in the picture
       const n = this.myst && this.myst.ninth;
-      const ninthUp = (n && this.phase === 'play' && this.playT >= n.at && this.playT < n.at + n.dur) || (r && r.t > 2.2 && r.t < r.end - 0.6);
+      const ninthUp = (n && this.phase === 'play' && this.playT >= n.at && this.playT < n.at + n.dur) || (r && r.t > 2.2 && r.t < r.end - 0.6) || (this.promo && this.promo.ninthUp);
       const cyc = this.cycle || this.episode || 1;
       const cam = ninthUp ? 9 : ((cyc - 1) % 8) + 1;
-      if (ninthUp && this.myst && !this.myst.camLogged) {
+      if (ninthUp && this.myst && !this.myst.camLogged && !this.promo) {
         this.myst.camLogged = true;
         this.myst.log.push(`${SQ.fmtClock(this.videoT)} the camera label switched to CAM 09 while the grey square was there`);
       }
@@ -1472,7 +1476,7 @@
       ctx.textBaseline = 'middle';
       ctx.fillStyle = 'rgba(255,255,255,0.45)';
       ctx.textAlign = 'left';
-      if (this.phase !== 'idle') ctx.fillText(this.glitchText('seed') || `seed ${this.seed}`, 44, SQ.H - 44);
+      if (this.phase !== 'idle') ctx.fillText(this.promo ? 'sector files' : this.glitchText('seed') || `seed ${this.seed}`, 44, SQ.H - 44);
       ctx.textAlign = 'right';
       if (this.track && this.phase !== 'idle') {
         const a = this.trackToast > 0 ? 1 : 0.45;

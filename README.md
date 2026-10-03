@@ -141,6 +141,16 @@ picture the camera number reads 09; the match info notes when.
 The static belongs to a series, not a single video: with "Per video" set, every finished video adds
 a little more, so a run of posts slowly loses its signal. Within a video it stays steady.
 
+### Promo video: Meet the Sectors
+
+The Video tab's "Promo video" records an introduction instead of a match, with your Look settings.
+"All eight" (about 32 seconds) opens on "Eight Sectors. One comes out.", gives each square a
+3-second file card (name, Sector, type, home and rival) and ends on a grid of all eight with
+"Comment your color". The grid has nine places; for about a second something grey stands in the
+last one and the camera reads CAM 09. Picking one square (about 13 seconds) shows its whole story
+instead. Both come with a caption in the match info. From the script: `--promo all`,
+`--promo each` (eight videos, one per square) or `--promo red` and so on.
+
 ### Battle damage
 
 "Battle damage" (Look tab) has three levels: Off; Bruises only, which keeps the eye bags, bruises

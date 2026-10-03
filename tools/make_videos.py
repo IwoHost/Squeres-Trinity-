@@ -14,6 +14,8 @@ Examples:
     python tools/make_videos.py -n 3 --mode marble  3 marble races
     python tools/make_videos.py --mode tournament   one tournament, every match its own part
     python tools/make_videos.py --reboot            the first video plays the reboot event
+    python tools/make_videos.py --promo all         the Meet the Sectors promo with all eight squares
+    python tools/make_videos.py --promo each        eight promos, one square each
     python tools/make_videos.py -n 6 --static 25 --per-video 15 --words 3 --fragment 1
                                                     six videos, the sixth one reboots with the first three words
 
@@ -28,6 +30,7 @@ import sys
 import time
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+PROMO = ["all", "each", "red", "green", "blue", "yellow", "purple", "cyan", "orange", "pink"]
 MODES = ["random", "chase", "territory", "domain", "race", "brawl", "bounce", "marble", "hill", "tournament"]
 
 
@@ -51,6 +54,7 @@ def main():
     ap.add_argument("--cipher", choices=["none", "shift", "numbers"], help="how the fragment is shown: plain, letters shifted, or letters as numbers")
     ap.add_argument("--grey", choices=["rare", "always", "off"], help="how often the grey square shows up")
     ap.add_argument("--gore", choices=["off", "bruises", "on"], help="battle damage: off, bruises only, or on (bruises and blood)")
+    ap.add_argument("--promo", choices=PROMO, help="make the Meet the Sectors promo instead of matches: all eight, each one, or one color")
     ap.add_argument("--headless", action="store_true", help="no browser window (can be choppy on some computers)")
     ap.add_argument("--browser", help="path to a Chrome or Chromium program to use instead of finding one")
     a = ap.parse_args()
@@ -115,12 +119,17 @@ def main():
         if not page.evaluate("() => SQ.game.recorder.supported"):
             sys.exit("This browser cannot record video. Install Chrome, or run:  python -m playwright install chromium")
 
-        total = 1 if a.mode == "tournament" else a.count
-        print(f"Making {total} {'tournament' if a.mode == 'tournament' else 'video' + ('s' if total != 1 else '')} into {out}")
+        if a.promo:
+            jobs = ["Red", "Green", "Blue", "Yellow", "Purple", "Cyan", "Orange", "Pink"] if a.promo == "each" else [""] if a.promo == "all" else [a.promo.capitalize()]
+        else:
+            jobs = [None] * (1 if a.mode == "tournament" else a.count)
+        total = len(jobs)
+        what = "promo" if a.promo else "tournament" if a.mode == "tournament" else "video"
+        print(f"Making {total} {what}{'s' if total != 1 and what != 'tournament' else ''} into {out}")
         state = {}
-        for i in range(total):
+        for i, who in enumerate(jobs):
             t0 = time.time()
-            res = page.evaluate("() => SQ.makeOne()")
+            res = page.evaluate("(w) => SQ.makePromo(w)", who) if who is not None else page.evaluate("() => SQ.makeOne()")
             for f in res["files"]:
                 (out / f["name"]).write_bytes(base64.b64decode(f["data"]))
                 if not f["name"].endswith(".txt"):

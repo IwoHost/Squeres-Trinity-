@@ -455,6 +455,35 @@
     else status(game.opts.record ? 'The next match will be recorded.' : 'Recording is off.');
   }
   $('start').addEventListener('click', () => start());
+
+  // ----- promo: Meet the Sectors -----
+  function fillPromoWho() {
+    const sel = $('promo-who');
+    const keep = sel.value;
+    sel.innerHTML = '';
+    const add = (value, label) => {
+      const o = document.createElement('option');
+      o.value = value;
+      o.textContent = label;
+      sel.appendChild(o);
+    };
+    add('', 'All eight');
+    SQ.TEAMS.forEach((t) => add(t.base, `${t.name} only`));
+    sel.value = keep;
+  }
+  fillPromoWho();
+  $('promo-who').addEventListener('focus', fillPromoWho); // names can be changed in the World tab
+  function startPromo(who) {
+    game.newPromo(who);
+    keepAwake();
+    $('parts').innerHTML = '';
+    $('parts').hidden = true;
+    showInfo('');
+    $('overlay').hidden = true;
+    $('save').hidden = true;
+    status(game.recorder.active ? 'Recording the promo…' : 'Recording is off; the promo plays without saving.');
+  }
+  $('promo-start').addEventListener('click', () => startPromo($('promo-who').value));
   $('overlay-start').addEventListener('click', () => start());
   $('replay').addEventListener('click', () => start(game.seed != null ? game.seed : undefined));
 
@@ -541,6 +570,11 @@
       batchWait = { resolve, items: [] };
       start();
     });
+  SQ.makePromo = (who) =>
+    new Promise((resolve) => {
+      batchWait = { resolve, items: [] };
+      startPromo(who || '');
+    });
   async function batchFinish(video) {
     const w = batchWait;
     batchWait = null;
@@ -557,7 +591,7 @@
     if (batchWait) batchWait.items.push(v);
   });
 
-  game.on('done', async ({ winner, video }) => {
+  game.on('done', async ({ winner, video, promo }) => {
     if (batchWait) batchFinish(game.tour ? null : video);
     // the last tournament part may still be on its way to the folder
     if (farm.pending) await farm.pending;
@@ -570,7 +604,7 @@
       setTimeout(() => farm.on && start(), 2500);
       return;
     }
-    $('overlay-title').textContent = winner ? winner.text : 'Match over';
+    $('overlay-title').textContent = winner ? winner.text : promo ? 'Promo done' : 'Match over';
     $('overlay-text').textContent = 'Ready for another one?';
     $('overlay-start').textContent = game.opts.mode === 'tournament' ? 'New tournament' : 'Next match';
     $('overlay').classList.add('compact');
@@ -584,7 +618,7 @@
       }, 2500);
     }
     if (game.tour && game.videos.length) status(`Tournament recorded in ${game.videos.length} parts. Save the ones you want.`);
-    showInfo(video && video.info ? `File: ${video.name}\n\n${video.info}` : game.mode && game.mode.winner ? game.matchInfo().file : '');
+    showInfo(video && video.info ? `File: ${video.name}\n\n${video.info}` : !promo && game.mode && game.mode.winner ? game.matchInfo().file : '');
     if (video) {
       const mb = (video.blob.size / 1048576).toFixed(1);
       $('save').hidden = false;
