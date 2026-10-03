@@ -1,4 +1,5 @@
-// Screen effects over the finished frame: a fish-eye bulge, blue glass shading and a CRT look on the game square, and TV static.
+// Screen effects over the finished frame: a fish-eye bulge, blue glass shading and a CRT look on the game square,
+// TV static, and an always-on glitch look.
 // The game draws into an offscreen 2D canvas; this pass copies it to the visible (and recorded) canvas with WebGL.
 (function () {
   const SQ = window.SQ;
@@ -22,6 +23,9 @@ uniform float fish;    // 0..1 bulge strength
 uniform float crt;     // 0..1 old tube look on the game square: scanlines, phosphor grid, glow
 uniform float noise;   // 0..1 how much static is on screen right now
 uniform float glitch;  // 0..1 burst when something big happens
+uniform float drift;   // 0..1 always-on glitch look: colors slightly apart, a slow tracking line
+uniform float gev;     // 0..1 strength of the glitch hit happening right now (0 between hits)
+uniform float gseed;   // the look of the current hit; changes at most 4 times a second
 uniform float seed;    // changes every frame, only for the fine grain (tiny dots average out, so nothing flashes)
 uniform float slow;    // changes about 3 times a second: anything big, like torn rows, moves no faster than that
 uniform float time;    // seconds, for the slow rolling bar
@@ -49,6 +53,20 @@ void main() {
     u = box.xy + (s + 0.5) * size;
   }
   vec2 tube = u; // where this pixel sits on the curved tube, before any tearing
+  // glitch hits: a few slices of the picture jump sideways and small blocks slip.
+  // Only positions move, never brightness, so nothing flashes.
+  float hitS = 0.0;
+  if (gev > 0.0) {
+    float slice = floor(uv.y * 36.0 + gseed * 3.0);
+    hitS = step(1.0 - gev * 0.22, rand(vec2(slice, gseed)));
+    u.x += hitS * (rand(vec2(slice, gseed + 2.0)) - 0.5) * 0.08 * gev;
+    vec2 blk = floor(uv * vec2(14.0, 40.0));
+    float hitB = step(1.0 - gev * 0.06, rand(blk + gseed * 1.7));
+    u += hitB * (vec2(rand(blk + 3.1), rand(blk + 5.7)) - 0.5) * vec2(0.06, 0.012);
+  }
+  // a thin tracking line that crawls down the picture
+  float trk = fract(uv.y * 0.6 - time * 0.05);
+  u.x += smoothstep(0.0, 0.01, trk) * smoothstep(0.03, 0.01, trk) * drift * 0.005;
   float row = floor(uv.y * res.y / 3.0);
   // torn rows: a few bands slide sideways, more with static, a lot during a glitch
   float band = floor(uv.y * 48.0 + slow * 7.0);
@@ -59,7 +77,7 @@ void main() {
   float bar = smoothstep(0.0, 0.08, roll) * smoothstep(0.2, 0.08, roll);
   u.x += bar * noise * 0.006;
   // colors split apart during a glitch
-  float split = glitch * 0.012 + noise * 0.0025;
+  float split = glitch * 0.012 + noise * 0.0025 + drift * 0.0025 + hitS * gev * 0.012;
   vec3 col;
   col.r = texture2D(tex, u + vec2(split, 0.0)).r;
   col.g = texture2D(tex, u).g;
@@ -143,12 +161,13 @@ void main() {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       this.gl = gl;
       this.u = {};
-      for (const k of ['fish', 'crt', 'noise', 'glitch', 'seed', 'slow', 'time', 'res', 'box']) this.u[k] = gl.getUniformLocation(prog, k);
+      for (const k of ['fish', 'crt', 'noise', 'glitch', 'drift', 'gev', 'gseed', 'seed', 'slow', 'time', 'res', 'box']) this.u[k] = gl.getUniformLocation(prog, k);
       this.ok = true;
     }
 
     // Copies the scene to the screen with the effects applied.
-    draw(scene, fish, noise, glitch, crt) {
+    // g: the glitch look, { drift, hit, seed }
+    draw(scene, fish, noise, glitch, crt, g) {
       const gl = this.gl;
       if (this.view.width !== scene.width || this.view.height !== scene.height) {
         this.view.width = scene.width;
@@ -160,6 +179,9 @@ void main() {
       gl.uniform1f(this.u.crt, crt || 0);
       gl.uniform1f(this.u.noise, noise);
       gl.uniform1f(this.u.glitch, glitch);
+      gl.uniform1f(this.u.drift, g ? g.drift : 0);
+      gl.uniform1f(this.u.gev, g ? g.hit : 0);
+      gl.uniform1f(this.u.gseed, g ? g.seed : 0);
       gl.uniform1f(this.u.seed, (Math.random() * 97) | 0);
       const now = performance.now() / 1000;
       gl.uniform1f(this.u.slow, Math.floor(now * 3) % 97);

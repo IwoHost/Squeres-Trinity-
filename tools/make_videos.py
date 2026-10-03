@@ -44,6 +44,8 @@ def main():
     ap.add_argument("--reboot", action="store_true", help="the first video plays the reboot event")
     ap.add_argument("--fisheye", type=int, help="fish-eye strength 0-100")
     ap.add_argument("--crt", type=int, help="CRT strength 0-100")
+    ap.add_argument("--glitch", type=int, help="always-on glitch strength 0-100")
+    ap.add_argument("--overlay", choices=["on", "off"], help="camera overlay: REC, camera number, signal bars, timecode")
     ap.add_argument("--words", type=int, choices=[1, 2, 3], help="words of the hidden message per reboot (changing it starts the message over)")
     ap.add_argument("--fragment", type=int, help="which fragment the next reboot shows, from 1")
     ap.add_argument("--cipher", choices=["none", "shift", "numbers"], help="how the fragment is shown: plain, letters shifted, or letters as numbers")
@@ -90,9 +92,11 @@ def main():
             "speed": a.speed,
             "quality": a.quality,
         }
-        for key, val in (("static", a.static), ("decay", a.per_video), ("fisheye", a.fisheye), ("crt", a.crt), ("cipher", a.cipher), ("ninth", a.grey)):
+        for key, val in (("static", a.static), ("decay", a.per_video), ("fisheye", a.fisheye), ("crt", a.crt), ("glitchFx", a.glitch), ("cipher", a.cipher), ("ninth", a.grey)):
             if val is not None:
                 settings[key] = val
+        if a.overlay is not None:
+            settings["feed"] = a.overlay == "on"
         if a.gore is not None:
             settings["gore"] = a.gore == "on"
         if a.words is not None:

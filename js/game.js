@@ -132,12 +132,13 @@
       this.canvas = this.post ? document.createElement('canvas') : canvas;
       this.ctx = this.canvas.getContext('2d', { alpha: false });
       this.glitch = 0;
+      this.gfx = { drift: 0, hit: 0, seed: 0, left: 0, step: 0, next: 2 };
       this.reboot = null; // the signal event, when the static has run its course
       this.audio = new SQ.AudioEngine();
       this.cam = new SQ.Camera();
       this.fx = new SQ.FX(this);
       this.recorder = new Recorder();
-      this.opts = { mode: 'random', memes: 1, speed: 1, music: 'shuffle', record: false, autoNext: false, quality: 'auto', voices: true, reel: true, fisheye: 30, crt: 35, static: 0, decay: 4, gore: true };
+      this.opts = { mode: 'random', memes: 1, speed: 1, music: 'shuffle', record: false, autoNext: false, quality: 'auto', voices: true, reel: true, fisheye: 30, crt: 35, glitchFx: 30, feed: true, static: 0, decay: 4, gore: true };
       this.setQuality('auto');
       this.fixedDt = 1 / 60;
       this.hitstopT = 0;
@@ -391,6 +392,35 @@
         }
       }
       if (r.done && SQ.stare > 0) SQ.stare = Math.max(0, SQ.stare - realDt * 1.5);
+    }
+
+    // The always-on glitch look: every few seconds a short hit where slices of the picture jump.
+    // A hit changes its look at most 4 times a second and never changes brightness, so it is flash-safe.
+    updateGlitchFx(dt) {
+      const d = (this.opts.glitchFx || 0) / 100;
+      const g = this.gfx;
+      g.drift = d;
+      if (!d) {
+        g.hit = g.left = 0;
+        return;
+      }
+      if (g.left > 0) {
+        g.left -= dt;
+        g.step -= dt;
+        if (g.step <= 0) {
+          g.seed = (Math.random() * 97) | 0;
+          g.step = 0.25;
+        }
+        if (g.left <= 0) g.hit = 0;
+        return;
+      }
+      g.next -= dt;
+      if (g.next > 0) return;
+      g.left = 0.2 + Math.random() * 0.35;
+      g.hit = d * (0.5 + 0.5 * Math.random());
+      g.step = 0;
+      // stronger glitch, more hits: about every 4 s at 30, every 1.5 s at 100
+      g.next = (5.2 - 3.7 * d) * (0.5 + Math.random());
     }
 
     // The small mysteries of a video, decided when it starts: whether the grey square shows up and
@@ -705,6 +735,7 @@
       SQ.gore = this.opts.gore !== false;
       SQ.wear = this.phase === 'play' || this.phase === 'finale' || this.phase === 'outro' ? Math.min(0.3, (this.playT || 0) / 90) : this.phase === 'done' ? SQ.wear : 0;
       this.glitch = Math.max(0, this.glitch - realDt * 2.4);
+      this.updateGlitchFx(realDt);
       this.cam.update(realDt);
       this.fx.update(realDt * this.timeScale, realDt);
       if (this.trackToast > 0) this.trackToast -= realDt;
@@ -944,7 +975,7 @@
       // a gentle curve: the first videos of a series only get a faint grain; steady for the whole video
       const noise = Math.pow(amt, 1.3);
       const glitch = amt > 0 ? this.glitch * (0.4 + 0.6 * amt) : 0;
-      if (this.post) this.post.draw(this.canvas, (this.opts.fisheye || 0) / 100, noise, glitch, (this.opts.crt || 0) / 100);
+      if (this.post) this.post.draw(this.canvas, (this.opts.fisheye || 0) / 100, noise, glitch, (this.opts.crt || 0) / 100, this.gfx);
       else if (noise + glitch > 0.01) this.drawStatic2D(noise + glitch * 0.6);
     }
 
@@ -1006,6 +1037,7 @@
       this.drawWinnerMeme(ctx);
       ctx.restore();
       this.drawNinth(ctx);
+      this.drawFeed(ctx);
 
       this.drawBelow(ctx);
       if (m.drawScreen && this.phase !== 'idle') m.drawScreen(ctx);
@@ -1017,6 +1049,76 @@
       if (this.phase === 'done') this.drawEndCard(ctx);
       this.drawFooter(ctx);
       this.drawHiddenFrame(ctx);
+    }
+
+    // The camera overlay: the match looks like footage from the Frame's own cameras. REC, the camera
+    // number, signal bars that drop as the static of the series climbs, and a running timecode.
+    drawFeed(ctx) {
+      if (this.opts.feed === false || this.phase === 'idle' || this.phase === 'intro') return;
+      const A = SQ.ARENA;
+      const x0 = A.x + 22;
+      const y0 = A.y + 22;
+      const x1 = A.x + A.size - 22;
+      const y1 = A.y + A.size - 22;
+      const r = this.reboot && !this.reboot.done ? this.reboot : null;
+      ctx.save();
+      ctx.lineCap = 'square';
+      ctx.lineJoin = 'miter';
+      // viewfinder corners
+      ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+      ctx.lineWidth = 4;
+      const L = 46;
+      for (const [x, y, sx, sy] of [[x0, y0, 1, 1], [x1, y0, -1, 1], [x0, y1, 1, -1], [x1, y1, -1, -1]]) {
+        ctx.beginPath();
+        ctx.moveTo(x, y + sy * L);
+        ctx.lineTo(x, y);
+        ctx.lineTo(x + sx * L, y);
+        ctx.stroke();
+      }
+      ctx.font = `700 27px ui-monospace, Menlo, Consolas, monospace`;
+      ctx.textBaseline = 'middle';
+      ctx.lineWidth = 5;
+      ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+      const text = (t, x, y, align, color) => {
+        ctx.textAlign = align;
+        ctx.strokeText(t, x, y);
+        ctx.fillStyle = color || 'rgba(255,255,255,0.8)';
+        ctx.fillText(t, x, y);
+      };
+      // REC with a dot that breathes slowly (a soft fade, not a blink)
+      const ty = y0 + 34;
+      ctx.globalAlpha = 0.5 + 0.4 * (0.5 + 0.5 * Math.sin(this.real * 2.4));
+      ctx.fillStyle = '#ff3b3b';
+      ctx.beginPath();
+      ctx.arc(x0 + 30, ty, 9, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      text(r ? 'REC  NO SIGNAL' : 'REC', x0 + 50, ty, 'left');
+      // the camera number reads 09 while the grey square is in the picture
+      const n = this.myst && this.myst.ninth;
+      const ninthUp = (n && this.phase === 'play' && this.playT >= n.at && this.playT < n.at + n.dur) || (r && r.t > 2.2 && r.t < r.end - 0.6);
+      const cyc = this.cycle || this.episode || 1;
+      const cam = ninthUp ? 9 : ((cyc - 1) % 8) + 1;
+      if (ninthUp && this.myst && !this.myst.camLogged) {
+        this.myst.camLogged = true;
+        this.myst.log.push(`${SQ.fmtClock(this.videoT)} the camera label switched to CAM 09 while the grey square was there`);
+      }
+      text(`CAM ${String(cam).padStart(2, '0')}`, x1 - 30, ty, 'right');
+      // signal bars: five when the series starts clean, fewer as the static climbs, none when it is lost
+      const sig = r ? 0 : Math.max(1, Math.ceil((100 - (this.opts.static || 0)) / 20));
+      const bx = x1 - 160;
+      for (let i = 0; i < 5; i++) {
+        const h = 8 + i * 5;
+        ctx.fillStyle = i < sig ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.18)';
+        ctx.fillRect(bx - (4 - i) * 11, ty + 11 - h, 7, h);
+      }
+      // running timecode of this video
+      const t = this.videoT || 0;
+      const p2 = (v) => String(Math.floor(v)).padStart(2, '0');
+      const by = y1 - 34;
+      text(`CYCLE ${String(cyc).padStart(3, '0')}  ${p2(t / 3600)}:${p2((t / 60) % 60)}:${p2(t % 60)}:${p2((t % 1) * 30)}`, x0 + 30, by, 'left');
+      text('LIVE FEED', x1 - 30, by, 'right');
+      ctx.restore();
     }
 
     drawBackdrop(ctx) {

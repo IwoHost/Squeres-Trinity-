@@ -129,6 +129,15 @@ The Look tab gives the game square a fish-eye lens with a light blue glass shade
 square stays flat. Both are in the recorded video. They need WebGL; without it the static still
 shows as grain.
 
+"Glitch" adds a glitch look that is always there: colors slightly apart, a thin tracking line
+crawling down, and every few seconds a short hit where slices of the picture jump sideways (more
+often the higher it is). Only positions move, never brightness, so it does not flash.
+
+"Camera overlay" makes the match look like camera footage: viewfinder corners, a slowly breathing
+REC dot, the camera number, signal bars that drop as the static of the series climbs (none during
+the reboot event), and a running timecode with the cycle number. While the grey square is in the
+picture the camera number reads 09; the match info notes when.
+
 The static belongs to a series, not a single video: with "Per video" set, every finished video adds
 a little more, so a run of posts slowly loses its signal. Within a video it stays steady.
 
@@ -222,7 +231,7 @@ Then, from the project folder:
 Other options: `--out FOLDER`, `--quality 720|1080`, `--no-reel`, `--speed 1|1.5|2`,
 `--static 0-100`, `--per-video 0|2|4|8|15`, `--fisheye 0-100`, `--crt 0-100`,
 `--words 1|2|3` (words of the message per reboot), `--fragment N` (which fragment comes next),
-`--cipher none|shift|numbers`, `--grey rare|always|off`, `--gore on|off`, `--headless`
+`--glitch 0-100`, `--overlay on|off`, `--cipher none|shift|numbers`, `--grey rare|always|off`, `--gore on|off`, `--headless`
 (no window) and `--browser PATH`. The script keeps its own static level, next fragment and
 cycle count between runs, so a series carries on. It plays in real time, so 10 reels take about
 5 minutes; leave the window alone while it runs.
