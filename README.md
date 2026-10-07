@@ -141,6 +141,25 @@ picture the camera number reads 09; the match info notes when.
 The static belongs to a series, not a single video: with "Per video" set, every finished video adds
 a little more, so a run of posts slowly loses its signal. Within a video it stays steady.
 
+### Special events
+
+On certain days the squares dress up and the screen gets a few slow decorations; the header,
+file name and caption mention it too. "Special event" in the Look tab is on Auto (by today's
+date) unless you pick one or turn it off; the script takes `--event`.
+
+| Event | When | What changes |
+|---|---|---|
+| Grandma's Day | Jan 21 | round glasses and a grey bun |
+| Grandpa's Day | Jan 22 | flat cap and a grey mustache |
+| Mother's Day | May 26 | a tulip and a little blush, falling petals |
+| Father's Day | Jun 23 | a tie and a mustache |
+| Summer | Jun 24 - Aug 31 | straw hats, shades, flowers, a snorkel; warm sun glow |
+| Halloween | Oct 25 - 31 | a costume per color (horns, bolts, bandages, cat ears, witch hat, vampire, pumpkin, bat wings); bats and an orange glow |
+| Independence Day | Nov 11 | a white-red cockade, white-red confetti |
+| Birthday | Nov 29 | party hats and confetti |
+
+The grey square never wears a costume.
+
 ### Promo video: Meet the Sectors
 
 The Video tab's "Promo video" records an introduction instead of a match, with your Look settings.
@@ -247,6 +266,19 @@ Other options: `--out FOLDER`, `--quality 720|1080`, `--no-reel`, `--speed 1|1.5
 (no window) and `--browser PATH`. The script keeps its own static level, next fragment and
 cycle count between runs, so a series carries on. It plays in real time, so 10 reels take about
 5 minutes; leave the window alone while it runs.
+
+### One command a day: tools/daily.py
+
+`python tools/daily.py` (or double-click `make_today.bat` on Windows) makes the next day of the
+posting plan: day 0 is the Meet the Sectors promo, days 1-7 the warm-up week with a cube spotlight
+each day, days 8-37 the five chapters. Each day lands in `posts/dayNN` with the videos, their
+captions and a `POST.txt` with every title, caption and hashtag of the day. `--status` shows where
+you are, `--day N` makes a given day. Your look is set at the top of the script.
+
+`--youtube public` also uploads the day's videos to YouTube, and `--youtube private --at 18:00`
+uploads them now and lets YouTube publish them at 18:00. This needs a one-time setup with the
+official YouTube API, explained at the top of `tools/youtube_upload.py`. TikTok and Instagram are
+still posted by hand from `POST.txt` for now.
 
 In the browser, the clip farm (Video tab) does the same and also saves a caption file with each
 clip, and the Match info box after a match starts with the title and caption.

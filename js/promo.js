@@ -113,7 +113,8 @@
 
   P.promoInfo = function () {
     const pr = this.promo;
-    const tags = '#squares #simulation #animation #trinitygames #lore';
+    const ev = SQ.eventCaption(SQ.event, {});
+    const tags = `#squares #simulation #animation #trinitygames #lore${ev ? ' ' + ev.tag : ''}`;
     let title;
     let caption;
     let name;
@@ -128,6 +129,7 @@
       caption = 'Every day the Frame takes one square from each Sector of the Grid. These are the ones it took. Pick your Sector.\nComment your color.';
       name = 'Meet the Sectors - Squares Trinity';
     }
+    if (ev) caption += `\n${ev.line}`;
     const lines = [`TITLE\n${title}`, `CAPTION\n${caption}`, `HASHTAGS\n${tags}`];
     if (this.myst.log.length) lines.push(`SECRETS (do not post)\n${this.myst.log.join('\n')}`);
     return { name: name.replace(/[\\/:*?"<>|]/g, ''), file: lines.join('\n\n') };
@@ -344,7 +346,7 @@
     const cell = A.size / 3;
     for (let i = 0; i < 9; i++) {
       const x = A.x + (i % 3) * cell + cell / 2;
-      const y = A.y + Math.floor(i / 3) * cell + cell / 2 - 40;
+      const y = A.y + Math.floor(i / 3) * cell + cell / 2 - 24;
       if (i < 8) {
         const t = list[i];
         const k = SQ.clamp((part.t - i * 0.08) / 0.35, 0, 1);
@@ -352,20 +354,20 @@
         ctx.translate(x, y + Math.sin(this.real * 2.5 + i) * 5);
         const s = SQ.ease.outBack(k);
         ctx.scale(s, s);
-        SQ.drawSquare(ctx, 0, 0, 150, t, { mood: 'normal', blink: Math.sin(this.real * 1.3 + i * 2) > 0.985 });
+        SQ.drawSquare(ctx, 0, 0, 128, t, { mood: 'normal', blink: Math.sin(this.real * 1.3 + i * 2) > 0.985 });
         ctx.restore();
         ctx.globalAlpha = k;
         const ns = SQ.fitSize(ctx, [{ t: t.name.toUpperCase() }], cell - 30, 34);
-        SQ.outlinedText(ctx, t.name.toUpperCase(), x, y + 112, ns, t.color, { stroke: 7 });
+        SQ.outlinedText(ctx, t.name.toUpperCase(), x, y + 92, ns, t.color, { stroke: 7 });
         ctx.globalAlpha = 1;
       } else {
         // the ninth place: empty, except for about a second when something grey stands in it
         const a = 0.42 * SQ.clamp(Math.min((part.t - 2.3) / 0.3, (3.5 - part.t) / 0.3), 0, 1);
-        if (a > 0.01) SQ.drawSquare(ctx, x, y, 150, SQ.NINTH, { mood: 'normal', alpha: a });
+        if (a > 0.01) SQ.drawSquare(ctx, x, y, 128, SQ.NINTH, { mood: 'normal', alpha: a });
         ctx.strokeStyle = 'rgba(255,255,255,0.12)';
         ctx.setLineDash([14, 12]);
         ctx.lineWidth = 4;
-        ctx.strokeRect(x - 85, y - 85, 170, 170);
+        ctx.strokeRect(x - 75, y - 75, 150, 150);
         ctx.setLineDash([]);
       }
     }

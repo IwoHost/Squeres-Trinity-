@@ -140,7 +140,7 @@
       this.cam = new SQ.Camera();
       this.fx = new SQ.FX(this);
       this.recorder = new Recorder();
-      this.opts = { mode: 'random', memes: 1, speed: 1, music: 'shuffle', record: false, autoNext: false, quality: 'auto', voices: true, reel: true, fisheye: 30, crt: 35, glitchFx: 30, feed: true, static: 0, decay: 4, gore: 'full' };
+      this.opts = { mode: 'random', memes: 1, speed: 1, music: 'shuffle', record: false, autoNext: false, quality: 'auto', voices: true, reel: true, fisheye: 30, crt: 35, glitchFx: 30, feed: true, event: 'auto', static: 0, decay: 4, gore: 'full' };
       this.setQuality('auto');
       this.fixedDt = 1 / 60;
       this.hitstopT = 0;
@@ -600,6 +600,7 @@
       if (this.phase === 'play' && !(this.reboot && !this.reboot.done)) this.playT = (this.playT || 0) + realDt;
       this.real += realDt;
       this.phaseT += realDt;
+      SQ.event = SQ.resolveEvent(this.opts.event);
       if (this.slowT > 0) {
         this.slowT -= realDt;
         if (this.slowT <= 0) {
@@ -897,7 +898,7 @@
       const where = this.tour ? `Trinity Games ${this.tour.seed} ${title(this.stage || '')}` : `Cycle ${this.cycle || this.episode}`;
       const signal = this.reboot ? `signal lost at ${this.matchSignal}%, Frame rebooted, fragment ${this.reboot.idx + 1} of ${this.reboot.total} ${this.reboot.plain}` : `signal ${this.matchSignal}%`;
       const seen = this.myst && this.myst.ninth && this.myst.ninth.logged ? 'grey square seen' : '';
-      const parts = [where, this.modeInfo.name, result, w && w.sub ? w.sub : '', events.join(', '), seen, signal, `seed ${this.tour ? this.tour.seed : this.seed}`];
+      const parts = [where, SQ.event ? SQ.event.name : '', this.modeInfo.name, result, w && w.sub ? w.sub : '', events.join(', '), seen, signal, `seed ${this.tour ? this.tour.seed : this.seed}`];
       let name = parts.filter(Boolean).join(' - ').replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, ' ');
       if (name.length > 200) name = name.slice(0, 200).trim();
       // the long version, with where each square is from
@@ -917,6 +918,7 @@
         if (rival) lines.push(`Rivalry: ${w.team.name} beat its rival ${rival.name}, who ${L.rivalWhy}`);
       }
       if (events.length) lines.push(`What happened: ${events.join(', ')}`);
+      if (SQ.event) lines.push(`Special event: ${SQ.event.name}`);
       lines.push(`Signal: ${this.reboot ? `lost at ${this.matchSignal}%, the Frame rebooted mid-match` : `${this.matchSignal}% static`}`);
       if (this.tour && this.tour.champion) lines.push(`Champion of the Trinity Games: ${this.tour.champion.name}`);
       if (this.reboot) lines.push(`Hidden transmission: fragment ${this.reboot.idx + 1} of ${this.reboot.total}, "${this.reboot.plain}"${this.reboot.text !== this.reboot.plain ? `, shown in code as "${this.reboot.text}"` : ''}`);
@@ -938,6 +940,7 @@
               fragments: this.reboot ? this.reboot.total : 0,
               ninthSeen: !!(this.myst && this.myst.ninth && this.myst.ninth.logged),
               count: teams.length,
+              event: SQ.event,
             },
             SQ.makeRng((this.seed ^ 0x5bd1e995) >>> 0)
           )
@@ -1018,6 +1021,7 @@
       const m = this.mode;
       ctx.setTransform(SQ.RES, 0, 0, SQ.RES, 0, 0);
       this.drawBackdrop(ctx);
+      SQ.drawEventDecor(ctx, this.real);
       if (this.promo) return this.drawPromo(ctx);
       if (this.tour && (this.phase === 'bracket' || this.phase === 'champion' || (this.phase === 'done' && this.tour.champion))) {
         this.drawBracket(ctx);
@@ -1152,7 +1156,7 @@
     drawHeader(ctx) {
       // The header only changes when the rules change, so outside the intro it is cached.
       if (this.phase === 'intro') return this.drawHeaderLive(ctx);
-      const key = this.phase + '|' + (this.tour ? this.stage : '') + '|' + this.episode + '|' + this.mode.title + '|' + JSON.stringify(this.mode.rules);
+      const key = this.phase + '|' + (SQ.event ? SQ.event.id : '') + '|' + (this.tour ? this.stage : '') + '|' + this.episode + '|' + this.mode.title + '|' + JSON.stringify(this.mode.rules);
       if (!this.headerCache || this.headerCache.key !== key) {
         const c = document.createElement('canvas');
         c.width = Math.round(SQ.W * SQ.RES);
@@ -1174,7 +1178,7 @@
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillStyle = 'rgba(255,255,255,0.55)';
-      const tag = this.phase === 'idle' ? 'SQUARES TRINITY' : this.tour ? `TRINITY GAMES  ·  ${this.stage}  ·  ${m.title}` : `SQUARES TRINITY  ·  EP ${this.episode}  ·  ${m.title}`;
+      const tag = this.phase === 'idle' ? 'SQUARES TRINITY' : this.tour ? `TRINITY GAMES  ·  ${this.stage}  ·  ${m.title}` : `${SQ.event ? SQ.event.tag : 'SQUARES TRINITY'}  ·  EP ${this.episode}  ·  ${m.title}`;
       ctx.fillText(spaced(tag), SQ.W / 2, 66, SQ.W - 120);
       // tri-color strip
       const sw = 60;

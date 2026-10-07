@@ -52,8 +52,10 @@
     }
     // viewers who count the squares will find one more than this
     if (d.ninthSeen) lines.push(`${d.count} contestants entered.`);
+    const ev = SQ.eventCaption && SQ.eventCaption(d.event, d);
+    if (ev) lines.push(ev.line);
     lines.push(pick(['Which Sector are you from?', 'Comment your color.', 'Who do you want in the next cycle?', 'Who saw that coming?', 'Pick a color before the next one.']));
-    const tags = ['#squares', '#simulation', '#satisfying', '#animation', '#trinitygames', MODE_TAGS[d.mode]].filter(Boolean);
+    const tags = ['#squares', '#simulation', '#satisfying', '#animation', '#trinitygames', MODE_TAGS[d.mode], ev && ev.tag].filter(Boolean);
     return { title, caption: lines.join('\n'), tags: tags.join(' ') };
   };
 })();

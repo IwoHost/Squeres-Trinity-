@@ -1,2 +1,7 @@
 dist/artifact.html
 tools/.profile/
+posts/
+videos/
+tools/.daily_state.json
+tools/client_secret.json
+tools/.youtube_token.json

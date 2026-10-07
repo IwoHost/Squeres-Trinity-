@@ -556,6 +556,7 @@
       else drawFace(ctx, s, o);
       const hurt = SQ.gore ? (o.hurt != null ? o.hurt : SQ.wear) : 0;
       if (hurt > 0.02) drawDamage(ctx, s, hurt, team, s < 36);
+      if (SQ.event) SQ.drawCostume(ctx, s, team, o);
     }
 
     if (o.shield > 0) {
