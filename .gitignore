@@ -6,3 +6,4 @@ tools/.daily_state.json
 tools/client_secret.json
 tools/.youtube_token.json
 __pycache__/
+tools/.meta.json

@@ -275,10 +275,15 @@ each day, days 8-37 the five chapters. Each day lands in `posts/dayNN` with the 
 captions and a `POST.txt` with every title, caption and hashtag of the day. `--status` shows where
 you are, `--day N` makes a given day. Your look is set at the top of the script.
 
-`--youtube public` also uploads the day's videos to YouTube, and `--youtube private --at 18:00`
-uploads them now and lets YouTube publish them at 18:00. This needs a one-time setup with the
-official YouTube API, explained at the top of `tools/youtube_upload.py`. TikTok and Instagram are
-still posted by hand from `POST.txt` for now.
+`--youtube`, `--instagram` and `--facebook` also post the day's videos there (Instagram and
+Facebook as Reels). `--at 18:00` publishes at that time instead: YouTube and Facebook take the
+videos right away and schedule them; Instagram has no scheduling, so the script waits until then
+and posts (leave the window open). Put the platforms in `UPLOAD_TO` at the top of `tools/daily.py`
+and a plain double-click posts everywhere. Every post is noted in the day's `uploaded.json`, so
+`--upload-only` can retry a failed upload without posting anything twice. Each platform needs a
+one-time setup with its official API: YouTube in `tools/youtube_upload.py`, Instagram and Facebook
+(a business Instagram linked to a Facebook page) in `tools/meta_upload.py`. TikTok is still by
+hand from `POST.txt`.
 
 In the browser, the clip farm (Video tab) does the same and also saves a caption file with each
 clip, and the Match info box after a match starts with the title and caption.
