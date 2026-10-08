@@ -47,6 +47,14 @@ UPLOAD_TO = []
 # Post at this time instead of right away (HH:MM, your time), or None for right away.
 POST_AT = None
 
+# Your own settings go in tools/my_settings.py (git pull never touches it), for example:
+#   UPLOAD_TO = ["youtube", "instagram", "facebook"]
+#   POST_AT = "18:00"
+try:
+    from my_settings import *  # noqa: F401,F403
+except ImportError:
+    pass
+
 CUBES = ["red", "green", "blue", "yellow", "purple", "cyan", "orange", "pink"]
 
 
