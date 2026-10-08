@@ -9,6 +9,7 @@
   const EACH = 3.2; // one square, full version
   const OUTRO = 4.6; // the grid of eight
   const SINGLE = 13; // one square with its story
+  const MEMORIAL = 20; // a day of remembrance: no match, the squares stand still with candles
 
   // Splits text into lines that fit maxW with the current font.
   function wrap(ctx, text, maxW) {
@@ -37,9 +38,10 @@
     this.tour = null;
     this.reboot = null;
     SQ.stare = 0;
-    const team = only ? SQ.TEAMS.find((t) => t.base === only || t.name.toLowerCase() === String(only).toLowerCase()) : null;
-    this.promo = { team, list: SQ.TEAMS.slice(), t: 0, at: -1, ninth: null, log: [], done: false };
-    this.promo.dur = team ? SINGLE : INTRO + EACH * 8 + OUTRO;
+    const memorial = String(only || '').toLowerCase() === 'memorial';
+    const team = only && !memorial ? SQ.TEAMS.find((t) => t.base === only || t.name.toLowerCase() === String(only).toLowerCase()) : null;
+    this.promo = { team, memorial, list: SQ.TEAMS.slice(), t: 0, at: -1, ninth: null, log: [], done: false };
+    this.promo.dur = memorial ? MEMORIAL : team ? SINGLE : INTRO + EACH * 8 + OUTRO;
     this.videoT = 0;
     this.playT = 0;
     this.myst = { log: [], glitches: [], hidden: null, ninth: null };
@@ -47,9 +49,15 @@
     this.cam.reset();
     this.video = null;
     this.setQuality(this.opts.quality);
-    this.track = this.audio.pickTrack(this.opts.music);
-    this.audio.intensity = 0.35;
-    this.audio.playTrack(this.track);
+    if (memorial) {
+      // no music on a day of remembrance
+      this.track = null;
+      this.audio.stopMusic(0.5);
+    } else {
+      this.track = this.audio.pickTrack(this.opts.music);
+      this.audio.intensity = 0.35;
+      this.audio.playTrack(this.track);
+    }
     this.trackToast = 0;
     this.setPhase('promo');
     if (this.opts.record && this.recorder.supported) {
@@ -61,6 +69,7 @@
   // which part of the video we are in: { kind: 'intro' | 'card' | 'grid', i, t }
   P.promoPart = function () {
     const pr = this.promo;
+    if (pr.memorial) return { kind: 'memorial', t: pr.t };
     if (pr.team) return { kind: 'card', team: pr.team, i: pr.list.indexOf(pr.team), t: pr.t, len: SINGLE, single: true };
     if (pr.t < INTRO) return { kind: 'intro', t: pr.t };
     const k = pr.t - INTRO;
@@ -77,6 +86,11 @@
       return;
     }
     pr.t += realDt;
+    if (pr.memorial) {
+      this.fx.update(realDt, realDt);
+      if (pr.t >= pr.dur) this.finishPromo();
+      return;
+    }
     const part = this.promoPart();
     // a sound and a little life at the start of every card
     const key = part.kind + (part.i != null ? part.i : '');
@@ -113,6 +127,14 @@
 
   P.promoInfo = function () {
     const pr = this.promo;
+    if (pr.memorial) {
+      const souls = isSouls();
+      const name = `No Games Today - ${souls ? "All Souls' Day" : "All Saints' Day"} - ${new Date().toISOString().slice(0, 10)}`;
+      const title = souls ? '2 November. No games today.' : '1 November. No games today.';
+      const caption = `${souls ? "All Souls' Day" : "All Saints' Day"}.\nToday there are no matches. Today we remember those who are no longer with us, and light a candle for them.\nThe Games return tomorrow.`;
+      const tags = souls ? '#zaduszki #allsoulsday' : '#wszystkichswietych #allsaintsday';
+      return { name: name.replace(/[\\/:*?"<>|]/g, ''), file: [`TITLE\n${title}`, `CAPTION\n${caption}`, `HASHTAGS\n${tags}`].join('\n\n') };
+    }
     const ev = SQ.eventCaption(SQ.event, {});
     const tags = `#squares #simulation #animation #trinitygames #lore${ev ? ' ' + ev.tag : ''}`;
     let title;
@@ -154,9 +176,90 @@
     this.emit('done', { winner: null, video: this.video, promo: true });
   };
 
+
+  // 2 November is All Souls' Day; every other day the remembrance video speaks of All Saints'
+  function isSouls() {
+    const d = new Date();
+    return d.getMonth() === 10 && d.getDate() === 2;
+  }
+
+  // The remembrance video: no game. The eight squares stand still with their eyes closed, a candle in
+  // front of each, and a few quiet lines of text appear one after another. No static, no glitches.
+  // The words are about real people, never the lore: this is not a joke day.
+  P.drawMemorial = function (ctx, t) {
+    const A = SQ.ARENA;
+    const W = SQ.W;
+    const fadeIn = (from, len) => SQ.clamp((t - from) / (len || 1.2), 0, 1);
+    const out = 1 - SQ.clamp((t - (MEMORIAL - 1.5)) / 1.5, 0, 1);
+    const souls = isSouls();
+    ctx.save();
+    ctx.globalAlpha = out;
+    ctx.font = `700 26px ${SQ.fontBody}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.fillText('S Q U A R E S   T R I N I T Y', W / 2, 66);
+    ctx.globalAlpha = out * fadeIn(0.2);
+    SQ.outlinedText(ctx, 'NO GAMES TODAY', W / 2, 210, 96, '#ece6da', { stroke: 14 });
+    SQ.outlinedText(ctx, souls ? "2 NOVEMBER  ·  ALL SOULS' DAY" : "1 NOVEMBER  ·  ALL SAINTS' DAY", W / 2, 318, 38, '#cfc6b4', { stroke: 8, font: SQ.fontBody, weight: 700 });
+    ctx.globalAlpha = out;
+    // a quiet frame instead of the bright arena
+    ctx.fillStyle = 'rgba(120,112,130,0.25)';
+    ctx.fillRect(A.x - 10, A.y - 10, A.size + 20, A.size + 20);
+    ctx.fillStyle = '#0c0d13';
+    ctx.fillRect(A.x, A.y, A.size, A.size);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(A.x, A.y, A.size, A.size);
+    ctx.clip();
+    ctx.globalAlpha = out * fadeIn(1, 1.5);
+    SQ.outlinedText(ctx, 'A MOMENT OF SILENCE', W / 2, A.y + 90, 32, 'rgba(236,230,218,0.7)', { stroke: 0, font: SQ.fontBody, weight: 700 });
+    const list = this.promo.list;
+    for (let i = 0; i < list.length; i++) {
+      const col = i % 4;
+      const row = Math.floor(i / 4);
+      const x = A.x + 125 + col * 250;
+      const y = A.y + 270 + row * 380;
+      ctx.globalAlpha = out * fadeIn(1.5 + i * 0.25, 1.5);
+      SQ.drawSquare(ctx, x, y, 130, list[i], { mood: 'normal', blink: true, squash: Math.sin(this.real * 1.2 + i) * 0.01 });
+      // the candle in front of each of them
+      const cy = y + 112;
+      const g = ctx.createRadialGradient(x, cy - 30, 2, x, cy - 30, 60);
+      g.addColorStop(0, 'rgba(255,170,60,0.25)');
+      g.addColorStop(1, 'rgba(255,170,60,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(x - 60, cy - 90, 120, 120);
+      ctx.fillStyle = '#b3122a';
+      SQ.roundRect(ctx, x - 16, cy - 20, 32, 42, 6);
+      ctx.fill();
+      const sway = Math.sin(this.real * 2 + i * 1.7) * 3;
+      ctx.fillStyle = '#ffcf6a';
+      ctx.beginPath();
+      ctx.moveTo(x, cy - 24);
+      ctx.quadraticCurveTo(x - 7, cy - 34, x + sway, cy - 50);
+      ctx.quadraticCurveTo(x + 7, cy - 34, x, cy - 24);
+      ctx.fill();
+      ctx.font = `700 24px ${SQ.fontBody}`;
+      ctx.fillStyle = 'rgba(236,230,218,0.6)';
+      ctx.fillText(list[i].name, x, cy + 52, 230);
+    }
+    ctx.restore();
+    // the words, one after another
+    const y0 = A.y + A.size + 60;
+    ctx.globalAlpha = out * fadeIn(3);
+    SQ.outlinedText(ctx, 'Today there are no matches.', W / 2, y0, 44, '#ffffff', { stroke: 8, font: SQ.fontBody, weight: 700 });
+    ctx.globalAlpha = out * fadeIn(7);
+    SQ.outlinedText(ctx, 'Today we remember those', W / 2, y0 + 68, 36, '#e6e0d4', { stroke: 7, font: SQ.fontBody, weight: 600 });
+    SQ.outlinedText(ctx, 'who are no longer with us.', W / 2, y0 + 112, 36, '#e6e0d4', { stroke: 7, font: SQ.fontBody, weight: 600 });
+    ctx.globalAlpha = out * fadeIn(12, 1.5);
+    SQ.outlinedText(ctx, 'We remember.', W / 2, y0 + 196, 58, '#ffcf6a', { stroke: 10 });
+    ctx.restore();
+  };
+
   // ---------------- drawing ----------------
   P.drawPromo = function (ctx) {
     const pr = this.promo;
+    if (pr.memorial) return this.drawMemorial(ctx, pr.done ? pr.dur - 1.6 : pr.t);
     const part = pr.done ? (pr.team ? { kind: 'card', team: pr.team, t: 99, len: 99, single: true } : { kind: 'grid', t: 99 }) : this.promoPart();
     const A = SQ.ARENA;
     const W = SQ.W;
@@ -166,7 +269,7 @@
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    const tagline = `${SQ.event ? SQ.event.edition.toUpperCase() : 'SQUARES TRINITY'}  ·  SECTOR FILES`;
+    const tagline = `${SQ.event && !SQ.event.respect ? SQ.event.edition.toUpperCase() : 'SQUARES TRINITY'}  ·  SECTOR FILES`;
     ctx.fillText(tagline.split('').join(' '), W / 2, 66, W - 120);
     ['#ff4d5e', '#35d97a', '#4f86ff'].forEach((c, i) => {
       ctx.fillStyle = c;

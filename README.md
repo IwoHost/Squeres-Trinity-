@@ -164,7 +164,7 @@ date) unless you pick one or turn it off; the script takes `--event`.
 | Father's Day | Jun 23 | a tie and a mustache |
 | Summer | Jun 24 - Aug 31 | straw hats, shades, flowers, a snorkel; warm sun glow |
 | Halloween | Oct 25 - 31 | a costume per color (horns, bolts, bandages, cat ears, witch hat, vampire, pumpkin, bat wings); bats and an orange glow |
-| All Saints' Day | Nov 1 - 2 | no costumes; a quieter screen with a row of grave candles |
+| All Saints' Day | Nov 1 - 2 | a day of remembrance: no match, see below |
 | Independence Day | Nov 11 | a white-red cockade, white-red confetti |
 | Birthday | Nov 29 | party hats and confetti |
 | St. Nicholas Day | Dec 6 | Santa hats, snow |
@@ -176,6 +176,15 @@ When two overlap, the shorter one wins (Christmas over winter, a single day over
 at the bottom ("HAPPY HALLOWEEN"; "MERRY CHRISTMAS", "WE REMEMBER" on All Saints', "NOTHING IS WRONG"
 on April Fools'), the title starts with it ("Happy Halloween. DoucheCube survives Cycle 4.") and the
 caption opens with "Halloween edition." The grey square never wears a costume.
+
+### All Saints' Day (Nov 1-2): no fighting
+
+On All Saints' and All Souls' Day there is no match. `tools/daily.py` makes a quiet 20-second
+remembrance video instead ("NO GAMES TODAY", the eight squares standing still with their eyes
+closed and a candle each, "Today we remember those who are no longer with us."), with no music,
+static or glitches, and the posting plan waits a day. The words are about real people, not the lore.
+In the browser it is "Remembrance" under Promo video; from the script, `--promo memorial`. Matches
+made on those days get no greeting, candles or holiday caption.
 
 ### Promo video: Meet the Sectors
 

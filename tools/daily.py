@@ -121,6 +121,10 @@ def read_caption(txt):
     return title, caption, tags
 
 
+# Days of remembrance: no match is made, only a quiet video, and the plan waits a day.
+RESPECT_DAYS = {(11, 1), (11, 2)}
+
+
 def full_caption(title, caption, tags):
     return "\n\n".join(x for x in (title, caption, tags) if x)
 
@@ -220,6 +224,28 @@ def main():
     state = load_state()
     targets = [] if a.no_upload else [t for t in ("youtube", "instagram", "facebook") if getattr(a, t) or t in UPLOAD_TO]
     at = a.at or POST_AT
+    today = datetime.date.today()
+    if a.day is None and not a.status and (today.month, today.day) in RESPECT_DAYS:
+        # All Saints' and All Souls': no fighting today, the plan carries on tomorrow
+        out = POSTS / f"respect-{today.isoformat()}"
+        out.mkdir(parents=True, exist_ok=True)
+        videos = sorted(p for p in out.glob("*") if p.suffix in (".mp4", ".webm"))
+        if not videos:
+            print("Today is a day of remembrance: no match, a quiet video instead. The plan continues tomorrow.")
+            cmd = [sys.executable, str(ROOT / "tools" / "make_videos.py"), "--out", str(out), *LOOK, "--promo", "memorial"]
+            if a.headless:
+                cmd.append("--headless")
+            if a.browser:
+                cmd += ["--browser", a.browser]
+            if subprocess.run(cmd).returncode != 0:
+                sys.exit("Making the remembrance video failed. Run the same command again.")
+            videos = sorted(p for p in out.glob("*") if p.suffix in (".mp4", ".webm"))
+            title, caption, tags = read_caption(videos[0].with_suffix(".txt"))
+            (out / "POST.txt").write_text(f"{today.isoformat()}  (day of remembrance)\n\n--- {videos[0].name}\n{title}\n\n{caption}\n\n{tags}\n", encoding="utf-8")
+            print(f"Ready in {out}")
+        if targets and not a.no_upload:
+            post_day(out, videos, targets, at)
+        return
     if a.upload_only:
         made = sorted(int(d) for d in state["made"])
         if a.day is None and not made:

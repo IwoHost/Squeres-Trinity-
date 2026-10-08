@@ -898,7 +898,7 @@
       const where = this.tour ? `Trinity Games ${this.tour.seed} ${title(this.stage || '')}` : `Cycle ${this.cycle || this.episode}`;
       const signal = this.reboot ? `signal lost at ${this.matchSignal}%, Frame rebooted, fragment ${this.reboot.idx + 1} of ${this.reboot.total} ${this.reboot.plain}` : `signal ${this.matchSignal}%`;
       const seen = this.myst && this.myst.ninth && this.myst.ninth.logged ? 'grey square seen' : '';
-      const parts = [where, SQ.event ? SQ.event.name : '', this.modeInfo.name, result, w && w.sub ? w.sub : '', events.join(', '), seen, signal, `seed ${this.tour ? this.tour.seed : this.seed}`];
+      const parts = [where, SQ.event && !SQ.event.respect ? SQ.event.name : '', this.modeInfo.name, result, w && w.sub ? w.sub : '', events.join(', '), seen, signal, `seed ${this.tour ? this.tour.seed : this.seed}`];
       let name = parts.filter(Boolean).join(' - ').replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, ' ');
       if (name.length > 200) name = name.slice(0, 200).trim();
       // the long version, with where each square is from
@@ -918,7 +918,7 @@
         if (rival) lines.push(`Rivalry: ${w.team.name} beat its rival ${rival.name}, who ${L.rivalWhy}`);
       }
       if (events.length) lines.push(`What happened: ${events.join(', ')}`);
-      if (SQ.event) lines.push(`Special event: ${SQ.event.name}`);
+      if (SQ.event && !SQ.event.respect) lines.push(`Special event: ${SQ.event.name}`);
       lines.push(`Signal: ${this.reboot ? `lost at ${this.matchSignal}%, the Frame rebooted mid-match` : `${this.matchSignal}% static`}`);
       if (this.tour && this.tour.champion) lines.push(`Champion of the Trinity Games: ${this.tour.champion.name}`);
       if (this.reboot) lines.push(`Hidden transmission: fragment ${this.reboot.idx + 1} of ${this.reboot.total}, "${this.reboot.plain}"${this.reboot.text !== this.reboot.plain ? `, shown in code as "${this.reboot.text}"` : ''}`);
@@ -982,11 +982,13 @@
     // ---------------- rendering ----------------
     render() {
       this.renderScene();
-      const amt = (this.opts.static || 0) / 100;
+      // a remembrance video is clean: no static, no glitches
+      const calm = this.promo && this.promo.memorial;
+      const amt = calm ? 0 : (this.opts.static || 0) / 100;
       // a gentle curve: the first videos of a series only get a faint grain; steady for the whole video
       const noise = Math.pow(amt, 1.3);
       const glitch = amt > 0 ? this.glitch * (0.4 + 0.6 * amt) : 0;
-      if (this.post) this.post.draw(this.canvas, (this.opts.fisheye || 0) / 100, noise, glitch, (this.opts.crt || 0) / 100, this.gfx);
+      if (this.post) this.post.draw(this.canvas, (this.opts.fisheye || 0) / 100, noise, glitch, (this.opts.crt || 0) / 100, calm ? null : this.gfx);
       else if (noise + glitch > 0.01) this.drawStatic2D(noise + glitch * 0.6);
     }
 
@@ -1021,7 +1023,8 @@
       const m = this.mode;
       ctx.setTransform(SQ.RES, 0, 0, SQ.RES, 0, 0);
       this.drawBackdrop(ctx);
-      SQ.drawEventDecor(ctx, this.real);
+      // on a day of remembrance only the remembrance video carries the candles
+      if (!(SQ.event && SQ.event.respect && !(this.promo && this.promo.memorial))) SQ.drawEventDecor(ctx, this.real);
       if (this.promo) return this.drawPromo(ctx);
       if (this.tour && (this.phase === 'bracket' || this.phase === 'champion' || (this.phase === 'done' && this.tour.champion))) {
         this.drawBracket(ctx);
@@ -1067,7 +1070,7 @@
     // The camera overlay: the match looks like footage from the Frame's own cameras. REC, the camera
     // number, signal bars that drop as the static of the series climbs, and a running timecode.
     drawFeed(ctx) {
-      if (this.opts.feed === false || this.phase === 'idle' || this.phase === 'intro') return;
+      if (this.opts.feed === false || this.phase === 'idle' || this.phase === 'intro' || (this.promo && this.promo.memorial)) return;
       const A = SQ.ARENA;
       const x0 = A.x + 22;
       const y0 = A.y + 22;
@@ -1178,7 +1181,7 @@
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillStyle = 'rgba(255,255,255,0.55)';
-      const tag = this.phase === 'idle' ? 'SQUARES TRINITY' : this.tour ? `TRINITY GAMES  ·  ${this.stage}  ·  ${m.title}` : `${SQ.event ? SQ.event.edition.toUpperCase() : 'SQUARES TRINITY'}  ·  EP ${this.episode}  ·  ${m.title}`;
+      const tag = this.phase === 'idle' ? 'SQUARES TRINITY' : this.tour ? `TRINITY GAMES  ·  ${this.stage}  ·  ${m.title}` : `${SQ.event && !SQ.event.respect ? SQ.event.edition.toUpperCase() : 'SQUARES TRINITY'}  ·  EP ${this.episode}  ·  ${m.title}`;
       ctx.fillText(spaced(tag), SQ.W / 2, 66, SQ.W - 120);
       // tri-color strip
       const sw = 60;
@@ -1480,7 +1483,7 @@
       ctx.textBaseline = 'middle';
       ctx.fillStyle = 'rgba(255,255,255,0.45)';
       ctx.textAlign = 'left';
-      if (this.phase !== 'idle') ctx.fillText(this.promo ? 'sector files' : this.glitchText('seed') || `seed ${this.seed}`, 44, SQ.H - 44);
+      if (this.phase !== 'idle') ctx.fillText(this.promo ? (this.promo.memorial ? '' : 'sector files') : this.glitchText('seed') || `seed ${this.seed}`, 44, SQ.H - 44);
       ctx.textAlign = 'right';
       if (this.track && this.phase !== 'idle') {
         const a = this.trackToast > 0 ? 1 : 0.45;
@@ -1489,7 +1492,7 @@
         ctx.fillText(this.glitchText('track') || `♪ ${this.track.name}`, SQ.W - 44, SQ.H - 44);
       }
       // the event greeting, between the seed and the song
-      if (SQ.event && this.phase !== 'idle') {
+      if (SQ.event && !SQ.event.respect && this.phase !== 'idle') {
         ctx.globalAlpha = 1;
         ctx.textAlign = 'center';
         ctx.font = `700 30px ${SQ.fontBody}`;

@@ -56,7 +56,8 @@
     father: { name: "Father's Day", tag: "FATHER'S DAY", dates: 'Jun 23', when: day(6, 23) },
     summer: { name: 'Summer', tag: 'SUMMER CYCLE', dates: 'Jun 24 - Aug 31', when: span(6, 24, 8, 31) },
     halloween: { name: 'Halloween', tag: 'HALLOWEEN CYCLE', dates: 'Oct 25-31', when: span(10, 25, 10, 31) },
-    allsaints: { name: "All Saints' Day", tag: 'CANDLES FOR THE LOST', dates: 'Nov 1-2', when: span(11, 1, 11, 2) },
+    // a day of remembrance: no greeting or decorations on matches; the daily tool makes a quiet video instead
+    allsaints: { name: "All Saints' Day", tag: 'ALL SAINTS', dates: 'Nov 1-2', when: span(11, 1, 11, 2), respect: true },
     independence: { name: 'Polish Independence Day', tag: 'INDEPENDENCE DAY', dates: 'Nov 11', when: day(11, 11) },
     birthday: { name: 'Birthday', tag: 'BIRTHDAY CYCLE', dates: 'Nov 29', when: day(11, 29) },
     mikolajki: { name: 'St. Nicholas Day', tag: 'MIKOLAJKI', dates: 'Dec 6', when: day(12, 6) },
@@ -783,7 +784,7 @@
 
   // An extra caption line and hashtag for the event, in the same dry voice.
   SQ.eventCaption = function (e, d) {
-    if (!e) return null;
+    if (!e || e.respect) return null;
     const lines = {
       halloween: d.ninthSeen ? 'Everyone dressed up for Halloween. One of them did not.' : 'The Frame allowed costumes this week. It did not allow mercy.',
       summer: 'Summer in the Grid. The arena does not have air conditioning.',
@@ -802,7 +803,7 @@
       smigus: 'Smigus-dyngus. Everyone in the arena got soaked. That is the tradition.',
       constitution: '3 May. Constitution Day. The Grid has rules too. It just never wrote them down.',
       childrensday: "Children's Day. Everyone got a propeller hat. It did not help them fly away.",
-      allsaints: '1 November. The Grid lights a candle for every square that did not come back.',
+      allsaints: 'Today we remember those who are no longer with us.',
       mikolajki: 'St. Nicholas Day. Everyone got a hat. Nobody got a present.',
       christmas: 'Christmas in the Grid. The Games do not stop. They just wear hats.',
       winter: 'Winter in the Grid. The arena is not heated.',

@@ -479,6 +479,7 @@
     };
     add('', 'All eight');
     SQ.TEAMS.forEach((t) => add(t.base, `${t.name} only`));
+    add('memorial', 'Remembrance (no match, 20 s, for All Saints)');
     sel.value = keep;
   }
   fillPromoWho();
