@@ -3,17 +3,22 @@ official Graph API. Used by daily.py; needs nothing to install.
 
 One-time setup (about 15 minutes, free):
   1. Go to https://developers.facebook.com, log in with the Facebook account that runs your page,
-     and create an app (type "Business" or "Other"). In the app, add the products
-     "Instagram" (API setup with Facebook login) and "Facebook Login for Business" if asked.
-  2. Open the Graph API Explorer (Tools > Graph API Explorer), pick your app, and under
-     Permissions add: pages_show_list, pages_read_engagement, pages_manage_posts,
-     instagram_basic, instagram_content_publish, business_management.
-     Click "Generate Access Token" and allow it for your page and your Instagram account.
+     and create an app (Other > Business). Add the product "Instagram" (API setup with
+     Facebook login).
+  2. Get a token, either way works:
+     a. System user (best, never expires): in https://business.facebook.com/settings open your
+        business portfolio. Under Accounts > Apps, add your app by its App ID. Under Users >
+        System users, add one (role Admin), then "Assign assets": your Facebook page and your
+        Instagram account (full control) and the app. Click "Generate new token", pick the app,
+        expiry Never, and the permissions: pages_show_list, pages_read_engagement,
+        pages_manage_posts, instagram_basic, instagram_content_publish, business_management.
+     b. Graph API Explorer (Tools > Graph API Explorer): pick your app, add the same
+        permissions, "Generate Access Token", allow your page and Instagram account.
   3. In the app's Settings > Basic, copy the App ID and App Secret.
   4. Run:  python tools/meta_upload.py setup
-     and paste the App ID, App Secret and the token from step 2. It swaps the token for a page
-     token that does not expire, finds your Instagram account, and saves it all in
-     tools/.meta.json. Keep that file private; never share or commit it.
+     and paste the App ID, App Secret and the token. It turns the token into a page token that
+     does not expire, finds your Instagram account, and saves it all in tools/.meta.json.
+     Keep that file private; never share or commit it.
   5. Check it:  python tools/meta_upload.py test
 
 While the app stays in development mode it can only post to accounts of people who have a
@@ -64,10 +69,13 @@ def setup():
     app_id = input("App ID: ").strip()
     secret = input("App Secret: ").strip()
     short = input("Access token from the Graph API Explorer: ").strip()
-    long_user = graph("GET", "oauth/access_token", grant_type="fb_exchange_token", client_id=app_id, client_secret=secret, fb_exchange_token=short)["access_token"]
-    pages = graph("GET", "me/accounts", fields="name,access_token,instagram_business_account{username}", access_token=long_user).get("data", [])
+    try:
+        long_user = graph("GET", "oauth/access_token", grant_type="fb_exchange_token", client_id=app_id, client_secret=secret, fb_exchange_token=short)["access_token"]
+    except RuntimeError:
+        long_user = short  # a system user token already lasts forever and cannot be exchanged
+    pages = graph("GET", "me/accounts", limit=100, fields="name,access_token,instagram_business_account{username}", access_token=long_user).get("data", [])
     if not pages:
-        sys.exit("No Facebook pages found for this token. Did you allow your page when generating the token?")
+        sys.exit("No Facebook pages found for this token. Did you give it your page (assign the page to the system user, or allow it when generating the token)?")
     for i, p in enumerate(pages, 1):
         ig = p.get("instagram_business_account")
         print(f"  {i}. {p['name']}" + (f"  (Instagram @{ig.get('username')})" if ig else "  (no Instagram linked)"))
