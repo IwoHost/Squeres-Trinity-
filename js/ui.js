@@ -303,6 +303,13 @@
   $('crt').addEventListener('input', (e) => ((game.opts.crt = +e.target.value), save()));
   $('glitch-fx').value = game.opts.glitchFx;
   $('glitch-fx').addEventListener('input', (e) => ((game.opts.glitchFx = +e.target.value), save()));
+  for (const id in SQ.EVENTS) {
+    const e = SQ.EVENTS[id];
+    const o = document.createElement('option');
+    o.value = id;
+    o.textContent = `${e.name} (${e.dates})`;
+    $('event').appendChild(o);
+  }
   $('event').value = game.opts.event;
   if ($('event').value === '') $('event').value = 'auto';
   $('event').addEventListener('change', (e) => ((game.opts.event = e.target.value), save()));

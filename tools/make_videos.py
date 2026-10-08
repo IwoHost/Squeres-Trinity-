@@ -49,7 +49,7 @@ def main():
     ap.add_argument("--crt", type=int, help="CRT strength 0-100")
     ap.add_argument("--glitch", type=int, help="always-on glitch strength 0-100")
     ap.add_argument("--overlay", choices=["on", "off"], help="camera overlay: REC, camera number, signal bars, timecode")
-    ap.add_argument("--event", choices=["auto", "off", "halloween", "summer", "grandma", "grandpa", "mother", "father", "independence", "birthday"], help="special event: auto (by date), off, or force one")
+    ap.add_argument("--event", help="special event: auto (by date), off, or one of: newyear grandma grandpa valentine fatthursday womensday aprilfools easter smigus constitution mother childrensday father summer halloween allsaints independence birthday mikolajki christmas winter friday13")
     ap.add_argument("--words", type=int, choices=[1, 2, 3], help="words of the hidden message per reboot (changing it starts the message over)")
     ap.add_argument("--fragment", type=int, help="which fragment the next reboot shows, from 1")
     ap.add_argument("--cipher", choices=["none", "shift", "numbers"], help="how the fragment is shown: plain, letters shifted, or letters as numbers")

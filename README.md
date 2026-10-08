@@ -149,16 +149,30 @@ date) unless you pick one or turn it off; the script takes `--event`.
 
 | Event | When | What changes |
 |---|---|---|
+| New Year | Dec 31 - Jan 1 | top hats, gold confetti |
 | Grandma's Day | Jan 21 | round glasses and a grey bun |
 | Grandpa's Day | Jan 22 | flat cap and a grey mustache |
+| Valentine's Day | Feb 14 | a heart and a blush, hearts drifting up |
+| Fat Thursday | Thursday before Lent (moves with Easter) | pink frosting with sprinkles |
+| Women's Day | Mar 8 | tulips, falling petals |
+| April Fools' Day | Apr 1 | clown noses and wigs; the header says NOTHING IS WRONG |
+| Easter | Easter Saturday and Sunday | bunny ears, pastel confetti |
+| Smigus-dyngus | Easter Monday | soaked squares, water drops |
+| Constitution Day | May 3 | a white-red cockade, white-red confetti |
 | Mother's Day | May 26 | a tulip and a little blush, falling petals |
+| Children's Day | Jun 1 | propeller caps, balloons |
 | Father's Day | Jun 23 | a tie and a mustache |
 | Summer | Jun 24 - Aug 31 | straw hats, shades, flowers, a snorkel; warm sun glow |
 | Halloween | Oct 25 - 31 | a costume per color (horns, bolts, bandages, cat ears, witch hat, vampire, pumpkin, bat wings); bats and an orange glow |
+| All Saints' Day | Nov 1 - 2 | no costumes; a quieter screen with a row of grave candles |
 | Independence Day | Nov 11 | a white-red cockade, white-red confetti |
 | Birthday | Nov 29 | party hats and confetti |
+| St. Nicholas Day | Dec 6 | Santa hats, snow |
+| Christmas | Dec 24 - 26 | Santa hats, elf hats and antlers, snow |
+| Winter | Dec 1 - Feb 28 | knitted beanies and scarves, snow |
+| Friday the 13th | any Friday the 13th | a darker screen; a black cat walks past |
 
-The grey square never wears a costume.
+When two overlap, the shorter one wins (Christmas over winter, a single day over a week). The grey square never wears a costume.
 
 ### Promo video: Meet the Sectors
 
