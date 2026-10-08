@@ -1178,7 +1178,7 @@
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillStyle = 'rgba(255,255,255,0.55)';
-      const tag = this.phase === 'idle' ? 'SQUARES TRINITY' : this.tour ? `TRINITY GAMES  ·  ${this.stage}  ·  ${m.title}` : `${SQ.event ? SQ.event.tag : 'SQUARES TRINITY'}  ·  EP ${this.episode}  ·  ${m.title}`;
+      const tag = this.phase === 'idle' ? 'SQUARES TRINITY' : this.tour ? `TRINITY GAMES  ·  ${this.stage}  ·  ${m.title}` : `${SQ.event ? SQ.event.edition.toUpperCase() : 'SQUARES TRINITY'}  ·  EP ${this.episode}  ·  ${m.title}`;
       ctx.fillText(spaced(tag), SQ.W / 2, 66, SQ.W - 120);
       // tri-color strip
       const sw = 60;
@@ -1487,6 +1487,14 @@
         ctx.globalAlpha = a;
         ctx.fillStyle = '#ffffff';
         ctx.fillText(this.glitchText('track') || `♪ ${this.track.name}`, SQ.W - 44, SQ.H - 44);
+      }
+      // the event greeting, between the seed and the song
+      if (SQ.event && this.phase !== 'idle') {
+        ctx.globalAlpha = 1;
+        ctx.textAlign = 'center';
+        ctx.font = `700 30px ${SQ.fontBody}`;
+        ctx.fillStyle = '#ffd23f';
+        ctx.fillText(SQ.event.hi.toUpperCase(), SQ.W / 2, SQ.H - 44, 420);
       }
       ctx.restore();
     }

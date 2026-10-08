@@ -55,6 +55,11 @@
     const ev = SQ.eventCaption && SQ.eventCaption(d.event, d);
     if (ev) lines.push(ev.line);
     lines.push(pick(['Which Sector are you from?', 'Comment your color.', 'Who do you want in the next cycle?', 'Who saw that coming?', 'Pick a color before the next one.']));
+    // a special event greets in the title and names its edition first in the caption
+    if (ev) {
+      title = `${ev.hi}. ${title}`;
+      lines.unshift(`${ev.edition}.`);
+    }
     const tags = ['#squares', '#simulation', '#satisfying', '#animation', '#trinitygames', MODE_TAGS[d.mode], ev && ev.tag].filter(Boolean);
     return { title, caption: lines.join('\n'), tags: tags.join(' ') };
   };

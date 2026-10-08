@@ -129,7 +129,10 @@
       caption = 'Every day the Frame takes one square from each Sector of the Grid. These are the ones it took. Pick your Sector.\nComment your color.';
       name = 'Meet the Sectors - Squares Trinity';
     }
-    if (ev) caption += `\n${ev.line}`;
+    if (ev) {
+      title = `${ev.hi}. ${title}`;
+      caption = `${ev.edition}.\n${caption}\n${ev.line}`;
+    }
     const lines = [`TITLE\n${title}`, `CAPTION\n${caption}`, `HASHTAGS\n${tags}`];
     if (this.myst.log.length) lines.push(`SECRETS (do not post)\n${this.myst.log.join('\n')}`);
     return { name: name.replace(/[\\/:*?"<>|]/g, ''), file: lines.join('\n\n') };
@@ -163,7 +166,8 @@
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    ctx.fillText('S Q U A R E S   T R I N I T Y   ·   S E C T O R   F I L E S', W / 2, 66, W - 120);
+    const tagline = `${SQ.event ? SQ.event.edition.toUpperCase() : 'SQUARES TRINITY'}  ·  SECTOR FILES`;
+    ctx.fillText(tagline.split('').join(' '), W / 2, 66, W - 120);
     ['#ff4d5e', '#35d97a', '#4f86ff'].forEach((c, i) => {
       ctx.fillStyle = c;
       ctx.fillRect(W / 2 - 90 + i * 60, 96, 60, 8);

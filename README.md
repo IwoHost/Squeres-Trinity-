@@ -172,7 +172,10 @@ date) unless you pick one or turn it off; the script takes `--event`.
 | Winter | Dec 1 - Feb 28 | knitted beanies and scarves, snow |
 | Friday the 13th | any Friday the 13th | a darker screen; a black cat walks past |
 
-When two overlap, the shorter one wins (Christmas over winter, a single day over a week). The grey square never wears a costume.
+When two overlap, the shorter one wins (Christmas over winter, a single day over a week). During an event the top line names the edition ("HALLOWEEN EDITION"), the greeting sits in gold
+at the bottom ("HAPPY HALLOWEEN"; "MERRY CHRISTMAS", "WE REMEMBER" on All Saints', "NOTHING IS WRONG"
+on April Fools'), the title starts with it ("Happy Halloween. DoucheCube survives Cycle 4.") and the
+caption opens with "Halloween edition." The grey square never wears a costume.
 
 ### Promo video: Meet the Sectors
 

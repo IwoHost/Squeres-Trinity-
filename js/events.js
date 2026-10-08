@@ -64,7 +64,22 @@
     winter: { name: 'Winter', tag: 'WINTER CYCLE', dates: 'Dec 1 - Feb 28', when: span(12, 1, 2, 29) },
     friday13: { name: 'Friday the 13th', tag: 'FRIDAY THE 13TH', dates: 'any Friday the 13th', when: { len: 1, test: (dt) => dt.getDay() === 5 && dt.getDate() === 13 } },
   };
-  for (const id in SQ.EVENTS) SQ.EVENTS[id].id = id;
+  // the greeting shown on screen and at the start of the title, and the edition named in the caption
+  const HI = {
+    newyear: 'Happy New Year', grandma: "Happy Grandma's Day", grandpa: "Happy Grandpa's Day", valentine: "Happy Valentine's Day",
+    fatthursday: 'Happy Fat Thursday', womensday: "Happy Women's Day", aprilfools: 'Nothing is wrong', easter: 'Happy Easter',
+    smigus: 'Happy Smigus-dyngus', constitution: 'Happy Constitution Day', mother: "Happy Mother's Day", childrensday: "Happy Children's Day",
+    father: "Happy Father's Day", summer: 'Happy summer', halloween: 'Happy Halloween', allsaints: 'We remember',
+    independence: 'Happy Independence Day', birthday: 'Happy birthday', mikolajki: 'Happy St. Nicholas Day', christmas: 'Merry Christmas',
+    winter: 'Stay warm', friday13: 'Good luck',
+  };
+  const EDITION = { aprilfools: 'Regular edition', friday13: 'Friday the 13th edition', allsaints: "All Saints' edition" };
+  for (const id in SQ.EVENTS) {
+    const e = SQ.EVENTS[id];
+    e.id = id;
+    e.hi = HI[id] || e.name;
+    e.edition = EDITION[id] || `${e.name} edition`;
+  }
 
   SQ.eventForDate = function (date) {
     let best = null;
@@ -794,6 +809,6 @@
       friday13: 'Friday the 13th. Something crossed the screen before the match. It was not a contestant.',
     };
     const tags = { halloween: '#halloween', summer: '#summer', mother: '#mothersday', father: '#fathersday', grandma: '#dzienbabci', grandpa: '#dziendziadka', independence: '#11listopada', birthday: '#birthday', newyear: '#newyear', valentine: '#valentinesday', fatthursday: '#tlustyczwartek', womensday: '#dzienkobiet', aprilfools: '#aprilfools', easter: '#easter', smigus: '#smigusdyngus', constitution: '#3maja', childrensday: '#dziendziecka', allsaints: '#wszystkichswietych', mikolajki: '#mikolajki', christmas: '#christmas', winter: '#winter', friday13: '#friday13' };
-    return { line: lines[e.id], tag: tags[e.id] };
+    return { line: lines[e.id], tag: tags[e.id], hi: e.hi, edition: e.edition };
   };
 })();
