@@ -269,7 +269,7 @@ cycle count between runs, so a series carries on. It plays in real time, so 10 r
 
 ### One command a day: tools/daily.py
 
-`python tools/daily.py` (or double-click `make_today.bat` on Windows) makes the next day of the
+`python tools/daily.py` (or `make_today.bat` on Windows, `./make_today.sh` on Linux and Mac) makes the next day of the
 posting plan: day 0 is the Meet the Sectors promo, days 1-7 the warm-up week with a cube spotlight
 each day, days 8-37 the five chapters. Each day lands in `posts/dayNN` with the videos, their
 captions and a `POST.txt` with every title, caption and hashtag of the day. `--status` shows where
