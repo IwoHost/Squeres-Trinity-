@@ -11,6 +11,7 @@
                                        18:00 and posts then (leave the window open)
     python tools/daily.py --upload-only   post the last day you made, without making it again
                                        (anything already posted is skipped)
+    python tools/daily.py --no-upload     make the next day now, post it later with --upload-only
 
 On Windows you can double-click make_today.bat instead.
 
@@ -203,12 +204,13 @@ def main():
     ap.add_argument("--facebook", action="store_true", help="post the videos as Reels on your Facebook page")
     ap.add_argument("--at", help="publish at this time (HH:MM, your time) instead of right away")
     ap.add_argument("--upload-only", action="store_true", help="post the last day you made, without making it again")
+    ap.add_argument("--no-upload", action="store_true", help="only make the videos; post them later with --upload-only")
     ap.add_argument("--headless", action="store_true", help="no browser window")
     ap.add_argument("--browser", help="path to a Chrome or Chromium program")
     a = ap.parse_args()
 
     state = load_state()
-    targets = [t for t in ("youtube", "instagram", "facebook") if getattr(a, t) or t in UPLOAD_TO]
+    targets = [] if a.no_upload else [t for t in ("youtube", "instagram", "facebook") if getattr(a, t) or t in UPLOAD_TO]
     at = a.at or POST_AT
     if a.upload_only:
         made = sorted(int(d) for d in state["made"])
@@ -256,6 +258,8 @@ def main():
     save_state(state)
     print(f"\nDay {day} is ready in {out}  (captions for all of it in POST.txt)")
 
+    if a.no_upload:
+        print("Not posted yet. When you want it online:  python tools/daily.py --upload-only")
     if targets:
         print(f"Posting to: {', '.join(targets)}")
         post_day(out, videos, targets, at)
