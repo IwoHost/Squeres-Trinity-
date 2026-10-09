@@ -100,8 +100,36 @@ def _send_file(url, path, token):
     return _call("POST", url, data=data, headers={"Authorization": f"OAuth {token}", "offset": "0", "file_size": str(len(data))})
 
 
+def clean_copy(path):
+    """Instagram is strict about video files. Browser recordings can have an uneven frame rate, so the
+    video is re-encoded to a plain MP4 first (30 fps, H.264, AAC 48 kHz) when imageio-ffmpeg is installed.
+    Returns the file to upload and whether it is a temporary copy."""
+    try:
+        import imageio_ffmpeg
+    except ImportError:
+        return pathlib.Path(path), False
+    import tempfile
+    import subprocess
+
+    out = pathlib.Path(tempfile.mkdtemp()) / "reel.mp4"
+    r = subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(), "-y", "-loglevel", "error", "-i", str(path), "-r", "30", "-c:v", "libx264", "-preset", "veryfast",
+                        "-crf", "20", "-pix_fmt", "yuv420p", "-c:a", "aac", "-ar", "48000", "-b:a", "128k", "-movflags", "+faststart", str(out)])
+    if r.returncode or not out.exists():
+        return pathlib.Path(path), False
+    return out, True
+
+
 def upload_instagram(path, caption):
     """Posts a Reel; returns the post id. Instagram has no scheduling here: it goes live now."""
+    path, temp = clean_copy(path)
+    try:
+        return _upload_instagram(path, caption)
+    finally:
+        if temp:
+            path.unlink(missing_ok=True)
+
+
+def _upload_instagram(path, caption):
     cfg = load()
     tok = cfg["page_token"]
     if not cfg.get("ig_id"):
