@@ -293,6 +293,18 @@ Other options: `--out FOLDER`, `--quality 720|1080`, `--no-reel`, `--speed 1|1.5
 cycle count between runs, so a series carries on. It plays in real time, so 10 reels take about
 5 minutes; leave the window alone while it runs.
 
+### Birthday videos: tools/birthday.py
+
+DoucheCube wishes a friend happy birthday by name, in Polish or English, with a voice: party hat,
+sunglasses, a talking mouth, confetti, the other seven squares joining in, a cake, about 30 seconds
+at 1080p. `python tools/birthday.py Szymon --lang pl` makes one now (`--say` sets how the voice
+pronounces the name, useful in English). Put friends in `tools/my_birthdays.txt` (private, never
+uploaded), one per line: `29.11  Szymon  pl`. Then `--check` makes the videos for today's birthdays
+into `posts/birthdays`, `--list` shows who is next, and `--install-timer` (Linux) checks every
+morning at 8:00 by itself and shows a notification. `tools/daily.py` also runs the check.
+Needs `pip install --user numpy imageio-ffmpeg playwright` and, for the voice, the espeak-ng program
+(Bazzite: `brew install espeak-ng`); without it the video is made without the voice.
+
 ### One command a day: tools/daily.py
 
 `python tools/daily.py` (or `make_today.bat` on Windows, `./make_today.sh` on Linux and Mac) makes the next day of the

@@ -8,3 +8,5 @@ tools/.youtube_token.json
 __pycache__/
 tools/.meta.json
 tools/my_settings.py
+tools/my_birthdays.txt
+tools/birthday/fonts/

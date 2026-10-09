@@ -36,6 +36,7 @@ import sys
 import time
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+HERE_TOOLS = ROOT / "tools"
 STATE = ROOT / "tools" / ".daily_state.json"
 POSTS = ROOT / "posts"
 
@@ -220,6 +221,10 @@ def main():
     ap.add_argument("--headless", action="store_true", help="no browser window")
     ap.add_argument("--browser", help="path to a Chrome or Chromium program")
     a = ap.parse_args()
+
+    # birthday videos for today's birthdays from tools/my_birthdays.txt (each is made only once)
+    if (HERE_TOOLS / "my_birthdays.txt").exists() and not a.status:
+        subprocess.run([sys.executable, str(HERE_TOOLS / "birthday.py"), "--check"])
 
     state = load_state()
     targets = [] if a.no_upload else [t for t in ("youtube", "instagram", "facebook") if getattr(a, t) or t in UPLOAD_TO]
