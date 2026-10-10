@@ -126,6 +126,48 @@ def read_caption(txt):
 RESPECT_DAYS = {(11, 1), (11, 2)}
 
 
+def join_spotlight(out, videos):
+    """A day with a match and a cube spotlight becomes one video: the spotlight plays after the match.
+    The two parts are kept in parts/. Needs imageio-ffmpeg; without it the day stays two videos."""
+    spot = [v for v in videos if v.name.startswith("Sector File - ")]
+    match = [v for v in videos if v not in spot]
+    if len(spot) != 1 or len(match) != 1:
+        return videos
+    try:
+        import imageio_ffmpeg
+    except ImportError:
+        print("(pip install --user imageio-ffmpeg to join the spotlight onto the match)")
+        return videos
+    m, sp = match[0], spot[0]
+    joined = out / f"_joining{m.suffix}"
+    norm = "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,fps=30,setsar=1"
+    r = subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(), "-y", "-loglevel", "error", "-i", str(m), "-i", str(sp), "-filter_complex",
+                        f"[0:v]{norm}[v0];[0:a]aresample=48000[a0];[1:v]{norm}[v1];[1:a]aresample=48000[a1];[v0][a0][v1][a1]concat=n=2:v=1:a=1[v][a]",
+                        "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p",
+                        "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", str(joined.with_suffix(".mp4"))])
+    joined = joined.with_suffix(".mp4")
+    if r.returncode or not joined.exists():
+        print("(could not join the spotlight onto the match; posting them separately)")
+        joined.unlink(missing_ok=True)
+        return videos
+    # the joined video keeps the match's title; its caption mentions the spotlight and takes both sets of hashtags
+    mt, mc, mtags = read_caption(m.with_suffix(".txt"))
+    st, _sc, stags = read_caption(sp.with_suffix(".txt"))
+    tags = " ".join(dict.fromkeys((mtags + " " + stags).split()))
+    rest = m.with_suffix(".txt").read_text(encoding="utf-8")
+    info = rest[rest.index("MATCH INFO"):] if "MATCH INFO" in rest else ""
+    final = out / (m.stem + ".mp4")
+    parts = out / "parts"
+    parts.mkdir(exist_ok=True)
+    for f in (m, m.with_suffix(".txt"), sp, sp.with_suffix(".txt")):
+        if f.exists():
+            f.rename(parts / f.name)
+    joined.rename(final)
+    final.with_suffix(".txt").write_text(f"TITLE\n{mt}\n\nCAPTION\n{mc}\nAfter the match, a Sector File: {st}\n\n{tags}\n\n{info}", encoding="utf-8")
+    print(f"Joined the spotlight onto the match: {final.name}")
+    return [final]
+
+
 def full_caption(title, caption, tags):
     return "\n\n".join(x for x in (title, caption, tags) if x)
 
@@ -287,6 +329,7 @@ def main():
             sys.exit(f"Making '{what}' failed. Fix the problem and run the same day again with --day {day}.")
 
     videos = sorted(p for p in out.iterdir() if p not in before and p.suffix in (".mp4", ".webm"))
+    videos = join_spotlight(out, videos)
     post = [f"DAY {day}  ({datetime.date.today().isoformat()})", ""]
     for v in videos:
         title, caption, tags = read_caption(v.with_suffix(".txt"))
