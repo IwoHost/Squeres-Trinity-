@@ -38,7 +38,7 @@
   }
 
   // ----- win stats, kept in this browser -----
-  const MODE_NAMES = { chase: 'Color Chase', territory: 'Tile Wars', domain: 'Domain Duel', race: 'Square Race', brawl: 'Weapon Brawl', bounce: 'Bounce Brawl', marble: 'Marble Race', hill: 'King of the Hill' };
+  const MODE_NAMES = { chase: 'Color Chase', territory: 'Tile Wars', domain: 'Domain Duel', race: 'Square Race', brawl: 'Weapon Brawl', bounce: 'Bounce Brawl', marble: 'Marble Race', hill: 'King of the Hill', abilities: 'Ability War' };
   let stats = store.get('stats', null);
   // anything odd in storage (an old version, a hand edit) starts the stats fresh instead of breaking the page
   if (!stats || typeof stats !== 'object' || !stats.modes || typeof stats.modes !== 'object') stats = { total: 0, modes: {} };

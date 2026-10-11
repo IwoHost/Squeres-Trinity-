@@ -3,7 +3,7 @@
 (function () {
   const SQ = window.SQ;
   // modes that work as 1v1 matches in a tournament
-  const TOUR_MODES = ['territory', 'domain', 'race', 'brawl', 'bounce', 'marble', 'hill'];
+  const TOUR_MODES = ['territory', 'domain', 'race', 'brawl', 'bounce', 'marble', 'hill', 'abilities'];
   // First-second hooks for Reel mode: a mode-specific line or a general one.
   const HOOKS = {
     all: ['WHICH COLOR WINS?', 'ONLY ONE SURVIVES', 'PICK A COLOR. NOW.', 'WAIT FOR THE ENDING', 'YOUR COLOR = YOUR LUCK'],
@@ -14,9 +14,10 @@
     territory: ['STEAL EVERY TILE', 'MOST TILES WINS'],
     hill: ['HOLD THE ZONE TO WIN', 'KING OF THE HILL'],
     domain: ['INVINCIBLE AT HOME', 'STAY IN YOUR DOMAIN'],
+    abilities: ['WHICH ABILITY WINS?', 'EVERY SQUARE ROLLED A POWER', '32 ABILITIES. ONE WINNER.'],
     chase: ['ROCK PAPER SQUARES', 'WHO GETS EATEN FIRST?'],
   };
-  const MODE_IDS = ['chase', 'territory', 'domain', 'race', 'brawl', 'bounce', 'marble', 'hill'];
+  const MODE_IDS = ['chase', 'territory', 'domain', 'race', 'brawl', 'bounce', 'marble', 'hill', 'abilities'];
 
   class Recorder {
     get supported() {

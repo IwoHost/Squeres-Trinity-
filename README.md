@@ -141,6 +141,26 @@ picture the camera number reads 09; the match info notes when.
 The static belongs to a series, not a single video: with "Per video" set, every finished video adds
 a little more, so a run of posts slowly loses its signal. Within a video it stays steady.
 
+### Ability War
+
+Every square has its own health and speed, like classes, and rolls one of four abilities that fit
+who it is and where it comes from. 8 squares x 4 abilities, two to four squares a match, so the
+matchups rarely repeat. Squares hurt each other on contact (14, crits 28); abilities do the rest.
+The header shows who rolled what, every square carries its ability name and a health bar, and the
+caption says what the winner won with. Balanced over 3000 simulated matches: every square wins
+31-39% of its matches, a match lasts about 18 seconds.
+
+| Square | Health | Speed | Abilities (one is rolled each match) |
+|---|---|---|---|
+| DoucheCube | 160 | 1 | **Forge Slam**: slams the ground, hurting everyone close; **Hothead**: double damage for 5 s, but takes a bit more too; **Molten Trail**: leaves burning metal behind; **Volunteer**: once, when nearly out: heals and shields up |
+| Mossimo | 150 | 0.95 | **Seed Bomb**: plants thorn bushes that hurt to touch; **Photosynthesis**: slowly heals all the time; **Vine Snare**: roots the nearest enemy in place; **Friends With Everyone**: takes less damage from everyone |
+| Professor Cache | 125 | 1 | **Predicted**: dodges a third of all hits; **Data Bolt**: shoots bolts at the nearest enemy; **Rewind**: once, instead of dying, rewinds 3 seconds; **Firewall**: a shield that blocks everything for 3 s |
+| VoltCube | 140 | 1.35 | **Chain Lightning**: lightning that jumps between enemies; **Overcharge**: bursts of extra speed and power; **Static Field**: whoever touches it is stunned; **Energy Drink**: heals and speeds up (banned in cycle 12) |
+| Cubert | 175 | 0.85 | **Royal Guard**: two guards circle it and block attacks; **Royal Decree**: every enemy slows down by order of the crown; **Crown Shield**: takes 20% less damage; **Tax**: heals for a third of the damage it deals |
+| Shivers | 140 | 1.2 | **Flash Freeze**: freezes the nearest enemy solid; **Run Away**: when hit, blinks away and leaves frostbite; **Frost Armor**: blocks one hit every few seconds; **Cold Snap**: a freezing pulse that hurts and slows |
+| Carnie | 165 | 1.05 | **Pie Toss**: pies to the face: enemies cannot see where to go; **Trick Box**: drops fake squares that explode; **Bounce House**: every wall bounce makes the next hit stronger; **Last Laugh**: laughs off some hits, and explodes when knocked out |
+| Sugarcube | 150 | 1 | **Sugar Rush**: every hit makes it faster and stronger; **Sweet Talk**: charms an enemy so it cannot hurt anyone; **Gumdrop Shield**: a sticky shield that soaks up damage; **Candy Mines**: drops candy that explodes when touched |
+
 ### Special events
 
 On certain days the squares dress up and the screen gets a few slow decorations; the header,

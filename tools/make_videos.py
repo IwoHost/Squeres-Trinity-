@@ -31,7 +31,7 @@ import time
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 PROMO = ["all", "each", "memorial", "red", "green", "blue", "yellow", "purple", "cyan", "orange", "pink"]
-MODES = ["random", "chase", "territory", "domain", "race", "brawl", "bounce", "marble", "hill", "tournament"]
+MODES = ["random", "chase", "territory", "domain", "race", "brawl", "bounce", "marble", "hill", "abilities", "tournament"]
 
 
 def main():

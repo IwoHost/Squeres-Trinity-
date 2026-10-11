@@ -7,6 +7,7 @@
     chase: '#colorchase',
     territory: '#tilewars',
     domain: '#domainduel',
+    abilities: '#abilitywar',
     race: '#squarerace',
     brawl: '#weaponbrawl',
     bounce: '#bouncebrawl',
@@ -41,7 +42,8 @@
       if (d.mode === 'marble') options.push(`${W.name} reached the bottom first. The rest met the lava.`);
       if (d.mode === 'race') options.push(`${W.name} found the way out first.`);
       if (d.mode === 'hill') options.push(`${W.name} held the hill. Nobody else did.`);
-      if (d.mode === 'brawl' || d.mode === 'bounce' || d.mode === 'domain') options.push(`Last square standing: ${W.name}.`);
+      if (d.mode === 'brawl' || d.mode === 'bounce' || d.mode === 'domain' || d.mode === 'abilities') options.push(`Last square standing: ${W.name}.`);
+      if (d.mode === 'abilities' && d.sub) options.push(`${W.name} wins ${d.sub}.`);
       title = rival && R() < 0.6 ? `${W.name} finally settles it with ${rival.name}.` : pick(options);
       lines.push(`${W.name} of ${sectorOf(W) || 'the Grid'} wins the ${d.modeName}${d.sub ? ` (${d.sub})` : ''}. ${shortSector(W) ? `${shortSector(W)} gets one more cycle of peace.` : ''}`.trim());
       if (rival) lines.push(`${rival.name} ${lore.rivalWhy}. ${W.name} remembers.`);
