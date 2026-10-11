@@ -50,7 +50,19 @@
     gumdrop: { name: 'Gumdrop Shield', desc: 'a sticky shield that soaks up damage', cd: 10 },
     candymines: { name: 'Candy Mines', desc: 'drops candy that explodes when touched', cd: 5 },
   };
-  for (const id in SQ.ABILITIES) SQ.ABILITIES[id].id = id;
+  const ICONS = {
+    forgeslam: '🔨', hothead: '🔥', moltentrail: '🌋', volunteer: '🛡️', seedbomb: '🌱', photosynthesis: '☀️', vinesnare: '🌿', friends: '🤝',
+    predicted: '🧠', databolt: '💾', rewind: '⏪', firewall: '🧱', chainlightning: '⚡', overcharge: '🔋', staticfield: '🌩️', energydrink: '🥤',
+    royalguard: '💂', decree: '📜', crownshield: '👑', tax: '💰', flashfreeze: '🧊', runaway: '🏃', frostarmor: '❄️', coldsnap: '🌨️',
+    pietoss: '🥧', trickbox: '🎁', bouncehouse: '🎈', lastlaugh: '🤡', sugarrush: '🍭', sweettalk: '💕', gumdrop: '🍬', candymines: '🍡',
+  };
+  // the abilities big enough to get a slow-motion close-up
+  const BIG = { forgeslam: 1, chainlightning: 1, decree: 1, coldsnap: 1, flashfreeze: 1, trickbox: 1, sweettalk: 1, vinesnare: 1 };
+  for (const id in SQ.ABILITIES) {
+    SQ.ABILITIES[id].id = id;
+    SQ.ABILITIES[id].icon = ICONS[id] || '✨';
+  }
+  const ROLL = 2.8; // seconds of the ability roll at the start
 
   const HIT = 14; // contact damage before modifiers
 
@@ -62,7 +74,15 @@
       this.blood = new SQ.Blood(200);
       this.teams = opts.teams || SQ.pickTeams(rng, rng.pick([2, 2, 3, 3, 4]));
       this.time = 0;
-      this.duration = opts.quick ? 50 : 75;
+      this.duration = (opts.quick ? 50 : 75) + ROLL;
+      this.parts = []; // little effect particles: embers, leaves, coins, hearts, snow
+      this.calls = []; // big ability call-outs
+      this.cracks = []; // Forge Slam marks on the floor
+      this.pillars = []; // Volunteer light
+      this.vhs = 0; // Rewind screen effect
+      this.decreeT = 0; // Royal Decree scroll
+      this.rollShown = [];
+      this.rolled = false;
       this.winner = null;
       this.hazards = [];
       this.shots = [];
@@ -75,16 +95,18 @@
         const a = rng.range(0, 6.28);
         return {
           team: ti, x: spots[ti][0], y: spots[ti][1], vx: Math.cos(a) * 300, vy: Math.sin(a) * 300,
-          size: 100, hp: C.hp, maxHp: C.hp, speed: C.speed, ab, cd: rng.range(1.5, 3), alive: true,
+          size: 116, hp: C.hp, maxHp: C.hp, speed: C.speed, ab, cd: rng.range(1.5, 3), alive: true,
           st: { rage: 0, slow: 0, stun: 0, shield: 0, charm: 0, blind: 0, boost: 0 },
           flash: 0, squash: 0, turnT: rng.range(1, 2), hits: 0, used: {}, hist: [], guards: [], pool: 0, stacks: 0, frostT: 0, blinkT: 0, trailT: 0,
+          ghosts: [], popT: 0, emitT: 0, stunKind: null,
         };
       });
       this.title = 'ABILITY WAR';
-      this.rules = this.sq.map((s) => [
-        { t: `${this.teams[s.team].name}: `, c: this.teams[s.team].color },
-        { t: s.ab.name, c: '#ffffff' },
-      ]);
+      // the header keeps the result secret until the roll lands
+      this.rules = [
+        [{ t: 'Every square rolls ', c: '#ffffff' }, { t: '1 of 4', c: '#ffd23f' }, { t: ' abilities', c: '#ffffff' }],
+        [{ t: 'Which one wins?', c: '#ff6ac1' }],
+      ];
       // Royal Guard starts with its guards
       for (const s of this.sq) if (s.ab.id === 'royalguard') this.spawnGuards(s);
     }
@@ -107,6 +129,19 @@
         if (d < bd) (bd = d), (best = o);
       }
       return best;
+    }
+    // the big moment when an ability fires: its icon and name pop up over the square
+    callout(s, text) {
+      this.calls.push({ s, x: s.x, y: s.y, t: 0, text: text || s.ab.name.toUpperCase(), icon: s.ab.icon, color: this.team(s).color });
+      s.popT = 0.3;
+      if (BIG[s.ab.id]) this.g.highlight(s.x, s.y, 1.5, 0.9, 0.45);
+    }
+    burst(x, y, kind, n, color, speed) {
+      for (let i = 0; i < n; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const v = (speed || 200) * (0.4 + Math.random() * 0.8);
+        this.parts.push({ kind, x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 60, t: 0, life: 0.8 + Math.random() * 0.6, color, size: 10 + Math.random() * 10 });
+      }
     }
     say(s, text) {
       this.g.fx.text(s.x, s.y - s.size * 0.85, text, this.team(s).light, 38);
@@ -139,6 +174,7 @@
       }
       if (v.ab.id === 'predicted' && this.rng.chance(0.33)) {
         g.fx.text(v.x, v.y - 70, 'PREDICTED', '#8fb4ff', 34);
+        v.ghosts.push({ x: v.x - 30, y: v.y, t: 0.4 }, { x: v.x + 30, y: v.y, t: 0.4 });
         return 0;
       }
       if (v.ab.id === 'frostarmor' && v.frostT <= 0) {
@@ -171,6 +207,8 @@
         v.x = past.x;
         v.y = past.y;
         g.fx.banner('REWIND', `${this.team(v).name} was not done yet`, this.team(v).color, 1.4);
+        this.vhs = 1;
+        this.callout(v, 'REWIND');
         g.fx.ring(v.x, v.y, '#8fb4ff', 140);
         g.audio.whoosh();
         return 0;
@@ -179,7 +217,11 @@
       v.flash = 1;
       g.fx.text(v.x, v.y - 70, `-${d}`, '#ffffff', d >= 25 ? 50 : 40);
       if (SQ.blood && d >= 8) this.blood.spray(v.x, v.y, src ? v.x - src.x : 1, src ? v.y - src.y : 0, d * 0.6);
-      if (src && src.ab && src.ab.id === 'tax' && src.alive) this.heal(src, Math.round(d * 0.3));
+      if (src && src.ab && src.ab.id === 'tax' && src.alive) {
+        this.heal(src, Math.round(d * 0.3));
+        // coins fly from the victim to the taxman
+        for (let i = 0; i < 4; i++) this.parts.push({ kind: 'coin', x: v.x, y: v.y, vx: (Math.random() - 0.5) * 300, vy: -200 - Math.random() * 150, t: 0, life: 0.9, to: src, size: 22 });
+      }
       if (src && src.ab && src.ab.id === 'sugarrush' && how === 'hit') {
         src.stacks = Math.min(5, src.stacks + 1);
         src.st.boost = Math.max(src.st.boost, 1.5);
@@ -190,6 +232,8 @@
         this.heal(v, 45);
         v.st.shield = 2;
         g.fx.banner('VOLUNTEERED', `${this.team(v).name} takes their place again`, this.team(v).color, 1.4);
+        this.pillars.push({ x: v.x, y: v.y, t: 0 });
+        this.callout(v, 'VOLUNTEER');
       }
       // Run Away: blink to the far side
       if (v.ab.id === 'runaway' && v.hp > 0 && v.blinkT <= 0) {
@@ -199,10 +243,13 @@
           this.damage(src, 14, v, 'zap');
         }
         g.fx.burst(v.x, v.y, '#bdf3ff', 12, 240, 8);
+        const ox = v.x;
+        const oy = v.y;
         v.x = SQ.clamp(1000 - v.x + this.rng.range(-80, 80), 70, 930);
         v.y = SQ.clamp(1000 - v.y + this.rng.range(-80, 80), 70, 930);
         v.st.boost = 1.5;
-        this.say(v, 'NOPE');
+        for (let k = 1; k <= 5; k++) v.ghosts.push({ x: ox + (v.x - ox) * (k / 6), y: oy + (v.y - oy) * (k / 6), t: 0.35 + k * 0.04 });
+        this.callout(v, 'NOPE');
         g.audio.whoosh();
       }
       if (v.hp <= 0) this.knockout(v, src);
@@ -225,6 +272,8 @@
       g.highlight(v.x, v.y, 2, 1.4, 0.25);
       if (v.ab.id === 'lastlaugh') {
         g.fx.banner('LAST LAUGH', 'HONK', this.team(v).color, 1.2);
+        this.callout(v, 'LAST LAUGH');
+        this.burst(v.x, v.y, 'confetti', 50, null, 520);
         g.fx.ring(v.x, v.y, '#ff8f33', 300);
         g.audio.boom();
         for (const o of this.enemies(v)) if (SQ.dist2(o.x, o.y, v.x, v.y) < 300 * 300) this.damage(o, 60, v, 'blast');
@@ -237,11 +286,13 @@
       const id = s.ab.id;
       const col = this.team(s).color;
       const near = this.nearest(s);
-      const label = () => this.say(s, s.ab.name.toUpperCase());
+      const label = () => this.callout(s);
       if (id === 'forgeslam') {
         label();
         g.fx.ring(s.x, s.y, '#ff8f33', 220);
         g.fx.burst(s.x, s.y, '#ffb35c', 26, 420, 10);
+        this.cracks.push({ x: s.x, y: s.y, t: 0, seed: Math.random() * 100 });
+        this.burst(s.x, s.y, 'ember', 24, null, 420);
         g.cam.shake(12);
         g.audio.boom();
         for (const o of this.enemies(s)) {
@@ -265,6 +316,7 @@
       } else if (id === 'vinesnare' && near) {
         label();
         near.st.stun = 2;
+        near.stunKind = 'vine';
         this.damage(near, 18, s, 'zap');
         this.zaps.push({ pts: [[s.x, s.y], [near.x, near.y]], color: '#35d97a', t: 0.5, width: 10 });
         g.fx.text(near.x, near.y - 90, 'ROOTED', '#35d97a', 36);
@@ -304,7 +356,8 @@
           this.spawnGuards(s);
         }
       } else if (id === 'decree') {
-        g.fx.banner('ROYAL DECREE', 'everyone slows down, by order of the crown', col, 1.3);
+        this.decreeT = 1.8;
+        this.callout(s, 'ROYAL DECREE');
         for (const o of this.enemies(s)) {
           o.st.slow = 4;
           this.damage(o, 10, s, 'blast');
@@ -313,12 +366,14 @@
       } else if (id === 'flashfreeze' && near) {
         label();
         near.st.stun = 2.5;
+        near.stunKind = 'ice';
         this.damage(near, 22, s, 'zap');
         g.fx.burst(near.x, near.y, '#bdf3ff', 20, 260, 9);
         g.audio.freeze();
       } else if (id === 'coldsnap') {
         label();
         g.fx.ring(s.x, s.y, '#bdf3ff', 320);
+        this.burst(s.x, s.y, 'snow', 30, null, 480);
         g.audio.freeze();
         for (const o of this.enemies(s)) {
           if (SQ.dist2(o.x, o.y, s.x, s.y) > 320 * 320) continue;
@@ -338,6 +393,7 @@
         label();
         near.st.charm = 3;
         g.fx.text(near.x, near.y - 90, 'CHARMED', '#ff6ac1', 36);
+        for (let i = 0; i < 6; i++) this.parts.push({ kind: 'heart', x: s.x, y: s.y, vx: (Math.random() - 0.5) * 260, vy: -120 - Math.random() * 120, t: -i * 0.06, life: 1, to: near, size: 34 });
       } else if (id === 'gumdrop') {
         label();
         s.pool = 30;
@@ -364,9 +420,39 @@
       const g = this.g;
       const rng = this.rng;
       this.time += dt;
+      this.updateFx(dt);
+      // the roll: squares wait while their abilities spin and land one after another
+      if (this.time < ROLL) {
+        this.sq.forEach((s, i) => {
+          const land = 0.9 + i * 0.4;
+          const C = SQ.CLASSES[this.team(s).base];
+          let idx;
+          if (this.time >= land) idx = C.abilities.indexOf(s.ab.id);
+          else idx = Math.floor(Math.pow(this.time, 0.6) * 14 + i) % C.abilities.length;
+          if (this.rollShown[i] !== idx) {
+            this.rollShown[i] = idx;
+            if (this.time >= land) {
+              g.audio.ding();
+              g.cam.punch(0.04);
+            } else g.audio.tick();
+          }
+        });
+        return;
+      }
+      if (!this.rolled) {
+        this.rolled = true;
+        this.rules = this.sq.map((s) => [
+          { t: `${this.team(s).name}: `, c: this.team(s).color },
+          { t: s.ab.name, c: '#ffffff' },
+        ]);
+        g.fx.banner('FIGHT!', null, '#ffd23f', 0.9, { size: 140 });
+        g.audio.beep(true);
+      }
       const alive = this.living();
       for (const s of alive) {
         s.flash = Math.max(0, s.flash - dt * 3);
+        s.popT = Math.max(0, s.popT - dt);
+        this.emit(s, dt);
         s.squash *= Math.exp(-dt * 9);
         for (const k in s.st) s.st[k] = Math.max(0, s.st[k] - dt);
         s.frostT -= dt;
@@ -506,6 +592,7 @@
         // Static Field stuns whoever touches it
         if (v.ab.id === 'staticfield' && v.alive && atk.alive) {
           atk.st.stun = 0.8;
+          atk.stunKind = 'zap';
           this.damage(atk, 14, v, 'zap');
           this.zaps.push({ pts: this.bolt(v.x, v.y, atk.x, atk.y), color: '#ffe066', t: 0.25, width: 5 });
         }
@@ -600,6 +687,53 @@
       return low < 0.35 || this.time > this.duration - 12 ? 1 : 0.6;
     }
 
+    // ---------------- effects ----------------
+    updateFx(dt) {
+      for (const p of this.parts) {
+        p.t += dt;
+        if (p.t < 0) continue;
+        if (p.to && p.to.alive) {
+          // coins and hearts curve towards whoever they are for
+          const k = Math.min(1, dt * 5);
+          p.vx += (p.to.x - p.x) * k * 4;
+          p.vy += (p.to.y - p.y) * k * 4;
+          p.vx *= 0.9;
+          p.vy *= 0.9;
+        } else if (p.kind !== 'leaf' && p.kind !== 'ember') p.vy += 500 * dt;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+      }
+      this.parts = this.parts.filter((p) => p.t < p.life);
+      for (const c of this.calls) c.t += dt;
+      this.calls = this.calls.filter((c) => c.t < 1.4);
+      for (const c of this.cracks) c.t += dt;
+      this.cracks = this.cracks.filter((c) => c.t < 3.5);
+      for (const c of this.pillars) c.t += dt;
+      this.pillars = this.pillars.filter((c) => c.t < 1.2);
+      this.vhs = Math.max(0, this.vhs - dt * 1.3);
+      this.decreeT = Math.max(0, this.decreeT - dt);
+      for (const s of this.sq) {
+        for (const gh of s.ghosts) gh.t -= dt;
+        s.ghosts = s.ghosts.filter((gh) => gh.t > 0);
+      }
+    }
+
+    // effects that come off a square all the time, depending on its ability and state
+    emit(s, dt) {
+      s.emitT -= dt;
+      if (s.emitT > 0) return;
+      s.emitT = 0.07;
+      const r = () => (Math.random() - 0.5) * s.size * 0.8;
+      const P = (kind, color, extra) => this.parts.push(Object.assign({ kind, x: s.x + r(), y: s.y + r(), vx: (Math.random() - 0.5) * 40, vy: -60 - Math.random() * 60, t: 0, life: 0.9, color, size: 8 + Math.random() * 8 }, extra));
+      const id = s.ab.id;
+      if (s.st.rage > 0 || id === 'moltentrail') P('ember', Math.random() < 0.5 ? '#ff5a2a' : '#ffb35c');
+      if (id === 'photosynthesis' && Math.random() < 0.5) P('leaf', '#5bd96a', { vy: -40 });
+      if (id === 'sugarrush' && s.stacks > 0) P('dot', ['#ff6ac1', '#ffd23f', '#1fd6f0'][Math.floor(Math.random() * 3)]);
+      if (id === 'staticfield' && Math.random() < 0.4) P('spark', '#ffe066', { life: 0.25, vy: 0 });
+      if (s.st.boost > 0) s.ghosts.push({ x: s.x, y: s.y, t: 0.25 });
+      if (s.st.charm > 0 && Math.random() < 0.3) P('heart', '#ff6ac1', { size: 22, life: 0.8 });
+    }
+
     // ---------------- drawing ----------------
     draw(ctx) {
       ctx.fillStyle = '#101016';
@@ -607,12 +741,24 @@
       ctx.fillStyle = 'rgba(255,255,255,0.03)';
       for (let y = 0; y < 10; y++) for (let x = 0; x < 10; x++) if ((x + y) % 2) ctx.fillRect(x * 100, y * 100, 100, 100);
       this.blood.draw(ctx);
+      for (const c of this.cracks) this.drawCrack(ctx, c);
       for (const hz of this.hazards) this.drawHazard(ctx, hz);
+      for (const p of this.pillars) {
+        const a = Math.sin(Math.min(1, p.t / 1.2) * Math.PI);
+        const gr = ctx.createLinearGradient(p.x - 80, 0, p.x + 80, 0);
+        gr.addColorStop(0, 'rgba(255,230,140,0)');
+        gr.addColorStop(0.5, `rgba(255,230,140,${0.55 * a})`);
+        gr.addColorStop(1, 'rgba(255,230,140,0)');
+        ctx.fillStyle = gr;
+        ctx.fillRect(p.x - 80, 0, 160, 1000);
+      }
       for (const s of this.sq) {
         if (!s.alive) continue;
         const t = this.team(s);
+        for (const gh of s.ghosts) SQ.drawSquare(ctx, gh.x, gh.y, s.size, t, { alpha: Math.min(0.35, gh.t), face: false });
         const sp = Math.hypot(s.vx, s.vy) || 1;
         SQ.drawSquare(ctx, s.x, s.y, s.size, t, {
+          pop: s.popT > 0 ? Math.sin((s.popT / 0.3) * Math.PI) * 0.6 : 0,
           lookX: s.vx / sp,
           lookY: s.vy / sp,
           squash: s.squash,
@@ -625,11 +771,13 @@
           outline: s.st.stun > 0 ? '#bdf3ff' : null,
         });
         this.drawStatus(ctx, s);
+        if (this.time >= ROLL) this.drawAbilityLook(ctx, s);
         for (const gd of s.guards) {
           if (!gd.alive) continue;
           const p = this.guardPos(s, gd);
           SQ.drawSquare(ctx, p.x, p.y, 30, t, { mood: 'angry' });
         }
+        if (this.time < ROLL) continue; // nothing to give the roll away
         // health bar and ability name above every square
         const w = 110;
         const y = s.y - s.size / 2 - 26;
@@ -663,17 +811,269 @@
         }
       }
       for (const z of this.zaps) {
-        ctx.strokeStyle = z.color;
-        ctx.lineWidth = z.width;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         ctx.globalAlpha = Math.min(1, z.t * 4);
-        ctx.beginPath();
-        z.pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
-        ctx.stroke();
+        // a wide soft glow, then a bright core
+        for (const [w, c] of [[z.width * 3.5, SQ.rgba(z.color, 0.35)], [z.width, z.color], [Math.max(2, z.width * 0.35), '#ffffff']]) {
+          ctx.strokeStyle = c;
+          ctx.lineWidth = w;
+          ctx.beginPath();
+          z.pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+          ctx.stroke();
+        }
         ctx.globalAlpha = 1;
       }
+      this.drawParts(ctx);
+      this.drawCalls(ctx);
+      if (this.decreeT > 0) this.drawDecree(ctx);
+      if (this.vhs > 0) this.drawVhs(ctx);
+      if (this.time < ROLL + 0.4) this.drawRoll(ctx);
     }
+
+    drawCrack(ctx, c) {
+      const a = Math.min(1, (3.5 - c.t) / 1);
+      ctx.strokeStyle = `rgba(255,140,60,${0.8 * a})`;
+      ctx.lineWidth = 6;
+      ctx.lineCap = 'round';
+      for (let i = 0; i < 9; i++) {
+        let ang = c.seed + i * 0.7;
+        let x = c.x;
+        let y = c.y;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        for (let k = 0; k < 4; k++) {
+          ang += Math.sin(c.seed * 3 + i * 5 + k) * 0.5;
+          x += Math.cos(ang) * 40;
+          y += Math.sin(ang) * 40;
+          ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+    }
+
+    // what makes each ability recognisable on the square itself
+    drawAbilityLook(ctx, s) {
+      const h = s.size / 2;
+      const id = s.ab.id;
+      if (id === 'crownshield') SQ.drawEmoji(ctx, '👑', s.x, s.y - h - 8, 52);
+      if (id === 'friends') {
+        ctx.strokeStyle = 'rgba(120,230,140,0.45)';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, h * 1.25 + Math.sin(this.time * 3) * 4, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      if (id === 'frostarmor' && s.frostT <= 0) {
+        ctx.strokeStyle = 'rgba(200,245,255,0.9)';
+        ctx.lineWidth = 5;
+        for (let i = 0; i < 4; i++) {
+          const cx = s.x + (i % 2 ? h : -h);
+          const cy = s.y + (i < 2 ? -h : h);
+          ctx.beginPath();
+          ctx.moveTo(cx - 14, cy);
+          ctx.lineTo(cx + 14, cy);
+          ctx.moveTo(cx, cy - 14);
+          ctx.lineTo(cx, cy + 14);
+          ctx.stroke();
+        }
+      }
+      if (id === 'staticfield') {
+        ctx.strokeStyle = 'rgba(255,224,102,0.8)';
+        ctx.lineWidth = 3;
+        for (let i = 0; i < 3; i++) {
+          const a = this.time * 5 + i * 2.1;
+          ctx.beginPath();
+          ctx.moveTo(s.x + Math.cos(a) * h * 1.1, s.y + Math.sin(a) * h * 1.1);
+          ctx.lineTo(s.x + Math.cos(a + 0.25) * h * 1.35, s.y + Math.sin(a + 0.25) * h * 1.35);
+          ctx.lineTo(s.x + Math.cos(a + 0.45) * h * 1.15, s.y + Math.sin(a + 0.45) * h * 1.15);
+          ctx.stroke();
+        }
+      }
+      if (id === 'bouncehouse' && s.stacks > 0) for (let i = 0; i < s.stacks; i++) SQ.drawEmoji(ctx, '🎈', s.x + Math.cos(this.time * 2 + i) * (h + 30), s.y + Math.sin(this.time * 2 + i) * (h + 30), 30);
+      if (s.pool > 0) {
+        // the gumdrop shield: a wobbling pink jelly
+        const w = Math.sin(this.time * 8) * 6;
+        ctx.fillStyle = 'rgba(255,120,190,0.28)';
+        SQ.roundRect(ctx, s.x - h - 16 - w / 2, s.y - h - 16 + w / 2, s.size + 32 + w, s.size + 32 - w, 30);
+        ctx.fill();
+      }
+      if (s.st.shield > 0 && id === 'firewall') {
+        ctx.strokeStyle = 'rgba(255,140,60,0.8)';
+        ctx.lineWidth = 4;
+        const x0 = s.x - h - 20;
+        const y0 = s.y - h - 20;
+        const w = s.size + 40;
+        ctx.strokeRect(x0, y0, w, w);
+        for (let r = 1; r < 5; r++) {
+          ctx.beginPath();
+          ctx.moveTo(x0, y0 + (r * w) / 5);
+          ctx.lineTo(x0 + w, y0 + (r * w) / 5);
+          ctx.stroke();
+        }
+      }
+      if (s.st.stun > 0 && s.stunKind === 'ice') {
+        ctx.fillStyle = 'rgba(180,235,255,0.45)';
+        ctx.fillRect(s.x - h - 12, s.y - h - 12, s.size + 24, s.size + 24);
+        ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(s.x - h - 12, s.y - h - 12, s.size + 24, s.size + 24);
+        ctx.beginPath();
+        ctx.moveTo(s.x - h, s.y - h + 10);
+        ctx.lineTo(s.x - h + 30, s.y - h - 8);
+        ctx.stroke();
+      }
+      if (s.st.stun > 0 && s.stunKind === 'vine') {
+        ctx.strokeStyle = '#2f9e44';
+        ctx.lineWidth = 9;
+        for (let i = 0; i < 3; i++) {
+          ctx.beginPath();
+          for (let k = 0; k <= 20; k++) {
+            const x = s.x - h - 10 + (k / 20) * (s.size + 20);
+            const y = s.y - h * 0.6 + i * h * 0.6 + Math.sin(k * 0.9 + i) * 10;
+            k ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+          }
+          ctx.stroke();
+        }
+      }
+      // the ability's badge on the corner
+      ctx.fillStyle = this.team(s).dark;
+      ctx.beginPath();
+      ctx.arc(s.x + h - 4, s.y + h - 4, 26, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      SQ.drawEmoji(ctx, s.ab.icon, s.x + h - 4, s.y + h - 4, 34);
+    }
+
+    drawParts(ctx) {
+      for (const p of this.parts) {
+        if (p.t < 0) continue;
+        const a = Math.max(0, 1 - p.t / p.life);
+        ctx.globalAlpha = a;
+        if (p.kind === 'coin') SQ.drawEmoji(ctx, '🪙', p.x, p.y, p.size);
+        else if (p.kind === 'heart') SQ.drawEmoji(ctx, '💗', p.x, p.y, p.size);
+        else if (p.kind === 'snow') SQ.drawEmoji(ctx, '❄️', p.x, p.y, 26);
+        else if (p.kind === 'leaf') SQ.drawEmoji(ctx, '🍃', p.x, p.y, 22);
+        else if (p.kind === 'confetti') {
+          ctx.fillStyle = ['#ff4d5e', '#ffd23f', '#35d97a', '#4f86ff', '#ff6ac1'][Math.floor(p.size) % 5];
+          ctx.fillRect(p.x - 7, p.y - 4, 14, 8);
+        } else if (p.kind === 'spark') {
+          ctx.strokeStyle = p.color;
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(p.x - 8, p.y - 8);
+          ctx.lineTo(p.x + 2, p.y);
+          ctx.lineTo(p.x - 2, p.y + 4);
+          ctx.lineTo(p.x + 8, p.y + 10);
+          ctx.stroke();
+        } else {
+          ctx.fillStyle = p.color;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size * (0.5 + 0.5 * a), 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // the big pop-up when an ability fires
+    drawCalls(ctx) {
+      for (const c of this.calls) {
+        const k = SQ.ease.outBack(Math.min(1, c.t / 0.25));
+        const a = Math.min(1, (1.4 - c.t) / 0.3);
+        const x = SQ.clamp(c.x, 200, 800);
+        // above the square, or below it when the square is near the top
+        const y = c.y < 300 ? c.y + 150 + c.t * 40 : c.y - 150 - c.t * 40;
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, a);
+        ctx.translate(x, y);
+        ctx.scale(k, k);
+        SQ.drawEmoji(ctx, c.icon, 0, -50, 96);
+        SQ.outlinedText(ctx, c.text, 0, 30, c.text.length > 12 ? 44 : 54, c.color, { stroke: 12 });
+        ctx.restore();
+      }
+    }
+
+    drawDecree(ctx) {
+      // a royal scroll rolls out across the arena
+      const t = 1.8 - this.decreeT;
+      const open = SQ.ease.outCubic(Math.min(1, t / 0.4));
+      const a = Math.min(1, this.decreeT / 0.3);
+      ctx.save();
+      ctx.globalAlpha = a;
+      const w = 820 * open;
+      ctx.fillStyle = '#f1e2b8';
+      ctx.fillRect(500 - w / 2, 430, w, 140);
+      ctx.fillStyle = '#c9a86a';
+      ctx.fillRect(500 - w / 2 - 14, 420, 28, 160);
+      ctx.fillRect(500 + w / 2 - 14, 420, 28, 160);
+      if (open > 0.9) {
+        SQ.outlinedText(ctx, 'BY ROYAL DECREE', 500, 480, 56, '#5a2d8a', { stroke: 0 });
+        ctx.font = `700 28px ${SQ.fontBody}`;
+        ctx.fillStyle = '#5a2d8a';
+        ctx.textAlign = 'center';
+        ctx.fillText('everyone shall slow down', 500, 540);
+      }
+      ctx.restore();
+    }
+
+    drawVhs(ctx) {
+      // Rewind: the picture rolls back like an old tape
+      ctx.save();
+      ctx.globalAlpha = this.vhs * 0.5;
+      ctx.fillStyle = '#4f86ff';
+      ctx.fillRect(0, 0, 1000, 1000);
+      ctx.globalAlpha = this.vhs;
+      ctx.fillStyle = 'rgba(255,255,255,0.25)';
+      for (let y = (this.time * 600) % 40; y < 1000; y += 40) ctx.fillRect(0, y, 1000, 4);
+      SQ.outlinedText(ctx, '◀◀ REWIND', 60, 80, 56, '#ffffff', { align: 'left', stroke: 10 });
+      ctx.restore();
+    }
+
+    // the slot machine at the start: every square's card spins through its four abilities
+    drawRoll(ctx) {
+      const fade = Math.min(1, (ROLL + 0.4 - this.time) / 0.4);
+      ctx.save();
+      ctx.globalAlpha = fade;
+      ctx.fillStyle = 'rgba(8,8,14,0.72)';
+      ctx.fillRect(0, 0, 1000, 1000);
+      SQ.outlinedText(ctx, 'ROLLING ABILITIES', 500, 110, 64, '#ffd23f', { stroke: 12 });
+      const n = this.sq.length;
+      const ch = Math.min(190, 760 / n);
+      const y0 = 540 - (n * ch) / 2 + ch / 2;
+      this.sq.forEach((s, i) => {
+        const t = this.team(s);
+        const C = SQ.CLASSES[t.base];
+        const land = 0.9 + i * 0.4;
+        const landed = this.time >= land;
+        const idx = this.rollShown[i] != null ? this.rollShown[i] : 0;
+        const ab = SQ.ABILITIES[C.abilities[idx]];
+        const y = y0 + i * ch;
+        const pop = landed ? 1 + 0.05 * Math.max(0, 1 - (this.time - land) / 0.25) : 1;
+        ctx.save();
+        ctx.translate(500, y);
+        ctx.scale(pop, pop);
+        ctx.fillStyle = SQ.rgba(t.dark, 0.95);
+        SQ.roundRect(ctx, -420, -ch * 0.42, 840, ch * 0.84, 24);
+        ctx.fill();
+        ctx.lineWidth = landed ? 8 : 4;
+        ctx.strokeStyle = landed ? '#ffd23f' : t.color;
+        ctx.stroke();
+        SQ.drawSquare(ctx, -350, 0, Math.min(110, ch * 0.6), t, { mood: landed ? 'happy' : 'normal' });
+        SQ.drawEmoji(ctx, ab.icon, -200, 0, Math.min(90, ch * 0.5));
+        ctx.globalAlpha = fade * (landed ? 1 : 0.75);
+        SQ.outlinedText(ctx, ab.name.toUpperCase(), -130, -ch * 0.1, Math.min(52, ch * 0.28), '#ffffff', { align: 'left', stroke: 9 });
+        ctx.font = `700 ${Math.round(Math.min(26, ch * 0.15))}px ${SQ.fontBody}`;
+        ctx.textAlign = 'left';
+        ctx.fillStyle = t.light;
+        ctx.fillText(`${t.name.toUpperCase()}  ·  ${C.hp} HP`, -130, ch * 0.2);
+        ctx.restore();
+      });
+      ctx.restore();
+    }
+
 
     drawStatus(ctx, s) {
       const h = s.size / 2;
@@ -757,7 +1157,7 @@
         ctx.fillText(`${t.name}`, 60, yy + rowH * 0.3);
         ctx.fillStyle = 'rgba(255,255,255,0.75)';
         ctx.font = `600 22px ${SQ.fontBody}`;
-        ctx.fillText(s.ab.name, 60, yy + rowH * 0.78);
+        ctx.fillText(this.time < ROLL ? '???' : s.ab.name, 60, yy + rowH * 0.78);
         const bx = 380;
         const bw = SQ.W - bx - 170;
         ctx.fillStyle = 'rgba(255,255,255,0.08)';

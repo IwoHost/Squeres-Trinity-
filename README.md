@@ -146,7 +146,12 @@ a little more, so a run of posts slowly loses its signal. Within a video it stay
 Every square has its own health and speed, like classes, and rolls one of four abilities that fit
 who it is and where it comes from. 8 squares x 4 abilities, two to four squares a match, so the
 matchups rarely repeat. Squares hurt each other on contact (14, crits 28); abilities do the rest.
-The header shows who rolled what, every square carries its ability name and a health bar, and the
+Each match opens with the roll: every square's card spins through its four abilities like a slot
+machine and lands on one, and only then the header, labels and health bars show what it got. Every
+ability has an icon (a badge on the square) and its own look: embers for Hothead, floor cracks for
+Forge Slam, an ice block for Flash Freeze, vines, coins flying to the taxman, hearts for Sweet Talk,
+a royal scroll for the Decree, a tape-rewind screen for Rewind, a light pillar for Volunteer. When an
+ability fires its icon and name pop up big, and the biggest ones get a slow-motion close-up. The
 caption says what the winner won with. Balanced over 3000 simulated matches: every square wins
 31-39% of its matches, a match lasts about 18 seconds.
 
